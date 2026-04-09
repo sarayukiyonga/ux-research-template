@@ -60,13 +60,6 @@ export const QUESTIONS: Question[] = [
     type: 'open',
   },
   {
-    id: 9,
-    columnIndex: 11,
-    title: '¿Qué esperas encontrar en el nuevo local que mejore tu experiencia actual?',
-    shortTitle: 'Expectativas del nuevo local',
-    type: 'open',
-  },
-  {
     id: 10,
     columnIndex: 12,
     title: '¿Sientes que lo que pagas por los entrenos es una inversión en tu salud o un gasto de ocio? ¿Por qué?',

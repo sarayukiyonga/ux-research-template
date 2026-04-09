@@ -69,9 +69,6 @@ Cómo percibe el precio. ¿Inversión o gasto? 1-2 frases.
 ### Su momento "esto funciona"
 El instante concreto en que sintió el cambio real. 1-2 frases.
 
-### Lo que espera del nuevo espacio
-Qué necesita mejorar. Qué sueña encontrar. 2 frases.
-
 ### Sus roces con el sistema actual
 Qué le cuesta o le da pereza del modelo actual. 1-2 frases.
 
