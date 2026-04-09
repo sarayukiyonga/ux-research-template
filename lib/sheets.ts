@@ -1,6 +1,15 @@
 import { google } from 'googleapis'
 import { SHEET_ID, SHEET_RANGE, QUESTIONS, DEMOGRAPHIC_COLUMNS } from './questions'
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
   const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
@@ -51,21 +60,17 @@ export async function getSurveyData(): Promise<SurveyData> {
 
   const byQuestion = QUESTIONS.map((q) => ({
     questionId: q.id,
-    answers: dataRows
-      .map((row) => row[q.columnIndex] ?? '')
-      .filter((a) => a.trim() !== ''),
+    answers: shuffle(
+      dataRows
+        .map((row) => row[q.columnIndex] ?? '')
+        .filter((a) => a.trim() !== '')
+    ),
   }))
 
   const demographic = {
-    men: dataRows
-      .map((row) => row[DEMOGRAPHIC_COLUMNS.men] ?? '')
-      .filter((a) => a.trim() !== ''),
-    women: dataRows
-      .map((row) => row[DEMOGRAPHIC_COLUMNS.women] ?? '')
-      .filter((a) => a.trim() !== ''),
-    nonBinary: dataRows
-      .map((row) => row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '')
-      .filter((a) => a.trim() !== ''),
+    men: shuffle(dataRows.map((row) => row[DEMOGRAPHIC_COLUMNS.men] ?? '').filter((a) => a.trim() !== '')),
+    women: shuffle(dataRows.map((row) => row[DEMOGRAPHIC_COLUMNS.women] ?? '').filter((a) => a.trim() !== '')),
+    nonBinary: shuffle(dataRows.map((row) => row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').filter((a) => a.trim() !== '')),
   }
 
   const lastRow = dataRows[dataRows.length - 1]
