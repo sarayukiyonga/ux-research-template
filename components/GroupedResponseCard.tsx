@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,7 +14,7 @@ import {
   Cell,
 } from 'recharts'
 
-interface Group {
+export interface Group {
   label: string
   count: number
   color: string
@@ -23,46 +23,25 @@ interface Group {
 }
 
 interface GroupedResponseCardProps {
-  questionId: number
   questionTitle: string
   shortTitle: string
   answers: string[]
+  groups: Group[]
+  loading: boolean
+  error: string
+  onRetry: () => void
 }
 
 export function GroupedResponseCard({
-  questionId,
   questionTitle,
   shortTitle,
   answers,
+  groups,
+  loading,
+  error,
+  onRetry,
 }: GroupedResponseCardProps) {
-  const [groups, setGroups] = useState<Group[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [selected, setSelected] = useState<Group | null>(null)
-
-  async function load() {
-    setLoading(true)
-    setError('')
-    try {
-      const r = await fetch('/api/group-responses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionTitle, answers }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d?.error ?? `Error ${r.status}`)
-      setGroups(d.groups ?? [])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error desconocido')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (answers.length === 0) { setLoading(false); return }
-    load()
-  }, [])
 
   if (answers.length === 0) return null
 
@@ -96,7 +75,7 @@ export function GroupedResponseCard({
           <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
             <p className="text-xs text-red-500">{error}</p>
             <button
-              onClick={load}
+              onClick={onRetry}
               className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
             >
               Reintentar
@@ -106,7 +85,6 @@ export function GroupedResponseCard({
 
         {!loading && groups.length > 0 && (
           <>
-            {/* Bar chart */}
             <ResponsiveContainer width="100%" height={Math.max(160, groups.length * 40)}>
               <BarChart
                 data={groups}
@@ -146,9 +124,7 @@ export function GroupedResponseCard({
                       key={i}
                       fill={g.color}
                       opacity={selected && selected.label !== g.label ? 0.25 : 1}
-                      onClick={() =>
-                        setSelected(selected?.label === g.label ? null : g)
-                      }
+                      onClick={() => setSelected(selected?.label === g.label ? null : g)}
                       style={{ cursor: 'pointer' }}
                     />
                   ))}
@@ -156,28 +132,21 @@ export function GroupedResponseCard({
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Pill filters */}
             <div className="flex flex-wrap gap-2">
               {groups.map((g) => (
                 <button
                   key={g.label}
-                  onClick={() =>
-                    setSelected(selected?.label === g.label ? null : g)
-                  }
+                  onClick={() => setSelected(selected?.label === g.label ? null : g)}
                   className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all"
                   style={{
                     borderColor: g.color,
-                    backgroundColor:
-                      selected?.label === g.label ? g.color : 'transparent',
+                    backgroundColor: selected?.label === g.label ? g.color : 'transparent',
                     color: selected?.label === g.label ? '#fff' : g.color,
                   }}
                 >
                   <span
                     className="h-1.5 w-1.5 rounded-full shrink-0"
-                    style={{
-                      backgroundColor:
-                        selected?.label === g.label ? '#fff' : g.color,
-                    }}
+                    style={{ backgroundColor: selected?.label === g.label ? '#fff' : g.color }}
                   />
                   {g.label}
                   <span className="opacity-70">({g.count})</span>
@@ -185,7 +154,6 @@ export function GroupedResponseCard({
               ))}
             </div>
 
-            {/* Detail panel */}
             {selected && (
               <div
                 className="rounded-xl p-4 space-y-3"
@@ -195,15 +163,11 @@ export function GroupedResponseCard({
                 }}
               >
                 <div>
-                  <p className="text-sm font-semibold text-gray-800 mb-0.5">
-                    {selected.label}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-800 mb-0.5">{selected.label}</p>
                   <p className="text-xs text-gray-500">{selected.interpretation}</p>
                 </div>
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-gray-600">
-                    Ejemplos de respuestas:
-                  </p>
+                  <p className="text-xs font-medium text-gray-600">Ejemplos de respuestas:</p>
                   {selected.examples.map((ex, i) => (
                     <div
                       key={i}

@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { QUESTIONS } from '@/lib/questions'
 import { QuestionCard } from './QuestionCard'
 import { DemographicCard } from './DemographicCard'
 import { PersonaCard } from './PersonaCard'
 import { OccupationsCard } from './OccupationsCard'
-import { GroupedResponseCard } from './GroupedResponseCard'
+import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface SurveyData {
@@ -16,13 +16,83 @@ interface SurveyData {
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
 }
 
-// Q2 usa OccupationsCard especializado; el resto usan GroupedResponseCard
+interface GroupState {
+  groups: Group[]
+  loading: boolean
+  error: string
+}
+
+// Q2 uses OccupationsCard — skip GroupedResponseCard for it
 const SKIP_GROUPED = [2]
+const GROUPED_QUESTIONS = QUESTIONS.filter((q) => !SKIP_GROUPED.includes(q.id))
+
+async function fetchGroups(questionTitle: string, answers: string[]): Promise<Group[]> {
+  const r = await fetch('/api/group-responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questionTitle, answers }),
+  })
+  if (!r.ok) {
+    const text = await r.text()
+    throw new Error(text || `Error ${r.status}`)
+  }
+  const d = await r.json()
+  return d.groups ?? []
+}
 
 export function SurveyDashboard() {
   const [data, setData] = useState<SurveyData | null>(null)
   const [error, setError] = useState('')
+  const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
 
+  // Helper to update one question's group state
+  const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
+    setGroupStates((prev) => ({
+      ...prev,
+      [questionId]: { ...{ groups: [], loading: true, error: '' }, ...prev[questionId], ...patch },
+    }))
+  }, [])
+
+  // Fetch groups for a single question and update state
+  const loadQuestion = useCallback(async (questionId: number, questionTitle: string, answers: string[]) => {
+    if (answers.length === 0) return
+    setGroupState(questionId, { loading: true, error: '', groups: [] })
+    try {
+      const groups = await fetchGroups(questionTitle, answers)
+      setGroupState(questionId, { loading: false, groups })
+    } catch (e) {
+      setGroupState(questionId, {
+        loading: false,
+        error: e instanceof Error ? e.message : 'Error desconocido',
+        groups: [],
+      })
+    }
+  }, [setGroupState])
+
+  // Once survey data is ready, load grouped questions sequentially
+  useEffect(() => {
+    if (!data) return
+
+    const getAnswers = (id: number) =>
+      data.byQuestion.find((q) => q.questionId === id)?.answers ?? []
+
+    // Mark all as loading immediately so skeletons appear
+    const initial: Record<number, GroupState> = {}
+    for (const q of GROUPED_QUESTIONS) {
+      initial[q.id] = { groups: [], loading: true, error: '' }
+    }
+    setGroupStates(initial)
+
+    // Run sequentially: await each before starting the next
+    ;(async () => {
+      for (const q of GROUPED_QUESTIONS) {
+        await loadQuestion(q.id, q.title, getAnswers(q.id))
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
+  // Load survey data
   useEffect(() => {
     fetch('/api/survey')
       .then((r) => r.json())
@@ -97,26 +167,33 @@ export function SurveyDashboard() {
       </div>
 
       {/* Preguntas con resumen agrupado + respuestas */}
-      {QUESTIONS.map((q) => (
-        <div key={q.id} className="space-y-3">
-          {!SKIP_GROUPED.includes(q.id) && (
-            <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
-              <GroupedResponseCard
-                questionId={q.id}
-                questionTitle={q.title}
-                shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
-                answers={getAnswers(q.id)}
-              />
-            </div>
-          )}
-          <QuestionCard
-            questionId={q.id}
-            title={q.title}
-            shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
-            answers={getAnswers(q.id)}
-          />
-        </div>
-      ))}
+      {QUESTIONS.map((q) => {
+        const gs = groupStates[q.id] ?? { groups: [], loading: true, error: '' }
+        const answers = getAnswers(q.id)
+        return (
+          <div key={q.id} className="space-y-3">
+            {!SKIP_GROUPED.includes(q.id) && (
+              <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
+                <GroupedResponseCard
+                  questionTitle={q.title}
+                  shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+                  answers={answers}
+                  groups={gs.groups}
+                  loading={gs.loading}
+                  error={gs.error}
+                  onRetry={() => loadQuestion(q.id, q.title, answers)}
+                />
+              </div>
+            )}
+            <QuestionCard
+              questionId={q.id}
+              title={q.title}
+              shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+              answers={answers}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }
