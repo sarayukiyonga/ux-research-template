@@ -48,49 +48,60 @@ function renderMarkdown(text: string) {
 export function CeoInsights({ qas }: CeoInsightsProps) {
   const [insights, setInsights] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(false)
+
+  async function generate() {
+    setLoading(true)
+    setError(false)
+    setInsights('')
+
+    try {
+      const res = await fetch('/api/ceo-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qas }),
+      })
+      if (!res.ok || !res.body) throw new Error(`Error ${res.status}`)
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        text += decoder.decode(value, { stream: true })
+        setInsights(text)
+      }
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-
-    async function generate() {
-      try {
-        const res = await fetch('/api/ceo-insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ qas }),
-        })
-        if (!res.ok || !res.body) throw new Error(`Error ${res.status}`)
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let text = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          if (cancelled) return
-          text += decoder.decode(value, { stream: true })
-          setInsights(text)
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Error')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
     generate()
-    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
     <Card className="w-full border-violet-200 bg-gradient-to-br from-violet-50 to-white">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">✦</span>
-          <CardTitle className="text-base font-semibold text-violet-800">
-            Informe estratégico — Análisis IA de la entrevista
-          </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">✦</span>
+            <CardTitle className="text-base font-semibold text-violet-800">
+              Informe estratégico — Análisis IA de la entrevista
+            </CardTitle>
+          </div>
+          {!loading && (error || insights) && (
+            <button
+              onClick={generate}
+              className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
+            >
+              ↺ Reintentar
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-400 mt-1">Generado automáticamente a partir de las respuestas de Patricia</p>
       </CardHeader>
@@ -106,7 +117,19 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
             <Skeleton className="h-4 w-3/4" />
           </div>
         )}
-        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        {!loading && error && !insights && (
+          <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+            <p className="text-xs text-red-500">No se pudo generar el informe estratégico.</p>
+            <button
+              onClick={generate}
+              className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {insights && (
           <div className="space-y-0.5">
             {renderMarkdown(insights)}

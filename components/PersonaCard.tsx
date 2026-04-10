@@ -56,56 +56,68 @@ function renderMarkdown(text: string) {
 export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
   const [persona, setPersona] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  async function generate() {
+    setLoading(true)
+    setError(false)
+    setPersona('')
+
+    try {
+      const res = await fetch('/api/persona', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ byQuestion, demographic }),
+      })
+
+      if (!res.ok || !res.body) throw new Error('Error')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        text += decoder.decode(value, { stream: true })
+        setPersona(text)
+      }
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-
-    async function generate() {
-      try {
-        const res = await fetch('/api/persona', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ byQuestion, demographic }),
-        })
-
-        if (!res.ok || !res.body) throw new Error('Error')
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let text = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          if (cancelled) return
-          text += decoder.decode(value, { stream: true })
-          setPersona(text)
-        }
-      } catch {
-        if (!cancelled) setPersona('Error al generar el User Persona. Recarga la página.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
     generate()
-    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
     <Card className="w-full border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">✦</span>
-          <CardTitle className="text-base font-semibold text-violet-800">
-            User Persona — Cliente tipo de Patri
-          </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">✦</span>
+            <CardTitle className="text-base font-semibold text-violet-800">
+              User Persona — Cliente tipo de Patri
+            </CardTitle>
+          </div>
+          {!loading && (error || persona) && (
+            <button
+              onClick={generate}
+              className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
+            >
+              ↺ Reintentar
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-400 mt-1">Generado con IA a partir de todas las respuestas</p>
       </CardHeader>
 
       <CardContent>
-        {loading && !persona ? (
+        {loading && !persona && (
           <div className="space-y-3 py-2">
             <Skeleton className="h-6 w-1/2" />
             <Skeleton className="h-4 w-3/4" />
@@ -114,7 +126,21 @@ export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
           </div>
-        ) : (
+        )}
+
+        {!loading && error && !persona && (
+          <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+            <p className="text-xs text-red-500">No se pudo generar el User Persona.</p>
+            <button
+              onClick={generate}
+              className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {persona && (
           <div className="space-y-1 prose-sm max-w-none">
             {renderMarkdown(persona)}
             {loading && (
