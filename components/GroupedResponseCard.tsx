@@ -69,17 +69,15 @@ export function GroupedResponseCard({
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <Badge variant="secondary" className="mb-2 text-xs font-normal">
-              {shortTitle} — Resumen agrupado
-            </Badge>
-            <CardTitle className="text-base font-semibold leading-snug text-gray-800">
-              {questionTitle}
-            </CardTitle>
-          </div>
-          <Badge className="shrink-0 text-xs">{answers.length} respuestas</Badge>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <Badge variant="secondary" className="text-xs font-normal truncate max-w-[75%]">
+            {shortTitle} — Resumen agrupado
+          </Badge>
+          <Badge className="shrink-0 text-xs whitespace-nowrap">{answers.length} resp.</Badge>
         </div>
+        <CardTitle className="text-sm sm:text-base font-semibold leading-snug text-gray-800">
+          {questionTitle}
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-5">

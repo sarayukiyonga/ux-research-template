@@ -114,17 +114,15 @@ export function OccupationsCard({ answers }: OccupationsCardProps) {
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <Badge variant="secondary" className="mb-2 text-xs font-normal">
-              Pregunta 2 — Ocupación
-            </Badge>
-            <CardTitle className="text-base font-semibold leading-snug text-gray-800">
-              Profesiones por carga física y riesgo musculoesquelético
-            </CardTitle>
-          </div>
-          <Badge className="shrink-0 text-xs">{answers.length} respuestas</Badge>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <Badge variant="secondary" className="text-xs font-normal truncate max-w-[75%]">
+            Pregunta 2 — Ocupación
+          </Badge>
+          <Badge className="shrink-0 text-xs whitespace-nowrap">{answers.length} resp.</Badge>
         </div>
+        <CardTitle className="text-sm sm:text-base font-semibold leading-snug text-gray-800">
+          Profesiones por carga física y riesgo musculoesquelético
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-6">
