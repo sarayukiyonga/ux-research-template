@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const sections = [
   {
@@ -71,6 +74,14 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="mx-auto w-full max-w-2xl px-4 py-14 flex-1">
@@ -133,8 +144,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Footer */}
-      <div className="text-center pb-8">
+      <div className="flex items-center justify-center gap-4 pb-8">
         <p className="text-xs text-gray-300">MOA · Martorell</p>
+        <button
+          onClick={handleLogout}
+          className="text-xs text-gray-300 hover:text-gray-500 transition-colors underline underline-offset-2"
+        >
+          Cerrar sesión
+        </button>
       </div>
     </main>
   )
