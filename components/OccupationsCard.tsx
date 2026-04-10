@@ -68,10 +68,10 @@ const CATEGORIES = [
   },
   {
     key: 'jubilada' as const,
-    label: 'Jubilada/o',
+    label: 'Jubilada/o | Parada/o',
     color: '#059669',
     icon: '🌿',
-    description: 'Retirada del mercado laboral',
+    description: 'Retirada del mercado laboral o sin empleo',
   },
 ]
 

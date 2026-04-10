@@ -9,7 +9,7 @@ const OccupationCategory = z.enum([
   'De pie prolongado',
   'Trabajo físico intenso',
   'Mixta',
-  'Jubilada/o',
+  'Jubilada/o | Parada/o',
 ])
 
 const schema = z.object({
@@ -62,7 +62,7 @@ Categorías posibles:
 - **De pie prolongado**: comercio, hostelería, peluquería, dependienta, cajera, enfermería en planta
 - **Trabajo físico intenso**: construcción, limpieza, carga y descarga, fisioterapia activa, agricultura
 - **Mixta**: combinación de sedentaria y activa según el día (ej: docente, comercial)
-- **Jubilada/o**: retirada del mercado laboral
+- **Jubilada/o | Parada/o**: retirada del mercado laboral o sin empleo actualmente
 
 Para cada categoría en el summary, indica los riesgos físicos más comunes (ej: "Dolor lumbar crónico", "Varices y edema en piernas", "Contracturas cervicales").`,
   })
