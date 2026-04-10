@@ -32,20 +32,24 @@ export async function POST(req: Request) {
   const { object } = await generateObject({
     model: 'openai/gpt-5.4',
     schema,
-    system: `Eres un consultor de diseño web especializado en marcas de salud y bienestar.
-Tu tarea es traducir las decisiones concretas tomadas por la fundadora de MOA en un formulario en principios de diseño claros y accionables.
+    system: `Eres un director de diseño con experiencia en sistemas de diseño multiplataforma para marcas de salud y bienestar.
+Tu tarea es traducir las decisiones de valores y personalidad de la fundadora de MOA en principios de diseño universales.
+Estos principios deben funcionar en cualquier soporte: web, app móvil, espacio físico, materiales impresos, redes sociales.
 NO inventes ni añadas nada que no se desprenda directamente de sus respuestas.
 Cada principio debe poder trazarse hasta una o varias respuestas del formulario.
 Responde siempre en español.`,
-    prompt: `Patricia Dorado, fundadora de MOA (centro de entrenamiento y salud en Martorell), ha respondido este formulario de diseño:
+    prompt: `Patricia Dorado, fundadora de MOA (centro de entrenamiento y salud en Martorell), ha respondido este formulario sobre los valores y la personalidad de su marca:
 
 ${formAnswers}
 
-Genera los principios de diseño para la web de MOA basándote EXCLUSIVAMENTE en estas respuestas.
+Genera los principios de diseño de MOA basándote EXCLUSIVAMENTE en estas respuestas.
+Estos principios deben ser válidos para cualquier soporte (web, app, espacio físico, materiales).
+
 Cada principio debe:
-1. Reflejar una decisión real que Patricia ha tomado
-2. Ser accionable para un diseñador o desarrollador web
-3. Incluir 3 reglas concretas de aplicación`,
+1. Estar anclado a una emoción o valor que Patricia ha expresado, no a una solución técnica concreta
+2. Ser aplicable tanto a una pantalla como a un cartel, una sala de entrenamiento o una notificación push
+3. Incluir 3 reglas de aplicación concretas pero genéricas (no solo web)
+4. Responder a la pregunta: "¿Cómo reconozco que este diseño es de MOA?"`,
   })
 
   return NextResponse.json(object)

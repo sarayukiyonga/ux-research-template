@@ -25,7 +25,7 @@ export default function DesignPage() {
                 Principios de diseño
               </h1>
               <p className="mt-1 text-gray-500 text-sm">
-                MOA · Generado con IA a partir de la entrevista a Patricia Dorado
+                MOA · Válidos para web, app, espacio físico y materiales de marca
               </p>
             </div>
           </div>
