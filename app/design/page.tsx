@@ -7,10 +7,10 @@ export default function DesignPage() {
       <div className="mx-auto max-w-3xl px-4 py-10">
         {/* Nav */}
         <Link
-          href="/ceo"
+          href="/"
           className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-6"
         >
-          ← Volver a la entrevista CEO
+          ← Volver al dashboard
         </Link>
 
         {/* Header */}
