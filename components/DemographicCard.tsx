@@ -50,11 +50,11 @@ export function DemographicCard({ men, women, nonBinary }: DemographicCardProps)
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <Badge variant="secondary" className="text-xs font-normal truncate max-w-[75%]">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className="inline-flex flex-wrap items-center rounded-full border border-transparent bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-normal leading-snug min-w-0">
             Pregunta 1 — Edad y género
-          </Badge>
-          <Badge className="shrink-0 text-xs whitespace-nowrap">{total} resp.</Badge>
+          </span>
+          <Badge className="shrink-0 text-xs whitespace-nowrap mt-0.5">{total} resp.</Badge>
         </div>
         <CardTitle className="text-sm sm:text-base font-semibold leading-snug text-gray-800">
           Edad y género de los participantes

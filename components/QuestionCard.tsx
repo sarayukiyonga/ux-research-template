@@ -19,11 +19,11 @@ export function QuestionCard({ title, shortTitle, answers }: QuestionCardProps) 
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left">
         <CardHeader className="pb-3 hover:bg-gray-50 transition-colors cursor-pointer">
           {/* Top row: badge + arrow */}
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <Badge variant="secondary" className="text-xs font-normal truncate max-w-[75%]">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="inline-flex flex-wrap items-center rounded-full border border-transparent bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-normal leading-snug min-w-0">
               {shortTitle}
-            </Badge>
-            <div className="flex items-center gap-2 shrink-0">
+            </span>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
               <Badge className="text-xs whitespace-nowrap">
                 {answers.length} {answers.length === 1 ? 'resp.' : 'resp.'}
               </Badge>
