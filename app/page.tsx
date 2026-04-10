@@ -65,7 +65,7 @@ export default function DashboardPage() {
             ✦
           </div>
           <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl tracking-tight">
-            MOA
+            MOA | Patricia Dorado Trainer
           </h1>
           <p className="mt-2 text-gray-500 text-sm">
             Panel de análisis · Marca y estrategia
