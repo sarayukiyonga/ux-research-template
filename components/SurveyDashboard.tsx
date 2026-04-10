@@ -6,6 +6,7 @@ import { QuestionCard } from './QuestionCard'
 import { DemographicCard } from './DemographicCard'
 import { PersonaCard } from './PersonaCard'
 import { OccupationsCard } from './OccupationsCard'
+import { MedicalAdviceCard } from './MedicalAdviceCard'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface SurveyData {
@@ -92,15 +93,21 @@ export function SurveyDashboard() {
           <OccupationsCard answers={getAnswers(2)} />
         </div>
 
-        {/* Preguntas 1–13 — Respuestas */}
+        {/* Preguntas — con análisis destacados intercalados */}
         {QUESTIONS.map((q) => (
-          <QuestionCard
-            key={q.id}
-            questionId={q.id}
-            title={q.title}
-            shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
-            answers={getAnswers(q.id)}
-          />
+          <div key={q.id} className="space-y-4">
+            {q.id === 3 && (
+              <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
+                <MedicalAdviceCard answers={getAnswers(3)} />
+              </div>
+            )}
+            <QuestionCard
+              questionId={q.id}
+              title={q.title}
+              shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+              answers={getAnswers(q.id)}
+            />
+          </div>
         ))}
     </div>
   )
