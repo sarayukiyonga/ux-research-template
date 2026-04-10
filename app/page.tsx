@@ -20,13 +20,22 @@ export default function Home() {
                 Análisis de respuestas · Entrenamiento con Patri
               </p>
             </div>
-            <Link
-              href="/ceo"
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm"
-            >
-              <span>✦</span>
-              Entrevista CEO →
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/ceo"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm"
+              >
+                <span>✦</span>
+                Entrevista CEO →
+              </Link>
+              <Link
+                href="/design"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm"
+              >
+                <span>🎨</span>
+                Diseño →
+              </Link>
+            </div>
           </div>
         </div>
 
