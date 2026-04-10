@@ -14,8 +14,7 @@ interface CeoInsightsProps {
   qas: QA[]
 }
 
-function renderMarkdown(text: string) {
-  const lines = text.split('\n')
+function renderLines(lines: string[]) {
   const elements: React.ReactNode[] = []
   let key = 0
 
@@ -43,6 +42,23 @@ function renderMarkdown(text: string) {
     }
   }
   return elements
+}
+
+function renderMarkdown(text: string, isStreaming = false) {
+  const lines = text.split('\n')
+  if (!isStreaming) return renderLines(lines)
+
+  // While streaming: render completed lines with markdown,
+  // show the in-progress last line as plain text to avoid flickering
+  const completedLines = lines.slice(0, -1)
+  const currentLine = lines[lines.length - 1]
+
+  return [
+    ...renderLines(completedLines),
+    currentLine
+      ? <span key="current" className="text-sm text-gray-700 leading-relaxed">{currentLine}</span>
+      : null,
+  ].filter(Boolean)
 }
 
 export function CeoInsights({ qas }: CeoInsightsProps) {
@@ -132,7 +148,7 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
 
         {insights && (
           <div className="space-y-0.5">
-            {renderMarkdown(insights)}
+            {renderMarkdown(insights, loading)}
             {loading && (
               <span className="inline-block h-4 w-0.5 bg-violet-400 animate-pulse ml-0.5" />
             )}
