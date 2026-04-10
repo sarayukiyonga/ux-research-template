@@ -20,7 +20,7 @@ export function QuestionCard({ title, shortTitle, answers }: QuestionCardProps) 
         onClick={() => setOpen((o) => !o)}
         className="w-full text-left"
       >
-        <CardHeader className="pb-3 hover:bg-gray-50 transition-colors">
+          <CardHeader className="pb-3 hover:bg-gray-50 transition-colors cursor-pointer">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
               <Badge variant="secondary" className="mb-2 text-xs font-normal">
@@ -34,7 +34,7 @@ export function QuestionCard({ title, shortTitle, answers }: QuestionCardProps) 
               <Badge className="text-xs">
                 {answers.length} {answers.length === 1 ? 'respuesta' : 'respuestas'}
               </Badge>
-              <span className="text-gray-400 text-sm transition-transform duration-200" style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <span className="text-gray-400 transition-transform duration-200" style={{ display: 'inline-block', fontSize: '40px', lineHeight: 1, transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 ▾
               </span>
             </div>
