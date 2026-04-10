@@ -11,7 +11,7 @@ export default function Home() {
             <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse" />
             Resultados en tiempo real
           </div>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
                 Encuesta de satisfacción
@@ -20,17 +20,17 @@ export default function Home() {
                 Análisis de respuestas · Entrenamiento con Patri
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end gap-2 shrink-0">
               <Link
                 href="/ceo"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm whitespace-nowrap"
               >
                 <span>✦</span>
                 Entrevista CEO →
               </Link>
               <Link
                 href="/design"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors shadow-sm whitespace-nowrap"
               >
                 <span>🎨</span>
                 Diseño →
