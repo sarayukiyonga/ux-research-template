@@ -48,8 +48,6 @@ function renderMarkdown(text: string, isStreaming = false) {
   const lines = text.split('\n')
   if (!isStreaming) return renderLines(lines)
 
-  // While streaming: render completed lines with markdown,
-  // show the in-progress last line as plain text to avoid flickering
   const completedLines = lines.slice(0, -1)
   const currentLine = lines[lines.length - 1]
 
@@ -63,11 +61,27 @@ function renderMarkdown(text: string, isStreaming = false) {
 
 export function CeoInsights({ qas }: CeoInsightsProps) {
   const [insights, setInsights] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [streaming, setStreaming] = useState(false)
+  const [loading, setLoading] = useState(true)   // true while checking saved
   const [error, setError] = useState(false)
+  const [savedAt, setSavedAt] = useState('')
 
+  // Save the finished report to Google Sheets
+  async function save(text: string) {
+    try {
+      const r = await fetch('/api/ceo-insights-saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const d = await r.json()
+      if (d.savedAt) setSavedAt(d.savedAt)
+    } catch {}
+  }
+
+  // Generate from the AI and save when done
   async function generate() {
-    setLoading(true)
+    setStreaming(true)
     setError(false)
     setInsights('')
 
@@ -88,15 +102,30 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
         text += decoder.decode(value, { stream: true })
         setInsights(text)
       }
+
+      // Save the completed report
+      await save(text)
     } catch {
       setError(true)
     } finally {
-      setLoading(false)
+      setStreaming(false)
     }
   }
 
+  // On mount: load saved report first, generate only if none exists
   useEffect(() => {
-    generate()
+    fetch('/api/ceo-insights-saved')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.saved?.text) {
+          setInsights(d.saved.text)
+          setSavedAt(d.saved.savedAt)
+        } else {
+          generate()
+        }
+      })
+      .catch(() => generate())
+      .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -110,19 +139,28 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
               Informe estratégico — Análisis IA de la entrevista
             </CardTitle>
           </div>
-          {!loading && (error || insights) && (
+          {/* Only show retry if there was an error */}
+          {!loading && !streaming && error && (
             <button
               onClick={generate}
-              className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
+              className="shrink-0 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-medium"
             >
               ↺ Reintentar
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-1">Generado automáticamente a partir de las respuestas de Patricia</p>
+        <p className="text-xs text-gray-400 mt-1">
+          {savedAt
+            ? `Generado el ${savedAt}`
+            : streaming
+            ? 'Generando informe…'
+            : 'Generado automáticamente a partir de las respuestas de Patricia'}
+        </p>
       </CardHeader>
+
       <CardContent>
-        {loading && !insights && (
+        {/* Loading saved */}
+        {loading && (
           <div className="space-y-3 py-2">
             <Skeleton className="h-5 w-1/3" />
             <Skeleton className="h-4 w-full" />
@@ -134,7 +172,8 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
           </div>
         )}
 
-        {!loading && error && !insights && (
+        {/* Error */}
+        {!loading && !streaming && error && !insights && (
           <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
             <p className="text-xs text-red-500">No se pudo generar el informe estratégico.</p>
             <button
@@ -146,10 +185,11 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
           </div>
         )}
 
-        {insights && (
+        {/* Content */}
+        {!loading && insights && (
           <div className="space-y-0.5">
-            {renderMarkdown(insights, loading)}
-            {loading && (
+            {renderMarkdown(insights, streaming)}
+            {streaming && (
               <span className="inline-block h-4 w-0.5 bg-violet-400 animate-pulse ml-0.5" />
             )}
           </div>
