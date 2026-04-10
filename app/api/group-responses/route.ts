@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const schema = z.object({
   groups: z

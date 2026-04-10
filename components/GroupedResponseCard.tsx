@@ -37,23 +37,31 @@ export function GroupedResponseCard({
 }: GroupedResponseCardProps) {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [selected, setSelected] = useState<Group | null>(null)
 
-  useEffect(() => {
-    if (answers.length === 0) {
+  async function load() {
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch('/api/group-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionTitle, answers }),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(d?.error ?? `Error ${r.status}`)
+      setGroups(d.groups ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error desconocido')
+    } finally {
       setLoading(false)
-      return
     }
+  }
 
-    fetch('/api/group-responses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionTitle, answers }),
-    })
-      .then((r) => r.json())
-      .then((d) => setGroups(d.groups ?? []))
-      .catch(() => setGroups([]))
-      .finally(() => setLoading(false))
+  useEffect(() => {
+    if (answers.length === 0) { setLoading(false); return }
+    load()
   }, [])
 
   if (answers.length === 0) return null
@@ -83,6 +91,18 @@ export function GroupedResponseCard({
               <Skeleton className="h-6 w-32 rounded-full" />
               <Skeleton className="h-6 w-20 rounded-full" />
             </div>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+            <p className="text-xs text-red-500">{error}</p>
+            <button
+              onClick={load}
+              className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
+            >
+              Reintentar
+            </button>
           </div>
         )}
 
