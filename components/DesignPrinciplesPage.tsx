@@ -288,6 +288,38 @@ function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving }: {
         </div>
       </div>
 
+      {/* Summary */}
+      <div className="rounded-2xl bg-violet-50 border border-violet-100 px-5 py-4">
+        <p className="text-sm text-violet-800 leading-relaxed">{data.summary}</p>
+      </div>
+
+      {/* Principles */}
+      <div className="space-y-3">
+        {data.principles.map((p, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border-2 p-5 space-y-3"
+            style={{ borderColor: p.color + '40', backgroundColor: p.color + '06' }}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">{p.icon}</span>
+              <div>
+                <p className="font-bold text-gray-900">{p.title}</p>
+                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{p.description}</p>
+              </div>
+            </div>
+            <ul className="space-y-1.5 pl-1">
+              {p.guidelines.map((g, j) => (
+                <li key={j} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  {g}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
     </div>
   )
 }
