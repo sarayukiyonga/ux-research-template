@@ -12,6 +12,16 @@ const sections = [
     color: 'violet',
   },
   {
+    href: '/potential',
+    emoji: '🔍',
+    tag: 'Tiempo real',
+    tagPulse: true,
+    title: 'Encuesta a clientes potenciales',
+    description:
+      'Perfil del público objetivo de MOA: barreras, motivaciones, conocimiento del mercado y oportunidades de captación.',
+    color: 'orange',
+  },
+  {
     href: '/ceo',
     emoji: '🎙️',
     tag: 'Entrevista',
@@ -39,6 +49,12 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-violet-300',
     icon: 'bg-violet-100',
     arrow: 'text-violet-400 group-hover:text-violet-600',
+  },
+  orange: {
+    tag: 'bg-orange-100 text-orange-700',
+    border: 'hover:border-orange-300',
+    icon: 'bg-orange-100',
+    arrow: 'text-orange-400 group-hover:text-orange-600',
   },
   blue: {
     tag: 'bg-blue-100 text-blue-700',

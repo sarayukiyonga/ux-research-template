@@ -7,6 +7,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface PersonaCardProps {
   byQuestion: { questionId: number; answers: string[] }[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
+  apiPath?: string
+  title?: string
+  subtitle?: string
 }
 
 function renderLines(lines: string[]) {
@@ -69,7 +72,13 @@ function renderMarkdown(text: string, isStreaming = false) {
   ].filter(Boolean)
 }
 
-export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
+export function PersonaCard({
+  byQuestion,
+  demographic,
+  apiPath = '/api/persona',
+  title = 'User Persona — Cliente tipo de Patri',
+  subtitle = 'Generado con IA a partir de todas las respuestas',
+}: PersonaCardProps) {
   const [persona, setPersona] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -80,7 +89,7 @@ export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
     setPersona('')
 
     try {
-      const res = await fetch('/api/persona', {
+      const res = await fetch(apiPath, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ byQuestion, demographic }),
@@ -117,7 +126,7 @@ export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
           <div className="flex items-center gap-2">
             <span className="text-2xl">✦</span>
             <CardTitle className="text-base font-semibold text-violet-800">
-              User Persona — Cliente tipo de Patri
+              {title}
             </CardTitle>
           </div>
           {!loading && (error || persona) && (
@@ -129,7 +138,7 @@ export function PersonaCard({ byQuestion, demographic }: PersonaCardProps) {
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-1">Generado con IA a partir de todas las respuestas</p>
+        <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
       </CardHeader>
 
       <CardContent>
