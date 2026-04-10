@@ -17,7 +17,7 @@ interface Question {
   id: string
   question: string
   hint?: string
-  type: 'single' | 'multi' | 'pairs'
+  type: 'single' | 'multi' | 'pairs' | 'priority'
   options?: Option[]
   pairs?: { left: string; right: string }[]
 }
@@ -25,9 +25,9 @@ interface Question {
 const QUESTIONS: Question[] = [
   {
     id: 'filter_word',
-    question: 'Si MOA fuera una sola palabra, ¿cuál sería?',
-    hint: 'Esta palabra actuará como filtro para cualquier decisión de diseño: "¿esto es [palabra]?"',
-    type: 'single',
+    question: '¿Con qué valores se identifica más MOA?',
+    hint: 'Elige una palabra principal (el filtro clave de diseño) y opcionalmente una secundaria (el matiz que la complementa).',
+    type: 'priority',
     options: [
       { id: 'progress',   emoji: '📈', label: 'Progreso',   description: 'Avanzar, mejorar, ir a más' },
       { id: 'care',       emoji: '💜', label: 'Cuidado',    description: 'Atención, mimo, trato personal' },
@@ -69,6 +69,8 @@ const QUESTIONS: Question[] = [
 
 type Answers = Record<string, string | string[] | number[]>
 
+// Priority choice stores [primaryId, secondaryId?]
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SingleChoice({ question, answer, onChange }: {
@@ -104,6 +106,90 @@ function SingleChoice({ question, answer, onChange }: {
           </div>
         </button>
       ))}
+    </div>
+  )
+}
+
+function PriorityChoice({ question, answer, onChange }: {
+  question: Question
+  answer: string[] | undefined
+  onChange: (v: string[]) => void
+}) {
+  // answer[0] = primary, answer[1] = secondary (optional)
+  const selected = answer ?? []
+  const primary = selected[0]
+  const secondary = selected[1]
+
+  const handleClick = (id: string) => {
+    if (id === primary) {
+      // Deselect primary → promote secondary if exists
+      onChange(secondary ? [secondary] : [])
+    } else if (id === secondary) {
+      // Deselect secondary
+      onChange([primary])
+    } else if (!primary) {
+      // Nothing selected → set as primary
+      onChange([id])
+    } else if (!secondary) {
+      // Primary exists → set as secondary
+      onChange([primary, id])
+    } else {
+      // Both exist → replace secondary
+      onChange([primary, id])
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {question.options!.map((opt) => {
+        const isPrimary = opt.id === primary
+        const isSecondary = opt.id === secondary
+        return (
+          <button
+            key={opt.id}
+            onClick={() => handleClick(opt.id)}
+            className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-all ${
+              isPrimary
+                ? 'border-violet-500 bg-violet-50'
+                : isSecondary
+                ? 'border-violet-300 bg-violet-50/50'
+                : 'border-gray-200 hover:border-violet-200 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {opt.emoji && <span className="text-xl shrink-0 mt-0.5">{opt.emoji}</span>}
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${isPrimary || isSecondary ? 'text-violet-900' : 'text-gray-800'}`}>
+                  {opt.label}
+                </p>
+                {opt.description && (
+                  <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
+                )}
+              </div>
+              {isPrimary && (
+                <span className="shrink-0 text-xs font-semibold bg-violet-500 text-white rounded-full px-2 py-0.5">
+                  Principal
+                </span>
+              )}
+              {isSecondary && (
+                <span className="shrink-0 text-xs font-semibold bg-violet-200 text-violet-700 rounded-full px-2 py-0.5">
+                  Secundaria
+                </span>
+              )}
+              {!isPrimary && !isSecondary && (
+                <div className="shrink-0 mt-0.5 h-4 w-4 rounded-full border-2 border-gray-300" />
+              )}
+            </div>
+          </button>
+        )
+      })}
+      <p className="text-xs text-gray-400 pt-1">
+        {!primary
+          ? 'Toca una opción para elegir la palabra principal'
+          : !secondary
+          ? 'Toca otra para añadir una secundaria (opcional)'
+          : 'Toca la secundaria para cambiarla, o la principal para reordenar'}
+      </p>
     </div>
   )
 }
@@ -226,6 +312,15 @@ function buildFormAnswers(answers: Answers): string {
       readable = opt
         ? `${opt.emoji ?? ''} ${opt.label}${opt.description ? ` (${opt.description})` : ''}`.trim()
         : String(raw)
+    } else if (q.type === 'priority') {
+      const ids = (raw as string[]) ?? []
+      const primary = q.options?.find((o) => o.id === ids[0])
+      const secondary = q.options?.find((o) => o.id === ids[1])
+      readable = primary
+        ? `Principal: ${primary.emoji ?? ''} ${primary.label} (${primary.description})${
+            secondary ? ` · Secundaria: ${secondary.emoji ?? ''} ${secondary.label} (${secondary.description})` : ''
+          }`.trim()
+        : '(sin respuesta)'
     } else if (q.type === 'multi') {
       const ids = (raw as string[]) ?? []
       readable = ids
@@ -479,7 +574,7 @@ export function DesignPrinciplesPage() {
   const hasAnswer = (id: string) => {
     const v = answers[id]
     if (v === undefined || v === null) return false
-    if (Array.isArray(v)) return v.length > 0
+    if (Array.isArray(v)) return v.length > 0  // priority: at least primary selected
     return true
   }
 
@@ -521,6 +616,13 @@ export function DesignPrinciplesPage() {
             <SingleChoice
               question={q}
               answer={answers[q.id] as string}
+              onChange={(v) => setAnswer(q.id, v)}
+            />
+          )}
+          {q.type === 'priority' && (
+            <PriorityChoice
+              question={q}
+              answer={answers[q.id] as string[]}
               onChange={(v) => setAnswer(q.id, v)}
             />
           )}
