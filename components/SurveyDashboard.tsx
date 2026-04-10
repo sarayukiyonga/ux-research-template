@@ -6,7 +6,7 @@ import { QuestionCard } from './QuestionCard'
 import { DemographicCard } from './DemographicCard'
 import { PersonaCard } from './PersonaCard'
 import { OccupationsCard } from './OccupationsCard'
-import { MedicalAdviceCard } from './MedicalAdviceCard'
+import { GroupedResponseCard } from './GroupedResponseCard'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface SurveyData {
@@ -15,6 +15,9 @@ interface SurveyData {
   byQuestion: { questionId: number; answers: string[] }[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
 }
+
+// Q2 usa OccupationsCard especializado; el resto usan GroupedResponseCard
+const SKIP_GROUPED = [2]
 
 export function SurveyDashboard() {
   const [data, setData] = useState<SurveyData | null>(null)
@@ -44,7 +47,7 @@ export function SurveyDashboard() {
   if (!data) {
     return (
       <div className="space-y-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="rounded-xl border p-6 space-y-3">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-4 w-full" />
@@ -78,7 +81,7 @@ export function SurveyDashboard() {
         </div>
       </div>
 
-      {/* User Persona — generado automáticamente */}
+      {/* User Persona */}
       <PersonaCard byQuestion={data.byQuestion} demographic={data.demographic} />
 
       {/* Pregunta 1 — Demografía */}
@@ -88,27 +91,32 @@ export function SurveyDashboard() {
         nonBinary={data.demographic.nonBinary}
       />
 
-        {/* Análisis destacado de ocupaciones */}
-        <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
-          <OccupationsCard answers={getAnswers(2)} />
-        </div>
+      {/* Análisis destacado de ocupaciones (Q2) */}
+      <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
+        <OccupationsCard answers={getAnswers(2)} />
+      </div>
 
-        {/* Preguntas — con análisis destacados intercalados */}
-        {QUESTIONS.map((q) => (
-          <div key={q.id} className="space-y-4">
-            {q.id === 3 && (
-              <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
-                <MedicalAdviceCard answers={getAnswers(3)} />
-              </div>
-            )}
-            <QuestionCard
-              questionId={q.id}
-              title={q.title}
-              shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
-              answers={getAnswers(q.id)}
-            />
-          </div>
-        ))}
+      {/* Preguntas con resumen agrupado + respuestas */}
+      {QUESTIONS.map((q) => (
+        <div key={q.id} className="space-y-3">
+          {!SKIP_GROUPED.includes(q.id) && (
+            <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
+              <GroupedResponseCard
+                questionId={q.id}
+                questionTitle={q.title}
+                shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+                answers={getAnswers(q.id)}
+              />
+            </div>
+          )}
+          <QuestionCard
+            questionId={q.id}
+            title={q.title}
+            shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+            answers={getAnswers(q.id)}
+          />
+        </div>
+      ))}
     </div>
   )
 }

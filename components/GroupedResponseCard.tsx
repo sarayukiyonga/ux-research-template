@@ -22,22 +22,33 @@ interface Group {
   interpretation: string
 }
 
-interface MedicalAdviceCardProps {
+interface GroupedResponseCardProps {
+  questionId: number
+  questionTitle: string
+  shortTitle: string
   answers: string[]
 }
 
-export function MedicalAdviceCard({ answers }: MedicalAdviceCardProps) {
+export function GroupedResponseCard({
+  questionId,
+  questionTitle,
+  shortTitle,
+  answers,
+}: GroupedResponseCardProps) {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Group | null>(null)
 
   useEffect(() => {
-    if (answers.length === 0) { setLoading(false); return }
+    if (answers.length === 0) {
+      setLoading(false)
+      return
+    }
 
-    fetch('/api/medical-advice', {
+    fetch('/api/group-responses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ questionTitle, answers }),
     })
       .then((r) => r.json())
       .then((d) => setGroups(d.groups ?? []))
@@ -45,16 +56,18 @@ export function MedicalAdviceCard({ answers }: MedicalAdviceCardProps) {
       .finally(() => setLoading(false))
   }, [])
 
+  if (answers.length === 0) return null
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <Badge variant="secondary" className="mb-2 text-xs font-normal">
-              Pregunta 3 — Situación de salud previa
+              {shortTitle} — Resumen agrupado
             </Badge>
             <CardTitle className="text-base font-semibold leading-snug text-gray-800">
-              ¿Qué les decían los médicos? Recomendaciones agrupadas por similitud
+              {questionTitle}
             </CardTitle>
           </div>
           <Badge className="shrink-0 text-xs">{answers.length} respuestas</Badge>
@@ -64,27 +77,35 @@ export function MedicalAdviceCard({ answers }: MedicalAdviceCardProps) {
       <CardContent className="space-y-5">
         {loading && (
           <div className="space-y-3">
-            <Skeleton className="h-44 w-full rounded-xl" />
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-32 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
           </div>
         )}
 
         {!loading && groups.length > 0 && (
           <>
             {/* Bar chart */}
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={Math.max(160, groups.length * 40)}>
               <BarChart
                 data={groups}
                 layout="vertical"
                 margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-                style={{ cursor: 'pointer' }}
               >
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis
                   type="category"
                   dataKey="label"
-                  width={160}
+                  width={170}
                   tick={{ fontSize: 11, fill: '#374151' }}
                   tickLine={false}
                   axisLine={false}
@@ -106,33 +127,42 @@ export function MedicalAdviceCard({ answers }: MedicalAdviceCardProps) {
                     <Cell
                       key={i}
                       fill={g.color}
-                      opacity={selected && selected.label !== g.label ? 0.3 : 1}
-                      onClick={() => setSelected(selected?.label === g.label ? null : g)}
+                      opacity={selected && selected.label !== g.label ? 0.25 : 1}
+                      onClick={() =>
+                        setSelected(selected?.label === g.label ? null : g)
+                      }
+                      style={{ cursor: 'pointer' }}
                     />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Group pills */}
+            {/* Pill filters */}
             <div className="flex flex-wrap gap-2">
               {groups.map((g) => (
                 <button
                   key={g.label}
-                  onClick={() => setSelected(selected?.label === g.label ? null : g)}
+                  onClick={() =>
+                    setSelected(selected?.label === g.label ? null : g)
+                  }
                   className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-all"
                   style={{
                     borderColor: g.color,
-                    backgroundColor: selected?.label === g.label ? g.color : 'transparent',
+                    backgroundColor:
+                      selected?.label === g.label ? g.color : 'transparent',
                     color: selected?.label === g.label ? '#fff' : g.color,
                   }}
                 >
                   <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: selected?.label === g.label ? '#fff' : g.color }}
+                    className="h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor:
+                        selected?.label === g.label ? '#fff' : g.color,
+                    }}
                   />
                   {g.label}
-                  <span className="ml-0.5 opacity-70">({g.count})</span>
+                  <span className="opacity-70">({g.count})</span>
                 </button>
               ))}
             </div>
@@ -141,14 +171,21 @@ export function MedicalAdviceCard({ answers }: MedicalAdviceCardProps) {
             {selected && (
               <div
                 className="rounded-xl p-4 space-y-3"
-                style={{ backgroundColor: selected.color + '10', borderLeft: `3px solid ${selected.color}` }}
+                style={{
+                  backgroundColor: selected.color + '12',
+                  borderLeft: `3px solid ${selected.color}`,
+                }}
               >
                 <div>
-                  <p className="text-sm font-semibold text-gray-800 mb-0.5">{selected.label}</p>
+                  <p className="text-sm font-semibold text-gray-800 mb-0.5">
+                    {selected.label}
+                  </p>
                   <p className="text-xs text-gray-500">{selected.interpretation}</p>
                 </div>
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-gray-600">Ejemplos de respuestas:</p>
+                  <p className="text-xs font-medium text-gray-600">
+                    Ejemplos de respuestas:
+                  </p>
                   {selected.examples.map((ex, i) => (
                     <div
                       key={i}
