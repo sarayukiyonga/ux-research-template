@@ -334,6 +334,7 @@ export function DesignPrinciplesPage() {
   // Results state — can come from saved or freshly generated
   const [results, setResults] = useState<ResultsData | null>(null)
   const [savedAt, setSavedAt] = useState('')
+  const [savedFormAnswers, setSavedFormAnswers] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(false)
@@ -348,6 +349,7 @@ export function DesignPrinciplesPage() {
         if (d.saved) {
           setResults(d.saved.principles)
           setSavedAt(d.saved.savedAt)
+          setSavedFormAnswers(d.saved.formAnswers ?? '')
         }
       })
       .catch(() => {})
@@ -368,10 +370,11 @@ export function DesignPrinciplesPage() {
     setSaving(false)
   }
 
-  const generate = async (currentAnswers: Answers) => {
+  // Accepts either a fresh Answers object (from the form) or a pre-built text string (when regenerating from saved)
+  const generate = async (currentAnswers: Answers, overrideFormAnswers?: string) => {
     setGenerating(true)
     setGenError(false)
-    const formAnswers = buildFormAnswers(currentAnswers)
+    const formAnswers = overrideFormAnswers ?? buildFormAnswers(currentAnswers)
     try {
       const res = await fetch('/api/design-principles', {
         method: 'POST',
@@ -460,7 +463,7 @@ export function DesignPrinciplesPage() {
         savedAt={savedAt}
         saving={saving}
         onRedo={() => { setShowForm(true); setCurrentIdx(0) }}
-        onRegenerate={() => generate(answers)}
+        onRegenerate={() => generate(answers, savedFormAnswers || undefined)}
       />
     )
   }
