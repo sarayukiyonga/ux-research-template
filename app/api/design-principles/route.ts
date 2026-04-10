@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { SHEET_ID, SHEET_RANGE } from '@/lib/questions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -10,7 +11,7 @@ export const maxDuration = 60
 const schema = z.object({
   summary: z
     .string()
-    .describe('2-3 frases que sinteticen la esencia de diseño de MOA, citando las propias palabras de Patricia cuando sea posible'),
+    .describe('2-3 frases que sinteticen la esencia de diseño de MOA, usando las propias palabras de Patricia y de los clientes cuando sea posible'),
   principles: z
     .array(
       z.object({
@@ -18,29 +19,30 @@ const schema = z.object({
         title: z.string().describe('Nombre del principio (3-5 palabras)'),
         description: z
           .string()
-          .describe('Qué significa para MOA y de dónde viene — anclado en lo que Patricia ha dicho (2-3 frases)'),
+          .describe('Qué significa para MOA y por qué importa — con referencia a lo que Patricia o los clientes han dicho (2-3 frases)'),
         guidelines: z
           .array(z.string())
-          .describe('3 reglas aplicables en cualquier soporte: web, app, espacio físico, materiales'),
+          .describe('3 reglas aplicables en cualquier soporte: web, app, espacio físico, materiales impresos'),
         color: z.string().describe('Color hex de acento'),
       })
     )
     .describe('5-7 principios de diseño ordenados por importancia'),
 })
 
-async function getCeoInterview(): Promise<string> {
-  const auth = new google.auth.JWT({
+function getAuth() {
+  return new google.auth.JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   })
+}
 
-  const sheets = google.sheets({ version: 'v4', auth })
+async function getCeoInterview(): Promise<string> {
+  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CEO_SHEET_ID,
     range: 'A:N',
   })
-
   const rows = res.data.values ?? []
   const dataRow = rows[1]
   if (!dataRow) throw new Error('Sin datos en la hoja CEO')
@@ -51,37 +53,83 @@ async function getCeoInterview(): Promise<string> {
   }).join('\n\n---\n\n')
 }
 
+// Questions most relevant for design: how they arrived, trust, post-session feeling, group value
+const DESIGN_RELEVANT_QUESTION_COLS: { title: string; colIndex: number }[] = [
+  { title: '¿Qué te decían los médicos o tu entorno sobre tu salud antes de conocer a la entrenadora?', colIndex: 5 },
+  { title: '¿Qué te frenaba a la hora de apuntarte a un gimnasio convencional?', colIndex: 7 },
+  { title: '¿Qué viste en ella que te dio la confianza para poner tu salud en sus manos?', colIndex: 8 },
+  { title: '¿Cómo describirías la sensación física y mental justo después de una sesión grupal?', colIndex: 9 },
+  { title: '¿Qué te aporta entrenar con otras personas con situaciones similares a la tuya?', colIndex: 10 },
+]
+const MAX_ANSWERS_PER_QUESTION = 8
+
+async function getClientVoice(): Promise<string> {
+  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: SHEET_RANGE,
+  })
+  const rows = res.data.values ?? []
+  const dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+
+  return DESIGN_RELEVANT_QUESTION_COLS.map(({ title, colIndex }) => {
+    const answers = dataRows
+      .map((row) => row[colIndex]?.trim() ?? '')
+      .filter((a) => a.length > 0)
+      .slice(0, MAX_ANSWERS_PER_QUESTION)
+
+    if (answers.length === 0) return null
+
+    const lines = answers.map((a, i) => `  ${i + 1}. "${a}"`).join('\n')
+    return `${title}\n${lines}`
+  }).filter(Boolean).join('\n\n---\n\n')
+}
+
 export async function POST(req: Request) {
   const { formAnswers } = await req.json()
 
-  const interview = await getCeoInterview()
+  const [interview, clientVoice] = await Promise.all([
+    getCeoInterview(),
+    getClientVoice(),
+  ])
 
   const { object } = await generateObject({
     model: 'openai/gpt-5.4',
     schema,
     system: `Eres un director de diseño con experiencia en sistemas de diseño multiplataforma para marcas de salud y bienestar.
-Tu tarea es crear los principios de diseño de MOA a partir de dos fuentes:
-1. La entrevista completa a su fundadora (fuente principal, rica en contexto)
-2. Tres respuestas clave que Patricia ha dado expresamente para guiar el diseño (matices específicos)
+Tu tarea es crear los principios de diseño de MOA a partir de tres fuentes complementarias:
+1. La entrevista a su fundadora — su intención, valores y visión
+2. Las respuestas reales de sus clientes — cómo perciben MOA y qué palabras usan
+3. Un formulario de prioridades respondido por Patricia — sus decisiones y límites de diseño
 
 Los principios deben ser válidos en cualquier soporte: web, app, espacio físico, materiales impresos.
-Usa siempre las palabras y expresiones de Patricia cuando puedas — los principios deben sonar a ella.
-NO inventes nada que no pueda trazarse a lo que ella ha dicho.
+Cuando los clientes confirmen lo que Patricia dice, refuérzalo. Cuando haya matices entre ambos, refléctalos.
+Usa las propias palabras de Patricia y de los clientes siempre que puedas.
+NO inventes nada que no se pueda trazar a las tres fuentes.
 Responde siempre en español.`,
-    prompt: `ENTREVISTA A PATRICIA DORADO, FUNDADORA DE MOA:
+    prompt: `FUENTE 1 — ENTREVISTA A PATRICIA DORADO, FUNDADORA DE MOA:
 
 ${interview}
 
 ---
 
-RESPUESTAS DEL FORMULARIO DE DISEÑO (matices específicos aportados por Patricia):
+FUENTE 2 — VOZ DE LOS CLIENTES (respuestas reales de la encuesta de satisfacción):
+
+${clientVoice}
+
+---
+
+FUENTE 3 — FORMULARIO DE PRIORIDADES DE DISEÑO (respondido por Patricia):
 
 ${formAnswers}
 
 ---
 
-Genera los principios de diseño de MOA combinando ambas fuentes.
-La entrevista es el contexto y la voz. Las respuestas del formulario son las prioridades y los límites.
+Genera los principios de diseño de MOA integrando las tres fuentes.
+- La entrevista define la intención y el carácter de marca.
+- Los clientes validan, matizan o enriquecen esa intención con su experiencia real.
+- El formulario fija las prioridades y los límites.
+
 Cada principio debe responder a: "¿Cómo reconozco que este diseño es de MOA y no de otro?"`,
   })
 
