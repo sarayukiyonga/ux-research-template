@@ -76,7 +76,10 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
-    } catch {}
+      else if (d.error) console.error('[CeoInsights] Save error:', d.error)
+    } catch (e) {
+      console.error('[CeoInsights] Save failed:', e)
+    }
   }
 
   // Generate from the AI and save when done
