@@ -61,28 +61,13 @@ export function GroupedResponseCard({
 
   useEffect(() => {
     if (answers.length === 0) { setLoading(false); return }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          observer.disconnect()
-          load()
-        }
-      },
-      { rootMargin: '200px' }
-    )
-
-    const el = document.getElementById(`grouped-${questionId}`)
-    if (el) observer.observe(el)
-    else load()
-
-    return () => observer.disconnect()
+    load()
   }, [])
 
   if (answers.length === 0) return null
 
   return (
-    <Card className="w-full" id={`grouped-${questionId}`}>
+    <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
