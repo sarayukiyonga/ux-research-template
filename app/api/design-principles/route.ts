@@ -1,4 +1,5 @@
 import { generateObject } from 'ai'
+import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
   ])
 
   const { object } = await generateObject({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     schema,
     system: `Eres un director de diseño con experiencia en sistemas de diseño multiplataforma para marcas de salud y bienestar.
 Tu tarea es crear los principios de diseño de MOA a partir de cuatro fuentes complementarias:

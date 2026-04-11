@@ -1,4 +1,5 @@
 import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
 import { QUESTIONS } from '@/lib/questions'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     .join('\n')
 
   const result = streamText({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     system: `Eres un analista experto en bienestar, salud y entrenamiento personal. 
 Analiza las respuestas de una encuesta a clientes de una entrenadora personal especializada en personas mayores o con limitaciones físicas. 
 Sé empático, preciso y orientado a insights accionables para la entrenadora.

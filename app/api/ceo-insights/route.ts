@@ -1,4 +1,5 @@
 import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
     .join('\n\n---\n\n')
 
   const result = streamText({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     system: `Eres un consultor estratégico de marca y negocio especializado en centros de salud y bienestar.
 Analiza entrevistas a CEOs y fundadoras para extraer insights accionables.
 Responde siempre en español. Sé directo, concreto y orientado a la acción.`,

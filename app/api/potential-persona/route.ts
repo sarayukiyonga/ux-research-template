@@ -1,4 +1,5 @@
 import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
 import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     .join('\n\n')
 
   const result = streamText({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     system: `Eres un investigador UX especializado en salud y bienestar. 
 Analizas encuestas a clientes potenciales para crear perfiles de buyer persona útiles para diseño web y estrategia de captación.
 Responde siempre en español. Sé concreto y basa todo en las respuestas reales.`,

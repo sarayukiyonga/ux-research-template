@@ -1,4 +1,5 @@
 import { generateObject } from 'ai'
+import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   const { questionTitle, answers } = await req.json()
 
   const { object } = await generateObject({
-    model: 'openai/gpt-5.4',
+    model: openai('gpt-4o-mini'),
     schema,
     system: `Eres un investigador UX y psicólogo especializado en bienestar y salud.
 Analiza respuestas abiertas de encuestas y agrúpalas por similitud semántica.
