@@ -118,7 +118,8 @@ export function PotentialSurveyDashboard() {
   }, [])
 
   const loadQuestion = useCallback(async (questionId: number, questionTitle: string, answers: string[]) => {
-    if (answers.length === 0) {
+    if (answers.length < 4) {
+      // Too few answers to group meaningfully — skip AI call
       setGroupState(questionId, { loading: false, groups: [], error: '' })
       return
     }

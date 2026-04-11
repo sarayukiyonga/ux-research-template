@@ -55,7 +55,7 @@ export function SurveyDashboard() {
 
   // Fetch groups for a single question and update state
   const loadQuestion = useCallback(async (questionId: number, questionTitle: string, answers: string[]) => {
-    if (answers.length === 0) return
+    if (answers.length < 4) return
     setGroupState(questionId, { loading: true, error: '', groups: [] })
     try {
       const groups = await fetchGroups(questionTitle, answers)
