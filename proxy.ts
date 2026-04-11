@@ -8,7 +8,7 @@ const PUBLIC_PREFIXES = [
   '/favicon',
 ]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
