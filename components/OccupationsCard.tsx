@@ -12,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { loadCache, saveCache, clearCache } from '@/lib/ai-cache'
 
 interface CategoryData {
   count: number
@@ -35,6 +36,7 @@ interface OccupationResult {
 
 interface OccupationsCardProps {
   answers: string[]
+  cacheKey?: string
 }
 
 const CATEGORIES = [
@@ -75,25 +77,48 @@ const CATEGORIES = [
   },
 ]
 
-export function OccupationsCard({ answers }: OccupationsCardProps) {
+export function OccupationsCard({ answers, cacheKey = 'occupations' }: OccupationsCardProps) {
   const [data, setData] = useState<OccupationResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState('')
 
-  useEffect(() => {
+  async function load(force = false) {
     if (answers.length === 0) { setLoading(false); return }
 
-    fetch('/api/occupations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers }),
-    })
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => setError('Error al analizar las profesiones'))
-      .finally(() => setLoading(false))
-  }, [])
+    if (!force) {
+      const cached = loadCache<OccupationResult>(cacheKey)
+      if (cached) {
+        setData(cached.data)
+        setSavedAt(cached.savedAt)
+        setLoading(false)
+        return
+      }
+    } else {
+      clearCache(cacheKey)
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch('/api/occupations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      })
+      const d = await r.json()
+      setData(d)
+      const at = saveCache(cacheKey, d)
+      setSavedAt(at)
+    } catch {
+      setError('Error al analizar las profesiones')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = data
     ? CATEGORIES.map((c) => ({
@@ -118,11 +143,24 @@ export function OccupationsCard({ answers }: OccupationsCardProps) {
           <span className="inline-flex flex-wrap items-center rounded-full border border-transparent bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-normal leading-snug min-w-0">
             Pregunta 2 — Ocupación
           </span>
-          <Badge className="shrink-0 text-xs whitespace-nowrap mt-0.5">{answers.length} resp.</Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {!loading && data && (
+              <button
+                onClick={() => load(true)}
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors"
+              >
+                ↺ Actualizar
+              </button>
+            )}
+            <Badge className="text-xs whitespace-nowrap mt-0.5">{answers.length} resp.</Badge>
+          </div>
         </div>
         <CardTitle className="text-sm sm:text-base font-semibold leading-snug text-gray-800">
           Profesiones por carga física y riesgo musculoesquelético
         </CardTitle>
+        {savedAt && !loading && (
+          <p className="text-xs text-gray-300 mt-1">Guardado el {savedAt}</p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-6">

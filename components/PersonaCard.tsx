@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { loadCache, saveCache, clearCache } from '@/lib/ai-cache'
 
 interface PersonaCardProps {
   byQuestion: { questionId: number; answers: string[] }[]
@@ -10,6 +11,7 @@ interface PersonaCardProps {
   apiPath?: string
   title?: string
   subtitle?: string
+  cacheKey?: string
 }
 
 function renderLines(lines: string[]) {
@@ -59,8 +61,6 @@ function renderMarkdown(text: string, isStreaming = false) {
   const lines = text.split('\n')
   if (!isStreaming) return renderLines(lines)
 
-  // While streaming: render completed lines with markdown,
-  // show the in-progress last line as plain text to avoid flickering
   const completedLines = lines.slice(0, -1)
   const currentLine = lines[lines.length - 1]
 
@@ -78,15 +78,32 @@ export function PersonaCard({
   apiPath = '/api/persona',
   title = 'User Persona — Cliente tipo de Patri',
   subtitle = 'Generado con IA a partir de todas las respuestas',
+  cacheKey = 'persona_default',
 }: PersonaCardProps) {
   const [persona, setPersona] = useState('')
   const [loading, setLoading] = useState(true)
+  const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState(false)
+  const [savedAt, setSavedAt] = useState('')
 
-  async function generate() {
+  async function generate(force = false) {
+    if (!force) {
+      const cached = loadCache<string>(cacheKey)
+      if (cached) {
+        setPersona(cached.data)
+        setSavedAt(cached.savedAt)
+        setLoading(false)
+        return
+      }
+    } else {
+      clearCache(cacheKey)
+    }
+
     setLoading(true)
+    setStreaming(true)
     setError(false)
     setPersona('')
+    setSavedAt('')
 
     try {
       const res = await fetch(apiPath, {
@@ -107,10 +124,14 @@ export function PersonaCard({
         text += decoder.decode(value, { stream: true })
         setPersona(text)
       }
+
+      const at = saveCache(cacheKey, text)
+      setSavedAt(at)
     } catch {
       setError(true)
     } finally {
       setLoading(false)
+      setStreaming(false)
     }
   }
 
@@ -120,25 +141,30 @@ export function PersonaCard({
   }, [])
 
   return (
-    <Card className="w-full border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm">
+    <Card className="w-full border-violet-200 bg-linear-to-br from-violet-50 to-white shadow-sm">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl">✦</span>
             <CardTitle className="text-base font-semibold text-violet-800">
               {title}
             </CardTitle>
           </div>
-          {!loading && (error || persona) && (
+          {!loading && (persona || error) && (
             <button
-              onClick={generate}
+              onClick={() => generate(true)}
               className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
             >
-              ↺ Reintentar
+              ↺ Actualizar
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-gray-400">{subtitle}</p>
+          {savedAt && !streaming && (
+            <span className="text-xs text-gray-300">· Guardado el {savedAt}</span>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent>
@@ -155,9 +181,9 @@ export function PersonaCard({
 
         {!loading && error && !persona && (
           <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-            <p className="text-xs text-red-500">No se pudo generar el User Persona.</p>
+            <p className="text-xs text-red-500">No se pudo generar el perfil.</p>
             <button
-              onClick={generate}
+              onClick={() => generate(true)}
               className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
             >
               Reintentar
@@ -167,8 +193,8 @@ export function PersonaCard({
 
         {persona && (
           <div className="space-y-1 prose-sm max-w-none">
-            {renderMarkdown(persona, loading)}
-            {loading && (
+            {renderMarkdown(persona, streaming)}
+            {streaming && (
               <span className="inline-block h-4 w-0.5 bg-violet-400 animate-pulse ml-0.5" />
             )}
           </div>

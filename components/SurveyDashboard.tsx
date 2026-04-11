@@ -8,6 +8,7 @@ import { PersonaCard } from './PersonaCard'
 import { OccupationsCard } from './OccupationsCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { Skeleton } from '@/components/ui/skeleton'
+import { loadCache, saveCache, clearCacheByPrefix } from '@/lib/ai-cache'
 
 interface SurveyData {
   totalResponses: number
@@ -20,11 +21,12 @@ interface GroupState {
   groups: Group[]
   loading: boolean
   error: string
+  savedAt?: string
 }
 
-// Q2 uses OccupationsCard — skip GroupedResponseCard for it
 const SKIP_GROUPED = [2]
 const GROUPED_QUESTIONS = QUESTIONS.filter((q) => !SKIP_GROUPED.includes(q.id))
+const CACHE_PREFIX = 'survey_group_q'
 
 async function fetchGroups(questionTitle: string, answers: string[]): Promise<Group[]> {
   const r = await fetch('/api/group-responses', {
@@ -44,8 +46,8 @@ export function SurveyDashboard() {
   const [data, setData] = useState<SurveyData | null>(null)
   const [error, setError] = useState('')
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Helper to update one question's group state
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
       ...prev,
@@ -53,13 +55,31 @@ export function SurveyDashboard() {
     }))
   }, [])
 
-  // Fetch groups for a single question and update state
-  const loadQuestion = useCallback(async (questionId: number, questionTitle: string, answers: string[]) => {
-    if (answers.length < 4) return
+  const loadQuestion = useCallback(async (
+    questionId: number,
+    questionTitle: string,
+    answers: string[],
+    force = false
+  ) => {
+    if (answers.length < 4) {
+      setGroupState(questionId, { loading: false, groups: [], error: '' })
+      return
+    }
+
+    const cacheKey = CACHE_PREFIX + questionId
+    if (!force) {
+      const cached = loadCache<Group[]>(cacheKey)
+      if (cached) {
+        setGroupState(questionId, { loading: false, groups: cached.data, savedAt: cached.savedAt })
+        return
+      }
+    }
+
     setGroupState(questionId, { loading: true, error: '', groups: [] })
     try {
       const groups = await fetchGroups(questionTitle, answers)
-      setGroupState(questionId, { loading: false, groups })
+      const savedAt = saveCache(cacheKey, groups)
+      setGroupState(questionId, { loading: false, groups, savedAt })
     } catch (e) {
       setGroupState(questionId, {
         loading: false,
@@ -69,30 +89,29 @@ export function SurveyDashboard() {
     }
   }, [setGroupState])
 
-  // Once survey data is ready, load grouped questions sequentially
-  useEffect(() => {
-    if (!data) return
-
+  const loadAllGroups = useCallback((surveyData: SurveyData, force = false) => {
     const getAnswers = (id: number) =>
-      data.byQuestion.find((q) => q.questionId === id)?.answers ?? []
+      surveyData.byQuestion.find((q) => q.questionId === id)?.answers ?? []
 
-    // Mark all as loading immediately so skeletons appear
     const initial: Record<number, GroupState> = {}
     for (const q of GROUPED_QUESTIONS) {
       initial[q.id] = { groups: [], loading: true, error: '' }
     }
     setGroupStates(initial)
 
-    // Run sequentially: await each before starting the next
     ;(async () => {
       for (const q of GROUPED_QUESTIONS) {
-        await loadQuestion(q.id, q.title, getAnswers(q.id))
+        await loadQuestion(q.id, q.title, getAnswers(q.id), force)
       }
     })()
+  }, [loadQuestion])
+
+  useEffect(() => {
+    if (!data) return
+    loadAllGroups(data, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
-  // Load survey data
   useEffect(() => {
     fetch('/api/survey')
       .then((r) => r.json())
@@ -102,6 +121,14 @@ export function SurveyDashboard() {
       })
       .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
   }, [])
+
+  async function handleRefreshAll() {
+    if (!data) return
+    setRefreshing(true)
+    clearCacheByPrefix(CACHE_PREFIX)
+    await loadAllGroups(data, true)
+    setRefreshing(false)
+  }
 
   if (error) {
     return (
@@ -131,6 +158,8 @@ export function SurveyDashboard() {
   const getAnswers = (questionId: number) =>
     data.byQuestion.find((q) => q.questionId === questionId)?.answers ?? []
 
+  const anyGroupSaved = Object.values(groupStates).some((gs) => gs.savedAt)
+
   return (
     <div className="space-y-6">
       {/* Stats */}
@@ -152,7 +181,11 @@ export function SurveyDashboard() {
       </div>
 
       {/* User Persona */}
-      <PersonaCard byQuestion={data.byQuestion} demographic={data.demographic} />
+      <PersonaCard
+        byQuestion={data.byQuestion}
+        demographic={data.demographic}
+        cacheKey="persona_survey"
+      />
 
       {/* Pregunta 1 — Demografía */}
       <DemographicCard
@@ -162,8 +195,23 @@ export function SurveyDashboard() {
       />
 
       {/* Análisis destacado de ocupaciones (Q2) */}
-      <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
-        <OccupationsCard answers={getAnswers(2)} />
+      <div className="rounded-2xl border-2 border-violet-200 bg-linear-to-br from-violet-50 to-white p-1">
+        <OccupationsCard answers={getAnswers(2)} cacheKey="survey_occupations" />
+      </div>
+
+      {/* Cabecera análisis agrupados + botón actualizar */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          Análisis agrupados por IA
+        </p>
+        <button
+          onClick={handleRefreshAll}
+          disabled={refreshing}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+        >
+          <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
+          {refreshing ? 'Actualizando…' : anyGroupSaved ? 'Actualizar análisis' : 'Generar análisis'}
+        </button>
       </div>
 
       {/* Preguntas con resumen agrupado + respuestas */}
@@ -173,7 +221,7 @@ export function SurveyDashboard() {
         return (
           <div key={q.id} className="space-y-3">
             {!SKIP_GROUPED.includes(q.id) && (
-              <div className="rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white p-1">
+              <div className="rounded-2xl border-2 border-violet-200 bg-linear-to-br from-violet-50 to-white p-1">
                 <GroupedResponseCard
                   questionTitle={q.title}
                   shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
@@ -181,7 +229,7 @@ export function SurveyDashboard() {
                   groups={gs.groups}
                   loading={gs.loading}
                   error={gs.error}
-                  onRetry={() => loadQuestion(q.id, q.title, answers)}
+                  onRetry={() => loadQuestion(q.id, q.title, answers, true)}
                 />
               </div>
             )}

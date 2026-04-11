@@ -7,6 +7,7 @@ import { QuestionCard } from './QuestionCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { PersonaCard } from './PersonaCard'
 import { Skeleton } from '@/components/ui/skeleton'
+import { loadCache, saveCache, clearCacheByPrefix } from '@/lib/ai-cache'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,10 @@ interface GroupState {
   groups: Group[]
   loading: boolean
   error: string
+  savedAt?: string
 }
+
+const CACHE_PREFIX = 'potential_group_q'
 
 const OPEN_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'open')
 const CLOSED_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'closed')
@@ -109,6 +113,7 @@ export function PotentialSurveyDashboard() {
   const [data, setData] = useState<SurveyData | null>(null)
   const [error, setError] = useState('')
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
+  const [refreshing, setRefreshing] = useState(false)
 
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
@@ -117,16 +122,29 @@ export function PotentialSurveyDashboard() {
     }))
   }, [])
 
-  const loadQuestion = useCallback(async (questionId: number, questionTitle: string, answers: string[]) => {
+  const loadQuestion = useCallback(async (
+    questionId: number,
+    questionTitle: string,
+    answers: string[],
+    force = false
+  ) => {
     if (answers.length < 4) {
-      // Too few answers to group meaningfully — skip AI call
       setGroupState(questionId, { loading: false, groups: [], error: '' })
       return
+    }
+    const cacheKey = CACHE_PREFIX + questionId
+    if (!force) {
+      const cached = loadCache<Group[]>(cacheKey)
+      if (cached) {
+        setGroupState(questionId, { loading: false, groups: cached.data, savedAt: cached.savedAt })
+        return
+      }
     }
     setGroupState(questionId, { loading: true, error: '', groups: [] })
     try {
       const groups = await fetchGroups(questionTitle, answers)
-      setGroupState(questionId, { loading: false, groups })
+      const savedAt = saveCache(cacheKey, groups)
+      setGroupState(questionId, { loading: false, groups, savedAt })
     } catch (e) {
       setGroupState(questionId, {
         loading: false,
@@ -135,6 +153,19 @@ export function PotentialSurveyDashboard() {
       })
     }
   }, [setGroupState])
+
+  const loadAllGroups = useCallback((surveyData: SurveyData, force = false) => {
+    const getAnswers = (id: number) =>
+      surveyData.byQuestion.find((q) => q.questionId === id)?.answers ?? []
+    const initial: Record<number, GroupState> = {}
+    for (const q of OPEN_QUESTIONS) initial[q.id] = { groups: [], loading: true, error: '' }
+    setGroupStates(initial)
+    ;(async () => {
+      for (const q of OPEN_QUESTIONS) {
+        await loadQuestion(q.id, q.title, getAnswers(q.id), force)
+      }
+    })()
+  }, [loadQuestion])
 
   useEffect(() => {
     fetch('/api/potential-survey')
@@ -148,23 +179,17 @@ export function PotentialSurveyDashboard() {
 
   useEffect(() => {
     if (!data) return
-
-    const getAnswers = (id: number) =>
-      data.byQuestion.find((q) => q.questionId === id)?.answers ?? []
-
-    const initial: Record<number, GroupState> = {}
-    for (const q of OPEN_QUESTIONS) {
-      initial[q.id] = { groups: [], loading: true, error: '' }
-    }
-    setGroupStates(initial)
-
-    ;(async () => {
-      for (const q of OPEN_QUESTIONS) {
-        await loadQuestion(q.id, q.title, getAnswers(q.id))
-      }
-    })()
+    loadAllGroups(data, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
+
+  async function handleRefreshAll() {
+    if (!data) return
+    setRefreshing(true)
+    clearCacheByPrefix(CACHE_PREFIX)
+    await loadAllGroups(data, true)
+    setRefreshing(false)
+  }
 
   if (error) {
     return (
@@ -237,6 +262,7 @@ export function PotentialSurveyDashboard() {
         apiPath="/api/potential-persona"
         title="Perfil del cliente potencial"
         subtitle="Generado con IA a partir de las respuestas de los encuestados"
+        cacheKey="persona_potential"
       />
 
       {/* Demografía */}
@@ -263,6 +289,21 @@ export function PotentialSurveyDashboard() {
           </div>
         </div>
       )}
+
+      {/* Cabecera análisis agrupados + botón actualizar */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          Análisis agrupados por IA
+        </p>
+        <button
+          onClick={handleRefreshAll}
+          disabled={refreshing}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+        >
+          <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
+          {refreshing ? 'Actualizando…' : 'Actualizar análisis'}
+        </button>
+      </div>
 
       {/* Preguntas abiertas */}
       {OPEN_QUESTIONS.map((q) => {
