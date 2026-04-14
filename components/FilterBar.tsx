@@ -8,7 +8,7 @@ export interface ActiveFilters {
 
 export interface FilterOptions {
   ageRanges: string[]
-  painValues: string[]
+  painValues?: string[]
 }
 
 interface FilterBarProps {
@@ -42,15 +42,15 @@ export function FilterBar({
 }: FilterBarProps) {
   const isFiltered =
     activeFilters.gender !== 'all' ||
-    activeFilters.ageRanges.length > 0 ||
-    activeFilters.painValues.length > 0
+    (activeFilters.ageRanges?.length ?? 0) > 0 ||
+    (activeFilters.painValues?.length ?? 0) > 0
 
   function set<K extends keyof ActiveFilters>(key: K, value: ActiveFilters[K]) {
     onChange({ ...activeFilters, [key]: value })
   }
 
   function reset() {
-    onChange({ gender: 'all', ageRanges: [], painValues: [] })
+    onChange({ ...activeFilters, gender: 'all', ageRanges: [], painValues: [] })
   }
 
   return (
@@ -126,21 +126,21 @@ export function FilterBar({
         )}
 
         {/* Dolor crónico */}
-        {filterOptions.painValues.length > 0 && (
+        {(filterOptions.painValues?.length ?? 0) > 0 && (
           <div className="space-y-1.5">
             <p className="text-xs text-gray-400 font-medium">
               Dolor crónico
-              {activeFilters.painValues.length > 0 && (
-                <span className="ml-1.5 text-violet-600">({activeFilters.painValues.length} seleccionados)</span>
+              {(activeFilters.painValues?.length ?? 0) > 0 && (
+                <span className="ml-1.5 text-violet-600">({activeFilters.painValues!.length} seleccionados)</span>
               )}
             </p>
             <div className="flex gap-1.5 flex-wrap">
-              {filterOptions.painValues.map((val) => {
-                const active = activeFilters.painValues.includes(val)
+              {filterOptions.painValues!.map((val) => {
+                const active = (activeFilters.painValues ?? []).includes(val)
                 return (
                   <button
                     key={val}
-                    onClick={() => set('painValues', toggleValue(activeFilters.painValues, val))}
+                    onClick={() => set('painValues', toggleValue(activeFilters.painValues ?? [], val))}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                       active
                         ? 'bg-violet-600 text-white border-violet-600'
