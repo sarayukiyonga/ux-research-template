@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import {
   POTENTIAL_SHEET_ID,
@@ -10,6 +10,8 @@ import {
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+type Gender = 'men' | 'women' | 'nonBinary'
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -19,8 +21,33 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export async function GET() {
+function getRowGender(row: string[]): Gender | null {
+  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.men] ?? '').trim()) return 'men'
+  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.women] ?? '').trim()) return 'women'
+  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()) return 'nonBinary'
+  return null
+}
+
+function getRowAge(row: string[]): string {
+  return (
+    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.men] ?? '').trim() ||
+    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.women] ?? '').trim() ||
+    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
+  )
+}
+
+// Column index for pain question (Q1)
+const PAIN_COLUMN_INDEX = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
+
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = request.nextUrl
+    const genderParam = searchParams.get('gender') ?? 'all'
+    const ageRangesParam = searchParams.get('ageRanges') ?? ''
+    const selectedAgeRanges = ageRangesParam ? ageRangesParam.split(',').map((s) => s.trim()).filter(Boolean) : []
+    const painValuesParam = searchParams.get('painValues') ?? ''
+    const selectedPainValues = painValuesParam ? painValuesParam.split(',').map((s) => s.trim()).filter(Boolean) : []
+
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -34,7 +61,34 @@ export async function GET() {
     })
 
     const rows = res.data.values ?? []
-    const dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+    const allDataRows = rows.slice(1).filter((row) => row.some(Boolean))
+
+    // Compute filter options from the full dataset
+    const ageRangesSet = new Set<string>()
+    const painValuesSet = new Set<string>()
+    for (const row of allDataRows) {
+      const age = getRowAge(row)
+      if (age) ageRangesSet.add(age)
+      const pain = (row[PAIN_COLUMN_INDEX] ?? '').trim()
+      if (pain) painValuesSet.add(pain)
+    }
+    const ageRanges = Array.from(ageRangesSet).sort()
+    const painValues = Array.from(painValuesSet).sort()
+
+    // Apply filters
+    const dataRows = allDataRows.filter((row) => {
+      if (genderParam !== 'all') {
+        if (getRowGender(row) !== genderParam) return false
+      }
+      if (selectedAgeRanges.length > 0) {
+        if (!selectedAgeRanges.includes(getRowAge(row))) return false
+      }
+      if (selectedPainValues.length > 0) {
+        const pain = (row[PAIN_COLUMN_INDEX] ?? '').trim()
+        if (!selectedPainValues.includes(pain)) return false
+      }
+      return true
+    })
 
     const byQuestion = POTENTIAL_QUESTIONS.map((q) => ({
       questionId: q.id,
@@ -91,10 +145,12 @@ export async function GET() {
 
     return NextResponse.json({
       totalResponses: dataRows.length,
+      totalAll: allDataRows.length,
       lastUpdated: lastRow?.[0] ?? '',
       byQuestion,
       distributions,
       demographic,
+      filterOptions: { ageRanges, painValues },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error desconocido'
