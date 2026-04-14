@@ -7,14 +7,17 @@ import { DemographicCard } from './DemographicCard'
 import { PersonaCard } from './PersonaCard'
 import { OccupationsCard } from './OccupationsCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
+import { FilterBar, type ActiveFilters, type FilterOptions } from './FilterBar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { loadCache, saveCache, clearCacheByPrefix } from '@/lib/ai-cache'
 
 interface SurveyData {
   totalResponses: number
+  totalAll: number
   lastUpdated: string
   byQuestion: { questionId: number; answers: string[] }[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
+  filterOptions: FilterOptions
 }
 
 interface GroupState {
@@ -27,6 +30,16 @@ interface GroupState {
 const SKIP_GROUPED = [2]
 const GROUPED_QUESTIONS = QUESTIONS.filter((q) => !SKIP_GROUPED.includes(q.id))
 const CACHE_PREFIX = 'survey_group_q'
+
+const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
+
+function filtersToQuery(filters: ActiveFilters): string {
+  const params = new URLSearchParams()
+  if (filters.gender !== 'all') params.set('gender', filters.gender)
+  if (filters.ageRanges.length > 0) params.set('ageRanges', filters.ageRanges.join(','))
+  const qs = params.toString()
+  return qs ? `/api/survey?${qs}` : '/api/survey'
+}
 
 async function fetchGroups(questionTitle: string, answers: string[]): Promise<Group[]> {
   const r = await fetch('/api/group-responses', {
@@ -47,6 +60,7 @@ export function SurveyDashboard() {
   const [error, setError] = useState('')
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
   const [refreshing, setRefreshing] = useState(false)
+  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
 
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
@@ -113,14 +127,16 @@ export function SurveyDashboard() {
   }, [data])
 
   useEffect(() => {
-    fetch('/api/survey')
+    setData(null)
+    setError('')
+    fetch(filtersToQuery(filters))
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error)
         else setData(d)
       })
       .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
-  }, [])
+  }, [filters])
 
   async function handleRefreshAll() {
     if (!data) return
@@ -128,6 +144,12 @@ export function SurveyDashboard() {
     clearCacheByPrefix(CACHE_PREFIX)
     await loadAllGroups(data, true)
     setRefreshing(false)
+  }
+
+  function handleFiltersChange(newFilters: ActiveFilters) {
+    clearCacheByPrefix(CACHE_PREFIX)
+    setGroupStates({})
+    setFilters(newFilters)
   }
 
   if (error) {
@@ -162,6 +184,15 @@ export function SurveyDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Filtros */}
+      <FilterBar
+        filterOptions={data.filterOptions}
+        activeFilters={filters}
+        totalFiltered={data.totalResponses}
+        totalAll={data.totalAll}
+        onChange={handleFiltersChange}
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border bg-white p-4 shadow-sm">

@@ -32,15 +32,43 @@ export interface SurveyRow {
   answers: string[]
 }
 
+export interface SurveyFilters {
+  gender?: string
+  ageRanges?: string[]
+}
+
+export interface SurveyFilterOptions {
+  ageRanges: string[]
+}
+
 export interface SurveyData {
   totalResponses: number
+  totalAll: number
   lastUpdated: string
   responses: SurveyRow[]
   byQuestion: { questionId: number; answers: string[] }[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
+  filterOptions: SurveyFilterOptions
 }
 
-export async function getSurveyData(): Promise<SurveyData> {
+type Gender = 'men' | 'women' | 'nonBinary'
+
+function getRowGender(row: string[]): Gender | null {
+  if ((row[DEMOGRAPHIC_COLUMNS.men] ?? '').trim()) return 'men'
+  if ((row[DEMOGRAPHIC_COLUMNS.women] ?? '').trim()) return 'women'
+  if ((row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()) return 'nonBinary'
+  return null
+}
+
+function getRowAge(row: string[]): string {
+  return (
+    (row[DEMOGRAPHIC_COLUMNS.men] ?? '').trim() ||
+    (row[DEMOGRAPHIC_COLUMNS.women] ?? '').trim() ||
+    (row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
+  )
+}
+
+export async function getSurveyData(filters: SurveyFilters = {}): Promise<SurveyData> {
   const auth = getAuth()
   const sheets = google.sheets({ version: 'v4', auth })
 
@@ -50,8 +78,26 @@ export async function getSurveyData(): Promise<SurveyData> {
   })
 
   const rows = res.data.values ?? []
-  // First row is headers, skip it
-  const dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const allDataRows = rows.slice(1).filter((row) => row.some(Boolean))
+
+  // Compute filter options from the full dataset
+  const ageRangesSet = new Set<string>()
+  for (const row of allDataRows) {
+    const age = getRowAge(row)
+    if (age) ageRangesSet.add(age)
+  }
+  const ageRanges = Array.from(ageRangesSet).sort()
+
+  // Apply filters
+  const dataRows = allDataRows.filter((row) => {
+    if (filters.gender && filters.gender !== 'all') {
+      if (getRowGender(row) !== filters.gender) return false
+    }
+    if (filters.ageRanges && filters.ageRanges.length > 0) {
+      if (!filters.ageRanges.includes(getRowAge(row))) return false
+    }
+    return true
+  })
 
   const responses: SurveyRow[] = dataRows.map((row) => ({
     timestamp: row[0] ?? '',
@@ -78,9 +124,11 @@ export async function getSurveyData(): Promise<SurveyData> {
 
   return {
     totalResponses: dataRows.length,
+    totalAll: allDataRows.length,
     lastUpdated,
     responses,
     byQuestion,
     demographic,
+    filterOptions: { ageRanges },
   }
 }
