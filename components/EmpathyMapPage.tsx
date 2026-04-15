@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -300,11 +300,33 @@ const POS = {
 }
 
 function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
+  const outerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  const [scaledH, setScaledH] = useState(0)
+
+  useEffect(() => {
+    const update = () => {
+      if (!outerRef.current || !innerRef.current) return
+      const w = outerRef.current.clientWidth
+      if (w > 0) {
+        const s = w / SQ
+        setScale(s)
+        setScaledH(innerRef.current.scrollHeight * s)
+      }
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    if (outerRef.current) ro.observe(outerRef.current)
+    return () => ro.disconnect()
+  }, [data])
+
   return (
-    <div className="overflow-x-auto pb-1">
+    <div ref={outerRef} style={{ width: '100%', height: scaledH || undefined, overflow: 'hidden' }}>
       <div
+        ref={innerRef}
         className="border border-gray-200 rounded-2xl overflow-hidden bg-white"
-        style={{ width: SQ }}
+        style={{ width: SQ, transform: `scale(${scale})`, transformOrigin: 'top left' }}
       >
         {/* ── TOP SQUARE: 5 sections + avatar ── */}
         <div className="relative bg-white" style={{ width: SQ, height: SQ }}>
