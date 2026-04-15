@@ -13,6 +13,8 @@ interface SurveyFilters {
   painValues?: string[]
 }
 
+type EmpathySegment = 'clientes' | 'potenciales'
+
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
 function getAuth() {
@@ -191,22 +193,30 @@ async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
 // ── POST ───────────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  const { filters = {} } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  const filters: SurveyFilters = body.filters ?? {}
+  const segment = body.segment as EmpathySegment | undefined
 
-  const [interview, clientVoice, potentialVoice] = await Promise.all([
-    getCeoInterview(),
-    getClientVoice(filters),
-    getPotentialVoice(filters),
-  ])
+  if (segment !== 'clientes' && segment !== 'potenciales') {
+    return NextResponse.json({ error: 'segment requerido: clientes | potenciales' }, { status: 400 })
+  }
+
+  const interview = await getCeoInterview()
+  const surveyVoice =
+    segment === 'clientes' ? await getClientVoice(filters) : await getPotentialVoice(filters)
+
+  const audiencia =
+    segment === 'clientes'
+      ? 'CLIENTES ACTUALES de MOA (ya entrenan con Patricia). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.'
+      : 'CLIENTES POTENCIALES de MOA (aún no son clientes). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.'
 
   const { object } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema,
     system: `Eres un UX researcher experto en mapas de empatía aplicados a marcas de salud y bienestar.
-Tu tarea es construir un mapa de empatía del cliente/usuario de MOA a partir de tres fuentes:
-1. Entrevista a la fundadora Patricia Dorado (visión, valores, cómo percibe a sus clientes)
-2. Respuestas reales de clientes actuales de MOA
-3. Respuestas de clientes potenciales (personas que aún no son clientes)
+Construyes UN mapa de empatía para MOA (entrenadora personal de salud en Martorell) usando:
+1. Entrevista a Patricia Dorado (contexto de marca y visión; úsala con moderación, sin sustituir la voz del encuestado).
+2. ${audiencia}
 
 INSTRUCCIONES PARA CADA SECCIÓN:
 - "piensaSiente": Extrae miedos, preocupaciones no dichas, lo que realmente les importa, sus aspiraciones internas.
@@ -222,7 +232,7 @@ FORMATO DE CADA NOTA:
 - Directas y concretas, no abstractas
 - En primera persona o como cita cuando sea posible
 - Sin repetición entre secciones`,
-    prompt: `=== ENTREVISTA A LA FUNDADORA ===\n${interview}\n\n=== VOZ DE CLIENTES ACTUALES ===\n${clientVoice}\n\n=== VOZ DE CLIENTES POTENCIALES ===\n${potentialVoice}`,
+    prompt: `=== ENTREVISTA A LA FUNDADORA (contexto) ===\n${interview}\n\n=== VOZ DE ENCUESTA (${segment === 'clientes' ? 'CLIENTES ACTUALES' : 'CLIENTES POTENCIALES'}) ===\n${surveyVoice}`,
   })
 
   return NextResponse.json(object)

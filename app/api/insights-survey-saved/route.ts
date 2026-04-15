@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 type Segment = 'clientes' | 'potenciales'
 
 function sheetName(segment: Segment) {
-  return segment === 'clientes' ? 'mapa-empatia-clientes' : 'mapa-empatia-potenciales'
+  return segment === 'clientes' ? 'insights-clientes' : 'insights-potenciales'
 }
 
 function getAuth() {
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
         data: [
           {
             range: `${name}!A1:C1`,
-            values: [['Guardado el', 'Mapa de empatía (JSON)', 'Filtros (JSON)']],
+            values: [['Guardado el', 'Insights (JSON)', 'Filtros (JSON)']],
           },
           {
             range: `${name}!A2:C2`,

@@ -35,16 +35,6 @@ const sections = [
     color: 'blue',
   },
   {
-    href: '/pov',
-    emoji: '💬',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'Point of View (POV)',
-    description:
-      'Dos declaraciones: una de clientes actuales y otra de potenciales, con el patrón [Usuario] necesita [Necesidad] porque [Insight].',
-    color: 'sky',
-  },
-  {
     href: '/user-persona',
     emoji: '👤',
     tag: 'Conocimiento del cliente',
@@ -61,8 +51,28 @@ const sections = [
     tagPulse: false,
     title: 'Mapa de empatía',
     description:
-      'Qué piensa, siente, ve, oye, dice y hace el cliente de MOA. Generado con IA a partir de las encuestas de clientes actuales y potenciales.',
+      'Qué piensa, siente, ve, oye, dice y hace el cliente: dos pestañas (clientes actuales y potenciales), cada una con su encuesta y filtros.',
     color: 'rose',
+  },
+  {
+    href: '/insights',
+    emoji: '💡',
+    tag: 'Conocimiento del cliente',
+    tagPulse: false,
+    title: 'Insights',
+    description:
+      'Patrones y hallazgos accionables con IA: dos pestañas (clientes actuales y potenciales), cada una con su encuesta y filtros.',
+    color: 'amber',
+  },
+  {
+    href: '/pov',
+    emoji: '💬',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'Point of View (POV)',
+    description:
+      'Dos declaraciones: una de clientes actuales y otra de potenciales, con el patrón [Usuario] necesita [Necesidad] porque [Insight].',
+    color: 'sky',
   },
   {
     href: '/design',
@@ -112,6 +122,12 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-sky-300',
     icon: 'bg-sky-100',
     arrow: 'text-sky-400 group-hover:text-sky-600',
+  },
+  amber: {
+    tag: 'bg-amber-100 text-amber-800',
+    border: 'hover:border-amber-300',
+    icon: 'bg-amber-100',
+    arrow: 'text-amber-400 group-hover:text-amber-600',
   },
 }
 
