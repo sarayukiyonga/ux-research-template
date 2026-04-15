@@ -1,135 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
-
-// ── Filter types ───────────────────────────────────────────────────────────────
-
-interface ActiveFilters {
-  gender: 'all' | 'men' | 'women' | 'nonBinary'
-  ageRanges: string[]
-  painValues: string[]
-}
-
-interface FilterOptions {
-  ageRanges: string[]
-  painValues: string[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
-
-const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'women', label: 'Mujeres' },
-  { value: 'men', label: 'Hombres' },
-  { value: 'nonBinary', label: 'No binario' },
-]
-
-function toggleArr(arr: string[], v: string) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
-}
-
-function FiltersPanel({
-  filters,
-  options,
-  onChange,
-}: {
-  filters: ActiveFilters
-  options: FilterOptions
-  onChange: (f: ActiveFilters) => void
-}) {
-  const isFiltered = filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-  const activeCount = (filters.gender !== 'all' ? 1 : 0) + filters.ageRanges.length + filters.painValues.length
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          Filtrar encuestas
-          {isFiltered && (
-            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-sky-600 text-white text-[10px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
-        </p>
-        {isFiltered && (
-          <button
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 font-medium">Género</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filters, gender: opt.value })}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  filters.gender === opt.value
-                    ? 'bg-sky-600 text-white border-sky-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-sky-300 hover:text-sky-600'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {options.ageRanges.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Franja de edad
-              {filters.ageRanges.length > 0 && <span className="ml-1 text-sky-600">({filters.ageRanges.length})</span>}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.ageRanges.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.ageRanges.includes(r)
-                      ? 'bg-sky-600 text-white border-sky-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-sky-300 hover:text-sky-600'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {options.painValues.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
-              {filters.painValues.length > 0 && <span className="ml-1 text-sky-600">({filters.painValues.length})</span>}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.painValues.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.painValues.includes(v)
-                      ? 'bg-sky-600 text-white border-sky-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-sky-300 hover:text-sky-600'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+import { POVPersonaSource } from '@/components/POVPersonaSource'
 
 // ── POV statement types ────────────────────────────────────────────────────────
 
@@ -161,7 +35,49 @@ function normalizeSavedStatements(raw: unknown): POVPair | null {
   return null
 }
 
+/** La UI concatena "[usuario] necesita …"; limpia colas típicas de la IA que chocan con esa plantilla. */
+function sanitizePovUsuario(usuario: string): string {
+  let s = usuario.trim()
+  const stripEnd = (re: RegExp) => {
+    const next = s.replace(re, '').trim()
+    if (next !== s) s = next
+  }
+  stripEnd(/\s*,\s*que\s+busca\s+un\s+ambiente\s+a\s*$/i)
+  stripEnd(/\s+que\s+busca\s+un\s+ambiente\s+a\s*$/i)
+  stripEnd(/\s*,\s*que\s+busca\s+un\s+ambiente\s*$/i)
+  stripEnd(/\s+que\s+busca\s+un\s+ambiente\s*$/i)
+  stripEnd(/\s*,\s*que\s+ya\s*$/i)
+  stripEnd(/\s+que\s+ya\s*$/i)
+  // Si quedó "Patri en M" por límite de caracteres en el JSON guardado, completar Martorell (MOA)
+  if (/Patri\s+en\s+M\s*$/i.test(s)) {
+    s = s.replace(/Patri\s+en\s+M\s*$/i, 'Patri en Martorell').trim()
+  }
+  return s.trim()
+}
+
+function hasValidPersonasPayload(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false
+  const o = data as Record<string, unknown>
+  const ca = o.clienteActual
+  const cp = o.clientePotencial
+  if (!ca || !cp || typeof ca !== 'object' || typeof cp !== 'object') return false
+  const check = (p: Record<string, unknown>) =>
+    typeof p.nombre === 'string' &&
+    Array.isArray(p.motivaciones) &&
+    p.motivaciones.length > 0 &&
+    Array.isArray(p.necesidades) &&
+    p.necesidades.length > 0
+  return check(ca as Record<string, unknown>) && check(cp as Record<string, unknown>)
+}
+
 // ── POV Bubble ─────────────────────────────────────────────────────────────────
+
+function formatInsightForPov(insight: string): { text: string; showClosingDot: boolean } {
+  let t = insight.trim().replace(/\.{2,}\s*$/, '.')
+  if (!t) return { text: t, showClosingDot: true }
+  const showClosingDot = !/[.!?…]\s*$/.test(t)
+  return { text: t, showClosingDot }
+}
 
 function POVBubble({
   statement,
@@ -172,14 +88,13 @@ function POVBubble({
   sectionLabel: string
   tailLeft: boolean
 }) {
+  const { text: insightText, showClosingDot } = formatInsightForPov(statement.insight)
   return (
     <div className="flex flex-col" style={{ alignItems: tailLeft ? 'flex-start' : 'flex-end' }}>
-      {/* Bubble */}
       <div
         className="relative rounded-2xl border border-sky-200 px-6 py-5 max-w-2xl w-full"
         style={{ backgroundColor: '#dff1fb' }}
       >
-        {/* Section badge */}
         <span
           className="absolute -top-3 left-5 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide text-white shadow-sm"
           style={{ backgroundColor: '#3b9fd4' }}
@@ -187,9 +102,8 @@ function POVBubble({
           {sectionLabel}
         </span>
 
-        {/* POV text */}
         <p className="text-sm leading-relaxed text-sky-900">
-          <span className="text-sky-500 font-normal italic">{statement.usuario}</span>
+          <span className="text-sky-500 font-normal italic">{sanitizePovUsuario(statement.usuario)}</span>
           {' '}
           <span className="font-bold text-sky-800">necesita</span>
           {' '}
@@ -197,12 +111,11 @@ function POVBubble({
           {' '}
           <span className="font-bold text-sky-800">porque</span>
           {' '}
-          <span className="text-sky-600">{statement.insight}</span>
-          <span className="text-sky-400">.</span>
+          <span className="text-sky-600">{insightText}</span>
+          {showClosingDot ? <span className="text-sky-400">.</span> : null}
         </p>
       </div>
 
-      {/* Bubble tail (CSS triangle) */}
       <div
         style={{
           width: 0,
@@ -226,35 +139,24 @@ export function POVPage() {
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
-
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
+  const [personasOk, setPersonasOk] = useState(false)
 
   useEffect(() => {
     Promise.all([
       fetch('/api/pov-saved').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
-    ]).then(([saved, survey, potential]) => {
-      if (saved?.saved) {
-        const pair = normalizeSavedStatements(saved.saved.statements)
-        setStatements(pair)
-        setSavedAt(saved.saved.savedAt)
-        if (saved.saved.filters) {
-          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
+      fetch('/api/user-persona-saved').then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([povSaved, personaSaved]) => {
+        if (povSaved?.saved) {
+          const pair = normalizeSavedStatements(povSaved.saved.statements)
+          setStatements(pair)
+          setSavedAt(povSaved.saved.savedAt)
         }
-      }
-      const ageSet = new Set<string>([
-        ...(survey?.filterOptions?.ageRanges ?? []),
-        ...(potential?.filterOptions?.ageRanges ?? []),
-      ])
-      setFilterOptions({
-        ageRanges: Array.from(ageSet).sort(),
-        painValues: potential?.filterOptions?.painValues ?? [],
+        setPersonasOk(hasValidPersonasPayload(personaSaved?.saved?.personas))
       })
-    }).finally(() => setLoadingSaved(false))
+      .finally(() => setLoadingSaved(false))
   }, [])
 
   const saveStatements = async (data: POVPair) => {
@@ -263,7 +165,7 @@ export function POVPage() {
       const r = await fetch('/api/pov-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statements: data, filters }),
+        body: JSON.stringify({ statements: data, filters: { fuente: 'user-persona' } }),
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
@@ -273,29 +175,23 @@ export function POVPage() {
 
   const generate = async () => {
     setGenerating(true)
-    setGenError(false)
+    setGenError(null)
     try {
-      const res = await fetch('/api/pov', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters }),
-      })
-      if (!res.ok) throw new Error('Error')
-      const d = await res.json()
+      const res = await fetch('/api/pov', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar los POV.')
+        return
+      }
       const pair: POVPair = { clienteActual: d.clienteActual, clientePotencial: d.clientePotencial }
       setStatements(pair)
       await saveStatements(pair)
     } catch {
-      setGenError(true)
+      setGenError('No se pudieron generar los POV. Inténtalo de nuevo.')
     } finally {
       setGenerating(false)
     }
   }
-
-  const isFiltered = filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-  const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
-
-  // ── Loading ──
 
   if (loadingSaved) {
     return (
@@ -310,14 +206,12 @@ export function POVPage() {
     )
   }
 
-  // ── Generating ──
-
   if (generating) {
     return (
       <div className="space-y-5 py-4">
         <div className="text-center space-y-2 py-4">
           <div className="inline-block h-6 w-6 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Analizando respuestas y construyendo los POV…</p>
+          <p className="text-sm text-gray-500">Leyendo user personas y construyendo los POV…</p>
         </div>
         {[1, 2].map((i) => (
           <div key={i} className="rounded-2xl border p-5 space-y-2">
@@ -329,15 +223,13 @@ export function POVPage() {
     )
   }
 
-  // ── Error ──
-
   if (genError) {
     return (
-      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-600">No se pudieron generar los POV. Inténtalo de nuevo.</p>
+      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="text-sm text-red-600">{genError}</p>
         <button
           onClick={generate}
-          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors self-start sm:self-auto"
         >
           Reintentar
         </button>
@@ -345,25 +237,38 @@ export function POVPage() {
     )
   }
 
-  // ── Empty state ──
-
   if (!statements) {
     return (
       <div className="space-y-5">
-        <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+        <POVPersonaSource variant="full" />
+        {!personasOk && (
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
+            <p className="font-medium">Faltan user personas guardados</p>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Genera y guarda los <strong>dos</strong> perfiles en la página User Persona; los POV se derivan solo de
+              ahí.
+            </p>
+            <Link
+              href="/user-persona"
+              className="inline-block text-xs font-semibold text-amber-900 underline underline-offset-2"
+            >
+              Ir a User Persona →
+            </Link>
+          </div>
+        )}
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">💬</div>
           <div className="space-y-1">
             <p className="font-semibold text-gray-800">Genera los POV de MOA</p>
             <p className="text-sm text-gray-500 max-w-md mx-auto">
-              Se generarán <strong>dos</strong> declaraciones Point of View: una a partir solo de{' '}
-              <strong>clientes actuales</strong> y otra solo de <strong>clientes potenciales</strong>, con el patrón
-              <span className="italic"> [Usuario] necesita [Necesidad] porque [Insight]</span>.
+              Dos declaraciones <span className="italic">[Usuario] necesita [Necesidad] porque [Insight]</span>, una por
+              cada <strong>user persona</strong> guardado (cliente actual y cliente potencial).
             </p>
           </div>
           <button
             onClick={generate}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm"
+            disabled={!personasOk}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm disabled:opacity-45 disabled:pointer-events-none"
           >
             ✦ Generar los 2 POV
           </button>
@@ -372,51 +277,10 @@ export function POVPage() {
     )
   }
 
-  // ── Results ──
-
   return (
     <div className="space-y-5">
-      <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+      <POVPersonaSource variant="full" />
 
-      {/* Filter context banner */}
-      <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 space-y-2">
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-sky-700">
-            {isFiltered ? 'POV generados con estos filtros:' : 'POV generados sin filtros activos'}
-          </p>
-          {isFiltered && (
-            <div className="flex flex-wrap gap-1.5">
-              {filters.gender !== 'all' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-600 text-white text-xs font-medium">
-                  {genderLabel}
-                </span>
-              )}
-              {filters.ageRanges.map((r) => (
-                <span key={r} className="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-600 text-white text-xs font-medium">
-                  {r} años
-                </span>
-              ))}
-              {filters.painValues.map((v) => (
-                <span key={v} className="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-600 text-white text-xs font-medium">
-                  Dolor: {v}
-                </span>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-sky-500">
-            Cambia los filtros y pulsa{' '}
-            <button
-              onClick={generate}
-              className="font-semibold underline underline-offset-2 hover:text-sky-700 transition-colors"
-            >
-              ↺ Regenerar
-            </button>{' '}
-            para actualizar los POV según el segmento que necesites.
-          </p>
-        </div>
-      </div>
-
-      {/* Header actions */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-xs text-gray-400 flex items-center gap-1.5">
           {saving ? (
@@ -439,18 +303,9 @@ export function POVPage() {
         </button>
       </div>
 
-      {/* POV bubbles */}
       <div className="space-y-4">
-        <POVBubble
-          statement={statements.clienteActual}
-          sectionLabel="Clientes actuales"
-          tailLeft
-        />
-        <POVBubble
-          statement={statements.clientePotencial}
-          sectionLabel="Clientes potenciales"
-          tailLeft={false}
-        />
+        <POVBubble statement={statements.clienteActual} sectionLabel="Clientes actuales" tailLeft />
+        <POVBubble statement={statements.clientePotencial} sectionLabel="Clientes potenciales" tailLeft={false} />
       </div>
     </div>
   )

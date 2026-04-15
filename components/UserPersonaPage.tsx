@@ -1,139 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
-
-// ── Filter types & helpers ─────────────────────────────────────────────────────
-
-interface ActiveFilters {
-  gender: 'all' | 'men' | 'women' | 'nonBinary'
-  ageRanges: string[]
-  painValues: string[]
-}
-
-interface FilterOptions {
-  ageRanges: string[]
-  painValues: string[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
-
-const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'women', label: 'Mujeres' },
-  { value: 'men', label: 'Hombres' },
-  { value: 'nonBinary', label: 'No binario' },
-]
-
-function toggleArr(arr: string[], v: string) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
-}
-
-function FiltersPanel({
-  filters,
-  options,
-  onChange,
-}: {
-  filters: ActiveFilters
-  options: FilterOptions
-  onChange: (f: ActiveFilters) => void
-}) {
-  const isFiltered = filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-  const activeCount = (filters.gender !== 'all' ? 1 : 0) + filters.ageRanges.length + filters.painValues.length
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          Filtrar encuestas
-          {isFiltered && (
-            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
-        </p>
-        {isFiltered && (
-          <button
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 font-medium">Género</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filters, gender: opt.value })}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  filters.gender === opt.value
-                    ? 'bg-violet-600 text-white border-violet-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {options.ageRanges.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Franja de edad
-              {filters.ageRanges.length > 0 && (
-                <span className="ml-1 text-violet-600">({filters.ageRanges.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.ageRanges.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.ageRanges.includes(r)
-                      ? 'bg-violet-600 text-white border-violet-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {options.painValues.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
-              {filters.painValues.length > 0 && (
-                <span className="ml-1 text-violet-600">({filters.painValues.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.painValues.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.painValues.includes(v)
-                      ? 'bg-violet-600 text-white border-violet-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+import { UserPersonaInsightsSource } from '@/components/UserPersonaInsightsSource'
+import { readSegmentSurveyFilters, segmentFiltersToApi } from '@/lib/segment-survey-filters'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -157,7 +28,6 @@ interface Persona {
   edad: number
   educacion: string
   ubicacion: string
-  estadoCivil: string
   ocupacion: string
   tags: string[]
   frase: string
@@ -279,7 +149,6 @@ function PersonaCard({ persona, type }: { persona: Persona; type: 'clienteActual
             <DataRow icon="🎂" label="Edad" value={`${persona.edad} años`} />
             <DataRow icon="🎓" label="Estudios" value={persona.educacion} />
             <DataRow icon="📍" label="Ubicación" value={persona.ubicacion} />
-            <DataRow icon="💍" label="Estado civil" value={persona.estadoCivil} />
             <DataRow icon="💼" label="Ocupación" value={persona.ocupacion} />
           </div>
 
@@ -386,44 +255,52 @@ function InsightBlock({ title, items, dotColor, icon }: { title: string; items: 
 
 // ── Main page component ────────────────────────────────────────────────────────
 
+function hasValidInsightsPayload(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false
+  const o = data as Record<string, unknown>
+  return (
+    typeof o.resumen === 'string' &&
+    o.resumen.trim().length > 0 &&
+    Array.isArray(o.bloques) &&
+    o.bloques.length > 0
+  )
+}
+
 export function UserPersonaPage() {
   const [personas, setPersonas] = useState<UserPersonas | null>(null)
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
-
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
+  const [insightsClientesOk, setInsightsClientesOk] = useState(false)
+  const [insightsPotencialesOk, setInsightsPotencialesOk] = useState(false)
 
   useEffect(() => {
     Promise.all([
       fetch('/api/user-persona-saved').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
-    ]).then(([saved, survey, potential]) => {
-      if (saved?.saved) {
-        setPersonas(saved.saved.personas)
-        setSavedAt(saved.saved.savedAt)
-        if (saved.saved.filters) {
-          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
+      fetch('/api/insights-survey-saved?segment=clientes').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/insights-survey-saved?segment=potenciales').then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([saved, ic, ip]) => {
+        if (saved?.saved?.personas) {
+          setPersonas(saved.saved.personas)
+          setSavedAt(saved.saved.savedAt)
         }
-      }
-      const ageSet = new Set<string>([
-        ...(survey?.filterOptions?.ageRanges ?? []),
-        ...(potential?.filterOptions?.ageRanges ?? []),
-      ])
-      setFilterOptions({
-        ageRanges: Array.from(ageSet).sort(),
-        painValues: potential?.filterOptions?.painValues ?? [],
+        setInsightsClientesOk(hasValidInsightsPayload(ic?.saved?.data))
+        setInsightsPotencialesOk(hasValidInsightsPayload(ip?.saved?.data))
       })
-    }).finally(() => setLoadingSaved(false))
+      .finally(() => setLoadingSaved(false))
   }, [])
 
   const savePersonas = async (data: UserPersonas) => {
     setSaving(true)
     try {
+      const filters = {
+        fuente: 'insights',
+        clientes: segmentFiltersToApi(readSegmentSurveyFilters('clientes')),
+        potenciales: segmentFiltersToApi(readSegmentSurveyFilters('potenciales')),
+      }
       const r = await fetch('/api/user-persona-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -437,19 +314,26 @@ export function UserPersonaPage() {
 
   const generate = async () => {
     setGenerating(true)
-    setGenError(false)
+    setGenError(null)
     try {
       const res = await fetch('/api/user-persona', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters }),
+        body: JSON.stringify({
+          filtersClientes: segmentFiltersToApi(readSegmentSurveyFilters('clientes')),
+          filtersPotenciales: segmentFiltersToApi(readSegmentSurveyFilters('potenciales')),
+        }),
       })
-      if (!res.ok) throw new Error('Error')
-      const d: UserPersonas = await res.json()
-      setPersonas(d)
-      await savePersonas(d)
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar los perfiles.')
+        return
+      }
+      const personasPayload = d as UserPersonas
+      setPersonas(personasPayload)
+      await savePersonas(personasPayload)
     } catch {
-      setGenError(true)
+      setGenError('No se pudieron generar los perfiles. Inténtalo de nuevo.')
     } finally {
       setGenerating(false)
     }
@@ -479,7 +363,7 @@ export function UserPersonaPage() {
       <div className="space-y-5 py-4">
         <div className="text-center space-y-2 py-4">
           <div className="inline-block h-6 w-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Analizando encuestas y construyendo los perfiles…</p>
+          <p className="text-sm text-gray-500">Leyendo insights y construyendo los dos perfiles…</p>
         </div>
         {[1, 2].map((i) => (
           <div key={i} className="rounded-2xl border p-5 space-y-3">
@@ -496,11 +380,11 @@ export function UserPersonaPage() {
 
   if (genError) {
     return (
-      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-600">No se pudo generar los perfiles. Inténtalo de nuevo.</p>
+      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="text-sm text-red-600">{genError}</p>
         <button
           onClick={generate}
-          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors self-start sm:self-auto"
         >
           Reintentar
         </button>
@@ -508,27 +392,64 @@ export function UserPersonaPage() {
     )
   }
 
-  const isFiltered = filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-  const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
+  const canGeneratePersonas = insightsClientesOk && insightsPotencialesOk
 
   // ── Empty state ──
 
   if (!personas) {
     return (
       <div className="space-y-5">
-        <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+        <UserPersonaInsightsSource variant="full" />
+        {!canGeneratePersonas && (
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
+            <p className="font-medium">Faltan insights guardados</p>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Necesitas haber generado y guardado los insights en <strong>ambas</strong> pestañas antes de crear los user
+              persona.
+            </p>
+            <ul className="text-xs space-y-1 list-disc list-inside text-amber-900">
+              <li>
+                Clientes actuales:{' '}
+                {insightsClientesOk ? (
+                  <span className="text-green-700 font-medium">listo</span>
+                ) : (
+                  <>
+                    <span className="text-amber-800">pendiente</span> —{' '}
+                    <Link href="/insights" className="underline font-medium">
+                      Ir a Insights (clientes)
+                    </Link>
+                  </>
+                )}
+              </li>
+              <li>
+                Clientes potenciales:{' '}
+                {insightsPotencialesOk ? (
+                  <span className="text-green-700 font-medium">listo</span>
+                ) : (
+                  <>
+                    <span className="text-amber-800">pendiente</span> —{' '}
+                    <Link href="/insights?tab=potenciales" className="underline font-medium">
+                      Ir a Insights (potenciales)
+                    </Link>
+                  </>
+                )}
+              </li>
+            </ul>
+          </div>
+        )}
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">👤</div>
           <div className="space-y-1">
             <p className="font-semibold text-gray-800">Genera los User Personas de MOA</p>
             <p className="text-sm text-gray-500 max-w-md mx-auto">
-              La IA analizará las respuestas de clientes actuales y potenciales para construir dos perfiles
-              detallados con motivaciones, necesidades, puntos de dolor y rasgos de personalidad.
+              La IA combina los <strong>insights guardados</strong> de cada segmento con la <strong>encuesta filtrada</strong>{' '}
+              (edad, género, ocupación, muestras de respuestas y recuentos en potenciales) más la entrevista a Patri.
             </p>
           </div>
           <button
             onClick={generate}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors shadow-sm"
+            disabled={!canGeneratePersonas}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors shadow-sm disabled:opacity-45 disabled:pointer-events-none"
           >
             ✦ Generar User Personas
           </button>
@@ -541,45 +462,7 @@ export function UserPersonaPage() {
 
   return (
     <div className="space-y-5">
-      <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
-
-      {/* Filter context banner */}
-      <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 space-y-2">
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-violet-700">
-            {isFiltered ? 'Perfiles generados con estos filtros:' : 'Perfiles generados sin filtros activos'}
-          </p>
-          {isFiltered && (
-            <div className="flex flex-wrap gap-1.5">
-              {filters.gender !== 'all' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                  {genderLabel}
-                </span>
-              )}
-              {filters.ageRanges.map((r) => (
-                <span key={r} className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                  {r} años
-                </span>
-              ))}
-              {filters.painValues.map((v) => (
-                <span key={v} className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                  Dolor: {v}
-                </span>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-violet-500">
-            Cambia los filtros y pulsa{' '}
-            <button
-              onClick={generate}
-              className="font-semibold underline underline-offset-2 hover:text-violet-700 transition-colors"
-            >
-              ↺ Regenerar
-            </button>{' '}
-            para actualizar los perfiles según el segmento que necesites.
-          </p>
-        </div>
-      </div>
+      <UserPersonaInsightsSource variant="full" />
 
       {/* Header actions */}
       <div className="flex items-center justify-between gap-2 flex-wrap">

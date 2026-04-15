@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { QUESTIONS } from '@/lib/questions'
 import { QuestionCard } from './QuestionCard'
 import { DemographicCard } from './DemographicCard'
 import { PersonaCard } from './PersonaCard'
-import { OccupationsCard } from './OccupationsCard'
+import { OccupationsCard, type OccupationResult } from './OccupationsCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { FilterBar, type ActiveFilters, type FilterOptions } from './FilterBar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { loadCache, saveCache, clearCacheByPrefix } from '@/lib/ai-cache'
+import { readSegmentSurveyFilters, writeSegmentSurveyFilters } from '@/lib/segment-survey-filters'
+import { stableFiltersKey, toSurveyAiFiltersPayload } from '@/lib/survey-ai-filters'
 
 interface SurveyData {
   totalResponses: number
@@ -29,7 +30,6 @@ interface GroupState {
 
 const SKIP_GROUPED = [2]
 const GROUPED_QUESTIONS = QUESTIONS.filter((q) => !SKIP_GROUPED.includes(q.id))
-const CACHE_PREFIX = 'survey_group_q'
 
 const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
 
@@ -60,7 +60,40 @@ export function SurveyDashboard() {
   const [error, setError] = useState('')
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
   const [refreshing, setRefreshing] = useState(false)
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<ActiveFilters>(() =>
+    typeof window !== 'undefined' ? readSegmentSurveyFilters('clientes') : DEFAULT_FILTERS
+  )
+  const [aiBundleSavedAt, setAiBundleSavedAt] = useState('')
+  const [aiSheetHydrating, setAiSheetHydrating] = useState(false)
+  const [personaSheet, setPersonaSheet] = useState({
+    text: '',
+    savedAt: '',
+    loading: false,
+    error: false,
+  })
+  const [occSheet, setOccSheet] = useState<{
+    data: OccupationResult | null
+    savedAt: string
+    loading: boolean
+    error: string
+  }>({ data: null, savedAt: '', loading: false, error: '' })
+
+  const filtersPayload = useMemo(() => toSurveyAiFiltersPayload(filters), [filters])
+  const filtersKey = useMemo(() => stableFiltersKey(filtersPayload), [filtersPayload])
+
+  const latestBundleRef = useRef({
+    personaText: '',
+    occupationData: null as OccupationResult | null,
+    groupStates: {} as Record<number, GroupState>,
+  })
+
+  useEffect(() => {
+    latestBundleRef.current = {
+      personaText: personaSheet.text,
+      occupationData: occSheet.data,
+      groupStates,
+    }
+  }, [personaSheet.text, occSheet.data, groupStates])
 
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
@@ -69,71 +102,107 @@ export function SurveyDashboard() {
     }))
   }, [])
 
-  const loadQuestion = useCallback(async (
-    questionId: number,
-    questionTitle: string,
-    answers: string[],
-    force = false
-  ) => {
-    if (answers.length < 4) {
-      setGroupState(questionId, { loading: false, groups: [], error: '' })
-      return
-    }
-
-    const cacheKey = CACHE_PREFIX + questionId
-    if (!force) {
-      const cached = loadCache<Group[]>(cacheKey)
-      if (cached) {
-        setGroupState(questionId, { loading: false, groups: cached.data, savedAt: cached.savedAt })
-        return
-      }
-    }
-
-    setGroupState(questionId, { loading: true, error: '', groups: [] })
-    try {
-      const groups = await fetchGroups(questionTitle, answers)
-      const savedAt = saveCache(cacheKey, groups)
-      setGroupState(questionId, { loading: false, groups, savedAt })
-    } catch (e) {
-      setGroupState(questionId, {
-        loading: false,
-        error: e instanceof Error ? e.message : 'Error desconocido',
-        groups: [],
+  const postSurveyAiSave = useCallback(
+    async (groupsRecord: Record<number, Group[]>, persona: string, occupations: OccupationResult | null) => {
+      const r = await fetch('/api/survey-ai-saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segment: 'clientes',
+          filters: filtersPayload,
+          groups: Object.fromEntries(Object.entries(groupsRecord).map(([k, v]) => [String(k), v])),
+          persona,
+          occupations,
+        }),
       })
-    }
-  }, [setGroupState])
-
-  const loadAllGroups = useCallback((surveyData: SurveyData, force = false) => {
-    const getAnswers = (id: number) =>
-      surveyData.byQuestion.find((q) => q.questionId === id)?.answers ?? []
-
-    const initial: Record<number, GroupState> = {}
-    for (const q of GROUPED_QUESTIONS) {
-      initial[q.id] = { groups: [], loading: true, error: '' }
-    }
-    setGroupStates(initial)
-
-    ;(async () => {
-      for (const q of GROUPED_QUESTIONS) {
-        await loadQuestion(q.id, q.title, getAnswers(q.id), force)
-      }
-    })()
-  }, [loadQuestion])
+      if (!r.ok) throw new Error(await r.text())
+      const d = await r.json()
+      return d.savedAt as string
+    },
+    [filtersPayload]
+  )
 
   useEffect(() => {
     if (!data) return
-    loadAllGroups(data, false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
+    let cancelled = false
+    setAiSheetHydrating(true)
+    setPersonaSheet({ text: '', savedAt: '', loading: true, error: false })
+    setOccSheet({ data: null, savedAt: '', loading: true, error: '' })
+
+    const qs = `segment=clientes&filters=${encodeURIComponent(JSON.stringify(filtersPayload))}`
+    fetch(`/api/survey-ai-saved?${qs}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        if (d.saved) {
+          const rawGroups = d.saved.groups ?? {}
+          const nextStates: Record<number, GroupState> = {}
+          for (const q of GROUPED_QUESTIONS) {
+            const arr = (rawGroups[String(q.id)] ?? rawGroups[q.id] ?? []) as Group[]
+            nextStates[q.id] = {
+              groups: Array.isArray(arr) ? arr : [],
+              loading: false,
+              error: '',
+              savedAt: d.saved.savedAt,
+            }
+          }
+          setGroupStates(nextStates)
+          setPersonaSheet({
+            text: typeof d.saved.persona === 'string' ? d.saved.persona : '',
+            savedAt: d.saved.savedAt,
+            loading: false,
+            error: false,
+          })
+          setOccSheet({
+            data: (d.saved.occupations ?? null) as OccupationResult | null,
+            savedAt: d.saved.savedAt,
+            loading: false,
+            error: '',
+          })
+          setAiBundleSavedAt(d.saved.savedAt)
+        } else {
+          const empty: Record<number, GroupState> = {}
+          for (const q of GROUPED_QUESTIONS) {
+            empty[q.id] = { groups: [], loading: false, error: '' }
+          }
+          setGroupStates(empty)
+          setPersonaSheet({ text: '', savedAt: '', loading: false, error: false })
+          setOccSheet({ data: null, savedAt: '', loading: false, error: '' })
+          setAiBundleSavedAt('')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonaSheet({ text: '', savedAt: '', loading: false, error: true })
+          setOccSheet((o) => ({ ...o, loading: false, error: 'No se pudo leer Google Sheets' }))
+          const empty: Record<number, GroupState> = {}
+          for (const q of GROUPED_QUESTIONS) {
+            empty[q.id] = { groups: [], loading: false, error: '' }
+          }
+          setGroupStates(empty)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAiSheetHydrating(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [data, filtersKey, filtersPayload])
 
   useEffect(() => {
     setData(null)
     setError('')
+    setAiSheetHydrating(false)
     fetch(filtersToQuery(filters))
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error)
-        else setData(d)
+        else {
+          setAiSheetHydrating(true)
+          setData(d)
+        }
       })
       .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
   }, [filters])
@@ -141,13 +210,102 @@ export function SurveyDashboard() {
   async function handleRefreshAll() {
     if (!data) return
     setRefreshing(true)
-    clearCacheByPrefix(CACHE_PREFIX)
-    await loadAllGroups(data, true)
-    setRefreshing(false)
+    setPersonaSheet((p) => ({ ...p, loading: true, error: false }))
+    setOccSheet((o) => ({ ...o, loading: true, error: '' }))
+    for (const q of GROUPED_QUESTIONS) {
+      setGroupState(q.id, { loading: true, error: '', groups: [] })
+    }
+
+    const getAnswers = (id: number) => data.byQuestion.find((x) => x.questionId === id)?.answers ?? []
+
+    try {
+      const personaRes = await fetch('/api/persona', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ byQuestion: data.byQuestion, demographic: data.demographic, stream: false }),
+      })
+      if (!personaRes.ok) throw new Error(await personaRes.text())
+      const personaJson = await personaRes.json()
+      const personaText = typeof personaJson.text === 'string' ? personaJson.text : ''
+
+      const occAns = getAnswers(2)
+      let occData: OccupationResult | null = null
+      if (occAns.length > 0) {
+        const occRes = await fetch('/api/occupations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: occAns }),
+        })
+        if (!occRes.ok) throw new Error(await occRes.text())
+        occData = await occRes.json()
+      }
+
+      const groupResults = await Promise.all(
+        GROUPED_QUESTIONS.map(async (q) => {
+          const answers = getAnswers(q.id)
+          if (answers.length < 4) return { id: q.id, groups: [] as Group[] }
+          const groups = await fetchGroups(q.title, answers)
+          return { id: q.id, groups }
+        })
+      )
+
+      const groupsRecord: Record<number, Group[]> = {}
+      for (const { id, groups } of groupResults) {
+        groupsRecord[id] = groups
+      }
+
+      const savedAt = await postSurveyAiSave(groupsRecord, personaText, occData)
+
+      for (const q of GROUPED_QUESTIONS) {
+        setGroupState(q.id, {
+          loading: false,
+          groups: groupsRecord[q.id] ?? [],
+          error: '',
+          savedAt,
+        })
+      }
+      setPersonaSheet({ text: personaText, savedAt, loading: false, error: false })
+      setOccSheet({ data: occData, savedAt, loading: false, error: '' })
+      setAiBundleSavedAt(savedAt)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error'
+      setPersonaSheet((p) => ({ ...p, loading: false, error: true }))
+      setOccSheet((o) => ({ ...o, loading: false, error: msg }))
+      for (const q of GROUPED_QUESTIONS) {
+        setGroupState(q.id, { loading: false, groups: [], error: msg })
+      }
+    } finally {
+      setRefreshing(false)
+    }
   }
 
+  const retryOneGroup = useCallback(
+    async (questionId: number, questionTitle: string, answers: string[]) => {
+      if (answers.length < 4) return
+      setGroupState(questionId, { loading: true, error: '', groups: [] })
+      try {
+        const groups = await fetchGroups(questionTitle, answers)
+        const { personaText, occupationData, groupStates: gs } = latestBundleRef.current
+        const groupsRecord: Record<number, Group[]> = {}
+        for (const q of GROUPED_QUESTIONS) {
+          groupsRecord[q.id] = q.id === questionId ? groups : (gs[q.id]?.groups ?? [])
+        }
+        const savedAt = await postSurveyAiSave(groupsRecord, personaText, occupationData)
+        setGroupState(questionId, { loading: false, groups, error: '', savedAt })
+        setAiBundleSavedAt(savedAt)
+      } catch (e) {
+        setGroupState(questionId, {
+          loading: false,
+          groups: [],
+          error: e instanceof Error ? e.message : 'Error',
+        })
+      }
+    },
+    [setGroupState, postSurveyAiSave]
+  )
+
   function handleFiltersChange(newFilters: ActiveFilters) {
-    clearCacheByPrefix(CACHE_PREFIX)
+    writeSegmentSurveyFilters('clientes', newFilters)
     setGroupStates({})
     setFilters(newFilters)
   }
@@ -180,11 +338,10 @@ export function SurveyDashboard() {
   const getAnswers = (questionId: number) =>
     data.byQuestion.find((q) => q.questionId === questionId)?.answers ?? []
 
-  const anyGroupSaved = Object.values(groupStates).some((gs) => gs.savedAt)
+  const hasSheetBundle = Boolean(aiBundleSavedAt)
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
       <FilterBar
         filterOptions={data.filterOptions}
         activeFilters={filters}
@@ -192,8 +349,11 @@ export function SurveyDashboard() {
         totalAll={data.totalAll}
         onChange={handleFiltersChange}
       />
+      <p className="text-xs text-gray-400 -mt-2">
+        Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño (misma
+        selección al regenerar en esas páginas).
+      </p>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Total respuestas</p>
@@ -211,43 +371,52 @@ export function SurveyDashboard() {
         </div>
       </div>
 
-      {/* User Persona */}
       <PersonaCard
         byQuestion={data.byQuestion}
         demographic={data.demographic}
-        cacheKey="persona_survey"
+        sheetBacked
+        sheetText={personaSheet.text}
+        sheetSavedAt={personaSheet.savedAt}
+        sheetLoading={personaSheet.loading || aiSheetHydrating}
+        sheetError={personaSheet.error}
+        hideRefreshButton
       />
 
-      {/* Pregunta 1 — Demografía */}
       <DemographicCard
         men={data.demographic.men}
         women={data.demographic.women}
         nonBinary={data.demographic.nonBinary}
       />
 
-      {/* Análisis destacado de ocupaciones (Q2) */}
       <div className="rounded-2xl border-2 border-violet-200 bg-linear-to-br from-violet-50 to-white p-1">
-        <OccupationsCard answers={getAnswers(2)} cacheKey="survey_occupations" />
+        <OccupationsCard
+          answers={getAnswers(2)}
+          sheetBacked
+          sheetData={occSheet.data}
+          sheetSavedAt={occSheet.savedAt}
+          sheetLoading={occSheet.loading || aiSheetHydrating}
+          sheetError={occSheet.error}
+          hideRefreshButton
+        />
       </div>
 
-      {/* Cabecera análisis agrupados + botón actualizar */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-1">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-          Análisis agrupados por IA
+          Análisis agrupados por IA · Google Sheets
         </p>
         <button
-          onClick={handleRefreshAll}
-          disabled={refreshing}
-          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          type="button"
+          onClick={() => void handleRefreshAll()}
+          disabled={refreshing || aiSheetHydrating}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
         >
           <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
-          {refreshing ? 'Actualizando…' : anyGroupSaved ? 'Actualizar análisis' : 'Generar análisis'}
+          {refreshing ? 'Generando y guardando…' : hasSheetBundle ? 'Regenerar y guardar en Sheets' : 'Generar y guardar en Sheets'}
         </button>
       </div>
 
-      {/* Preguntas con resumen agrupado + respuestas */}
       {QUESTIONS.map((q) => {
-        const gs = groupStates[q.id] ?? { groups: [], loading: true, error: '' }
+        const gs = groupStates[q.id] ?? { groups: [], loading: aiSheetHydrating, error: '' }
         const answers = getAnswers(q.id)
         return (
           <div key={q.id} className="space-y-3">
@@ -258,9 +427,9 @@ export function SurveyDashboard() {
                   shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
                   answers={answers}
                   groups={gs.groups}
-                  loading={gs.loading}
+                  loading={gs.loading || aiSheetHydrating}
                   error={gs.error}
-                  onRetry={() => loadQuestion(q.id, q.title, answers, true)}
+                  onRetry={() => void retryOneGroup(q.id, q.title, answers)}
                 />
               </div>
             )}

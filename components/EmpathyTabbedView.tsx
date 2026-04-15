@@ -35,7 +35,8 @@ function EmpathyTabsInner() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Mapa de empatía</h1>
         <p className="mt-1 text-gray-500 text-sm">
-          Dos vistas: clientes actuales de MOA y público potencial. Cada pestaña usa solo su encuesta (más contexto de Patricia).
+          Dos vistas: clientes actuales y potenciales. Los filtros se eligen en la encuesta de cada segmento (/survey y
+          /potential); aquí solo generas y guardas el mapa con ese corte.
         </p>
 
         <div className="mt-5 flex rounded-xl border border-gray-200 bg-gray-100/80 p-1 max-w-md">

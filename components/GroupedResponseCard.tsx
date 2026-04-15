@@ -83,6 +83,13 @@ export function GroupedResponseCard({
           </div>
         )}
 
+        {!loading && !error && groups.length === 0 && (
+          <p className="text-sm text-gray-500 py-4 text-center">
+            Sin agrupación guardada en Sheets para esta pregunta. Usa «Generar análisis» arriba (o Reintentar si falló
+            la IA).
+          </p>
+        )}
+
         {!loading && groups.length > 0 && (
           <>
             <ResponsiveContainer width="100%" height={Math.max(160, groups.length * 40)}>

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SegmentFiltersReadBanner } from '@/components/SegmentFiltersReadBanner'
+import { readSegmentSurveyFilters, segmentFiltersToApi } from '@/lib/segment-survey-filters'
 
 export type EmpathySegment = 'clientes' | 'potenciales'
 
@@ -16,161 +18,6 @@ interface EmpathyMapData {
   hace: string[]
   dolorFrustraciones: string[]
   necesidadesDeseos: string[]
-}
-
-interface ActiveFilters {
-  gender: 'all' | 'men' | 'women' | 'nonBinary'
-  ageRanges: string[]
-  painValues: string[]
-}
-
-interface FilterOptions {
-  ageRanges: string[]
-  painValues: string[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
-
-const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'women', label: 'Mujeres' },
-  { value: 'men', label: 'Hombres' },
-  { value: 'nonBinary', label: 'No binario' },
-]
-
-function toggleArr(arr: string[], v: string) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
-}
-
-// ── FiltersPanel ───────────────────────────────────────────────────────────────
-
-function FiltersPanel({
-  filters,
-  options,
-  onChange,
-  showPain = true,
-  accent = 'rose',
-}: {
-  filters: ActiveFilters
-  options: FilterOptions
-  onChange: (f: ActiveFilters) => void
-  showPain?: boolean
-  accent?: 'rose' | 'orange'
-}) {
-  const activeBtn =
-    accent === 'rose'
-      ? 'bg-rose-500 text-white border-rose-500'
-      : 'bg-orange-500 text-white border-orange-500'
-  const hoverBtn =
-    accent === 'rose'
-      ? 'hover:border-rose-300 hover:text-rose-600'
-      : 'hover:border-orange-300 hover:text-orange-600'
-  const countColor = accent === 'rose' ? 'text-rose-500' : 'text-orange-500'
-  const badgeBg = accent === 'rose' ? 'bg-rose-500' : 'bg-orange-500'
-
-  const isFiltered =
-    filters.gender !== 'all' ||
-    filters.ageRanges.length > 0 ||
-    (showPain && filters.painValues.length > 0)
-  const activeCount =
-    (filters.gender !== 'all' ? 1 : 0) +
-    filters.ageRanges.length +
-    (showPain ? filters.painValues.length : 0)
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          Filtrar encuestas
-          {isFiltered && (
-            <span
-              className={`inline-flex items-center justify-center h-4 w-4 rounded-full text-white text-[10px] font-bold leading-none ${badgeBg}`}
-            >
-              {activeCount}
-            </span>
-          )}
-        </p>
-        {isFiltered && (
-          <button
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 font-medium">Género</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filters, gender: opt.value })}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  filters.gender === opt.value
-                    ? activeBtn
-                    : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {options.ageRanges.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Franja de edad
-              {filters.ageRanges.length > 0 && (
-                <span className={`ml-1 ${countColor}`}>({filters.ageRanges.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.ageRanges.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.ageRanges.includes(r)
-                      ? activeBtn
-                      : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {showPain && options.painValues.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
-              {filters.painValues.length > 0 && (
-                <span className={`ml-1 ${countColor}`}>({filters.painValues.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.painValues.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.painValues.includes(v)
-                      ? activeBtn
-                      : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // ── Sticky note ────────────────────────────────────────────────────────────────
@@ -480,7 +327,7 @@ const SEGMENT_META: Record<
     accent: 'rose',
     mapCardTitle: 'Mapa de empatía · Clientes actuales',
     emptyLead:
-      'La IA analizará solo la encuesta de clientes actuales de MOA (más el contexto de la entrevista a Patricia). Puedes aplicar filtros antes de generar.',
+      'La IA usará el mismo filtrado que tengas activo en la encuesta de clientes (página Encuesta de satisfacción) más el contexto de la entrevista a Patricia.',
   },
   potenciales: {
     otherHref: '/empathy/clientes',
@@ -489,7 +336,7 @@ const SEGMENT_META: Record<
     accent: 'orange',
     mapCardTitle: 'Mapa de empatía · Clientes potenciales',
     emptyLead:
-      'La IA analizará solo la encuesta a clientes potenciales (más el contexto de la entrevista a Patricia). Puedes aplicar filtros antes de generar.',
+      'La IA usará el mismo filtrado que tengas activo en la encuesta a clientes potenciales (página /potential) más el contexto de la entrevista a Patricia.',
   },
 }
 
@@ -511,36 +358,23 @@ export function EmpathyMapPage({
   const [genError, setGenError] = useState(false)
   const [loadingSaved, setLoadingSaved] = useState(true)
 
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
-
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/empathy-map-saved?segment=${segment}`).then((r) => r.json()).catch(() => ({})),
-      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
-    ]).then(([saved, survey, potential]) => {
-      if (saved?.saved) {
-        setData(saved.saved.data)
-        setSavedAt(saved.saved.savedAt)
-        if (saved.saved.filters) {
-          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
+    fetch(`/api/empathy-map-saved?segment=${segment}`)
+      .then((r) => r.json())
+      .then((saved) => {
+        if (saved?.saved) {
+          setData(saved.saved.data)
+          setSavedAt(saved.saved.savedAt)
         }
-      }
-      const ageSet = new Set<string>([
-        ...(survey?.filterOptions?.ageRanges ?? []),
-        ...(potential?.filterOptions?.ageRanges ?? []),
-      ])
-      setFilterOptions({
-        ageRanges: Array.from(ageSet).sort(),
-        painValues: potential?.filterOptions?.painValues ?? [],
       })
-    }).finally(() => setLoadingSaved(false))
+      .catch(() => {})
+      .finally(() => setLoadingSaved(false))
   }, [segment])
 
   const saveMap = async (mapData: EmpathyMapData) => {
     setSaving(true)
     try {
+      const filters = segmentFiltersToApi(readSegmentSurveyFilters(segment))
       const r = await fetch('/api/empathy-map-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -556,6 +390,7 @@ export function EmpathyMapPage({
     setGenerating(true)
     setGenError(false)
     try {
+      const filters = segmentFiltersToApi(readSegmentSurveyFilters(segment))
       const res = await fetch('/api/empathy-map', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -572,19 +407,7 @@ export function EmpathyMapPage({
     }
   }
 
-  const isFiltered =
-    filters.gender !== 'all' ||
-    filters.ageRanges.length > 0 ||
-    (meta.showPain && filters.painValues.length > 0)
-  const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
   const spinBorder = meta.accent === 'rose' ? 'border-rose-400' : 'border-orange-400'
-  const bannerBox =
-    meta.accent === 'rose'
-      ? 'border-rose-100 bg-rose-50'
-      : 'border-orange-100 bg-orange-50'
-  const bannerTitleCls = meta.accent === 'rose' ? 'text-rose-700' : 'text-orange-800'
-  const bannerMutedCls = meta.accent === 'rose' ? 'text-rose-500' : 'text-orange-600'
-  const chipCls = meta.accent === 'rose' ? 'bg-rose-500' : 'bg-orange-500'
   const genBtnCls =
     meta.accent === 'rose'
       ? 'bg-rose-500 hover:bg-rose-600'
@@ -656,13 +479,7 @@ export function EmpathyMapPage({
             </Link>
           </div>
         )}
-        <FiltersPanel
-          filters={filters}
-          options={filterOptions}
-          onChange={setFilters}
-          showPain={meta.showPain}
-          accent={meta.accent}
-        />
+        <SegmentFiltersReadBanner segment={segment} accent={meta.accent === 'rose' ? 'rose' : 'orange'} />
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">🗺️</div>
           <div className="space-y-1">
@@ -692,52 +509,7 @@ export function EmpathyMapPage({
         </div>
       )}
 
-      <FiltersPanel
-        filters={filters}
-        options={filterOptions}
-        onChange={setFilters}
-        showPain={meta.showPain}
-        accent={meta.accent}
-      />
-
-      {/* Filter context banner */}
-      <div className={`rounded-xl border px-4 py-3 space-y-2 ${bannerBox}`}>
-        <div className="space-y-1.5">
-          <p className={`text-xs font-semibold ${bannerTitleCls}`}>
-            {isFiltered ? 'Mapa generado con estos filtros:' : 'Mapa generado sin filtros activos'}
-          </p>
-          {isFiltered && (
-            <div className="flex flex-wrap gap-1.5">
-              {filters.gender !== 'all' && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipCls}`}>
-                  {genderLabel}
-                </span>
-              )}
-              {filters.ageRanges.map((r) => (
-                <span key={r} className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipCls}`}>
-                  {r} años
-                </span>
-              ))}
-              {meta.showPain &&
-                filters.painValues.map((v) => (
-                  <span key={v} className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipCls}`}>
-                    Dolor: {v}
-                  </span>
-                ))}
-            </div>
-          )}
-          <p className={`text-xs ${bannerMutedCls}`}>
-            Cambia los filtros y pulsa{' '}
-            <button
-              onClick={generate}
-              className="font-semibold underline underline-offset-2 opacity-90 hover:opacity-100 transition-colors"
-            >
-              ↺ Regenerar
-            </button>{' '}
-            para actualizar el mapa según el perfil que necesites.
-          </p>
-        </div>
-      </div>
+      <SegmentFiltersReadBanner segment={segment} accent={meta.accent === 'rose' ? 'rose' : 'orange'} />
 
       {/* Saved / actions header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">

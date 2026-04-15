@@ -19,7 +19,7 @@ interface CategoryData {
   mainRisks: string[]
 }
 
-interface OccupationResult {
+export interface OccupationResult {
   categorized: {
     profession: string
     category: string
@@ -37,6 +37,12 @@ interface OccupationResult {
 interface OccupationsCardProps {
   answers: string[]
   cacheKey?: string
+  sheetBacked?: boolean
+  sheetData?: OccupationResult | null
+  sheetSavedAt?: string
+  sheetLoading?: boolean
+  sheetError?: string
+  hideRefreshButton?: boolean
 }
 
 const CATEGORIES = [
@@ -77,14 +83,32 @@ const CATEGORIES = [
   },
 ]
 
-export function OccupationsCard({ answers, cacheKey = 'occupations' }: OccupationsCardProps) {
-  const [data, setData] = useState<OccupationResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+export function OccupationsCard({
+  answers,
+  cacheKey = 'occupations',
+  sheetBacked = false,
+  sheetData = null,
+  sheetSavedAt = '',
+  sheetLoading = false,
+  sheetError = '',
+  hideRefreshButton = false,
+}: OccupationsCardProps) {
+  const [data, setData] = useState<OccupationResult | null>(sheetBacked ? sheetData : null)
+  const [loading, setLoading] = useState(sheetBacked ? sheetLoading : true)
+  const [error, setError] = useState(sheetBacked ? sheetError : '')
   const [selected, setSelected] = useState<string | null>(null)
-  const [savedAt, setSavedAt] = useState('')
+  const [savedAt, setSavedAt] = useState(sheetBacked ? sheetSavedAt : '')
+
+  useEffect(() => {
+    if (!sheetBacked) return
+    setData(sheetData)
+    setSavedAt(sheetSavedAt)
+    setLoading(sheetLoading)
+    setError(sheetError)
+  }, [sheetBacked, sheetData, sheetSavedAt, sheetLoading, sheetError])
 
   async function load(force = false) {
+    if (sheetBacked) return
     if (answers.length === 0) { setLoading(false); return }
 
     if (!force) {
@@ -118,7 +142,10 @@ export function OccupationsCard({ answers, cacheKey = 'occupations' }: Occupatio
     }
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (sheetBacked) return
+    load()
+  }, [sheetBacked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = data
     ? CATEGORIES.map((c) => ({
@@ -144,7 +171,7 @@ export function OccupationsCard({ answers, cacheKey = 'occupations' }: Occupatio
             Pregunta 2 — Ocupación
           </span>
           <div className="flex items-center gap-2 shrink-0">
-            {!loading && data && (
+            {!sheetBacked && !hideRefreshButton && !loading && data && (
               <button
                 onClick={() => load(true)}
                 className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-400 hover:bg-gray-100 transition-colors"
@@ -173,6 +200,12 @@ export function OccupationsCard({ answers, cacheKey = 'occupations' }: Occupatio
         )}
 
         {error && <p className="text-sm text-red-500">{error}</p>}
+
+        {sheetBacked && !loading && !error && !data && answers.length > 0 && (
+          <p className="text-sm text-gray-500 py-6 text-center">
+            No hay análisis de ocupaciones guardado en Sheets para estos filtros. Pulsa «Generar análisis» arriba.
+          </p>
+        )}
 
         {data && (
           <>

@@ -24,7 +24,7 @@ export default function POVRoute() {
               Point of View (POV)
             </h1>
             <p className="mt-1 text-gray-500 text-sm">
-              MOA · Declaraciones de necesidad e insight extraídas de las encuestas con IA
+              MOA · Declaraciones generadas a partir de los user persona guardados (cliente actual y potencial)
             </p>
           </div>
         </div>
@@ -62,6 +62,13 @@ export default function POVRoute() {
         </div>
 
         <POVPage />
+
+        <p className="mt-10 text-center text-xs text-gray-400">
+          Siguiente paso:{' '}
+          <Link href="/hmw" className="text-sky-600 font-medium hover:underline underline-offset-2">
+            How Might We (HMW) →
+          </Link>
+        </p>
       </div>
     </main>
   )

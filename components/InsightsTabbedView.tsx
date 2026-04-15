@@ -35,7 +35,7 @@ function InsightsTabsInner() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Insights</h1>
         <p className="mt-1 text-gray-500 text-sm">
-          Hallazgos accionables con IA: elige la encuesta (clientes actuales o público potencial) y aplica filtros.
+          Hallazgos a partir del mapa de empatía guardado; los filtros de encuesta se eligen en /survey y /potential.
         </p>
 
         <div className="mt-5 flex rounded-xl border border-gray-200 bg-gray-100/80 p-1 max-w-md">

@@ -2,170 +2,130 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
-import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
-import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-interface SurveyFilters {
-  gender?: string
-  ageRanges?: string[]
-  painValues?: string[]
-}
+const necesidadField = z
+  .string()
+  .max(100)
+  .describe('Necesidad en infinitivo o frase verbal concreta, coherente con motivaciones/necesidades del persona')
 
-function getAuth() {
-  return new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  })
-}
+const insightField = z
+  .string()
+  .max(150)
+  .describe('Hallazgo profundo (dolor, contexto, emoción) alineado con el persona y su frase')
 
-// ── Demographic helpers ────────────────────────────────────────────────────────
+/** El front concatena: "[usuario] necesita [necesidad] porque [insight]." — usuario = solo sujeto, sin subordinadas finales. */
+const USUARIO_MAX = 120
 
-function clientGender(row: string[]): string | null {
-  if ((row[DEMOGRAPHIC_COLUMNS.men] ?? '').trim()) return 'men'
-  if ((row[DEMOGRAPHIC_COLUMNS.women] ?? '').trim()) return 'women'
-  if ((row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()) return 'nonBinary'
-  return null
-}
-function clientAge(row: string[]): string {
-  return (
-    (row[DEMOGRAPHIC_COLUMNS.men] ?? '').trim() ||
-    (row[DEMOGRAPHIC_COLUMNS.women] ?? '').trim() ||
-    (row[DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
-  )
-}
-function potentialGender(row: string[]): string | null {
-  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.men] ?? '').trim()) return 'men'
-  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.women] ?? '').trim()) return 'women'
-  if ((row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()) return 'nonBinary'
-  return null
-}
-function potentialAge(row: string[]): string {
-  return (
-    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.men] ?? '').trim() ||
-    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.women] ?? '').trim() ||
-    (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
-  )
-}
-
-const PAIN_COL = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
-
-// ── Schema ─────────────────────────────────────────────────────────────────────
-
-const statementSchema = z.object({
+const statementSchemaActual = z.object({
   usuario: z
     .string()
-    .max(60)
-    .describe('Descripción breve del tipo de usuario (ej: "La persona con dolor crónico", "La mujer activa de 40+")'),
-  necesidad: z
-    .string()
-    .max(100)
-    .describe('La necesidad concreta en forma de verbo infinitivo o frase verbal (ej: "encontrar un entrenamiento adaptado a sus limitaciones físicas")'),
-  insight: z
-    .string()
-    .max(150)
-    .describe('El hallazgo o motivación profunda que explica el por qué (ej: "siente que los gimnasios convencionales no están diseñados para alguien como ella")'),
+    .max(USUARIO_MAX)
+    .describe(
+      'SOLO el sujeto del enunciado (arquetipo: nombre o rol + edad y un matiz breve). La app une después la palabra "necesita". ' +
+        'PROHIBIDO terminar en subordinadas: no uses al final "que", "que ya", "quien", "a la que", comas + "ya", etc. ' +
+        'Ejemplo válido: "Marta, 48 años, administrativa, clienta de Patri en Martorell". ' +
+        'Ejemplo inválido: "Una clienta que ya" (sobra antes de "necesita").'
+    ),
+  necesidad: necesidadField,
+  insight: insightField,
 })
 
-const schema = z.object({
-  clienteActual: statementSchema.describe(
-    'UN solo POV sintetizando la encuesta de CLIENTES ACTUALES de MOA. Usa SOLO evidencias de ese bloque.'
-  ),
-  clientePotencial: statementSchema.describe(
-    'UN solo POV sintetizando la encuesta de CLIENTES POTENCIALES. Usa SOLO evidencias de ese bloque. Debe ser distinto al de clientes actuales.'
-  ),
+const statementSchemaPotencial = z.object({
+  usuario: z
+    .string()
+    .max(USUARIO_MAX)
+    .describe(
+      'SOLO el sujeto del enunciado (arquetipo + edad y un matiz breve). La app une después "necesita". ' +
+        'PROHIBIDO terminar en "que busca", "que busca un", "que busca un ambiente", "que busca un ambiente a", etc. ' +
+        'Lo de buscar ambiente / local / centro va en necesidad o insight, no en usuario. ' +
+        'Ejemplo válido: "Carlos, 61 años, jubilado en Martorell".'
+    ),
+  necesidad: necesidadField,
+  insight: insightField,
 })
 
-// ── Data fetchers ─────────────────────────────────────────────────────────────
-
-const CLIENT_COLS = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-const POTENTIAL_COLS = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-
-async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_RANGE })
-  let rows = (res.data.values ?? []).slice(1).filter((r) => r.some(Boolean))
-  const header = res.data.values?.[0] ?? []
-
-  if (filters.gender && filters.gender !== 'all') {
-    rows = rows.filter((row) => clientGender(row) === filters.gender)
-  }
-  if (filters.ageRanges?.length) {
-    rows = rows.filter((row) => filters.ageRanges!.includes(clientAge(row)))
-  }
-
-  const blocks = CLIENT_COLS.map((ci) => {
-    const q = header[ci]?.trim() ?? `Col ${ci}`
-    const answers = rows.map((r) => r[ci]?.trim() ?? '').filter((a) => a.length > 2).slice(0, 15)
-    if (answers.length === 0) return null
-    return `${q}\n${answers.map((a, i) => `  ${i + 1}. "${a}"`).join('\n')}`
-  }).filter(Boolean)
-
-  return blocks.length > 0 ? blocks.join('\n\n---\n\n') : '(Sin respuestas con los filtros seleccionados)'
+const ERR: Record<string, string> = {
+  no_sheet: 'No hay hoja de user persona guardada.',
+  empty: 'No hay user personas guardados. Genera y guarda los perfiles en la página User Persona.',
+  invalid_json: 'No se pudieron leer los user personas guardados.',
+  invalid_shape: 'Los user personas guardados no tienen el formato esperado (clienteActual / clientePotencial).',
 }
 
-async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: POTENTIAL_SHEET_ID, range: POTENTIAL_SHEET_RANGE })
-  let rows = (res.data.values ?? []).slice(1).filter((r) => r.some(Boolean))
-  const header = res.data.values?.[0] ?? []
+const SYSTEM_CLIENTE_ACTUAL = `Eres un UX researcher experto en Design Thinking (Point of View) para MOA (entrenadora Patri, salud y entrenamiento en Martorell).
 
-  if (filters.gender && filters.gender !== 'all') {
-    rows = rows.filter((row) => potentialGender(row) === filters.gender)
+Contexto que NO debes confundir: el documento describe al **CLIENTE ACTUAL** — persona que **ya** entrena con Patri o ya forma parte de su comunidad de clientas. No es un prospecto que está valorando si ir al gimnasio.
+
+Genera UNA declaración POV con tres campos: usuario, necesidad, insight.
+
+Formato mental: [Usuario] necesita [Necesidad] porque [Insight].
+
+CRÍTICO — Los tres campos se concatenan en una sola frase en la interfaz. El campo **usuario** es únicamente el **sujeto** (sustantivo / arquetipo); **nunca** lleve al final "que…", "que ya…", ni verbo: eso rompe la lectura delante de la palabra fija **"necesita"**.
+
+Reglas solo para CLIENTE ACTUAL:
+- usuario: arquetipo concreto (edad, ocupación, ciudad); la idea de "ya es clienta" se infiere del segmento, **no** la escribas como "que ya" al final del usuario.
+- necesidad: infinitivos o frases verbales de **continuidad, adherencia, sentirse acompañada, no perder progreso, gestionar su salud con guía conocida, encajar el entreno en su vida**. Evita redacciones de descubrimiento ("conocer MOA", "decidir si Patri encaja", "probar un centro nuevo") — eso sería cliente potencial.
+- insight: emoción o contexto que encaje con **quien ya confía en Patri** (miedo a retroceder, cansancio con otros modelos, valor del grupo, vergüenza o limitación física que Patri ya conoce, etc.), tomado del persona.
+
+Solo usa el bloque de texto que te damos. Español natural y conciso.`
+
+const SYSTEM_CLIENTE_POTENCIAL = `Eres un UX researcher experto en Design Thinking (Point of View) para MOA (entrenadora Patri, Martorell).
+
+Contexto: el documento describe al **CLIENTE POTENCIAL** — persona que **aún no** es clienta de Patri; podría valorar MOA frente a otras opciones o tiene dudas/barreras previas.
+
+Genera UNA declaración POV: usuario, necesidad, insight.
+
+Formato mental: [Usuario] necesita [Necesidad] porque [Insight].
+
+CRÍTICO — Igual que arriba: **usuario** solo sujeto, sin cola "que busca…" / "que busca un ambiente…" antes de la palabra fija **"necesita"** (quedaría "… ambiente a necesita", incorrecto).
+
+Reglas para CLIENTE POTENCIAL:
+- usuario: arquetipo concreto del persona (no genérico); si habla de "buscar ambiente" o "valorar un centro", va en **necesidad** o **insight**, no en usuario.
+- necesidad: infinitivos alineados con **decidir con confianza, entender la propuesta, superar dudas o barreras antes de dar el paso, encontrar un modelo que encaje con su salud**.
+- insight: dolor o motivación del persona en clave de **antes de ser cliente** (búsqueda, comparación, miedo, información).
+
+Solo usa el bloque de texto que te damos. Español natural. Debe quedar claramente distinto de un POV de "ya clienta".`
+
+export async function POST() {
+  const personas = await fetchSavedUserPersonas()
+
+  if (!personas.ok) {
+    return NextResponse.json(
+      {
+        error: `${ERR[personas.code]} Ve a /user-persona y guarda los dos perfiles antes de generar POV.`,
+      },
+      { status: 400 }
+    )
   }
-  if (filters.ageRanges?.length) {
-    rows = rows.filter((row) => filters.ageRanges!.includes(potentialAge(row)))
-  }
-  if (filters.painValues?.length) {
-    rows = rows.filter((row) => filters.painValues!.includes((row[PAIN_COL] ?? '').trim()))
-  }
 
-  const blocks = POTENTIAL_COLS.map((ci) => {
-    const q = header[ci]?.trim() ?? `Col ${ci}`
-    const answers = rows.map((r) => r[ci]?.trim() ?? '').filter((a) => a.length > 2).slice(0, 15)
-    if (answers.length === 0) return null
-    return `${q}\n${answers.map((a, i) => `  ${i + 1}. "${a}"`).join('\n')}`
-  }).filter(Boolean)
+  const textoActual = personaRecordToPlainText(
+    'USER PERSONA — CLIENTE ACTUAL (ya clientas de Patri / MOA)',
+    personas.data.clienteActual
+  )
+  const textoPotencial = personaRecordToPlainText(
+    'USER PERSONA — CLIENTE POTENCIAL (aún no clientas; podrían valorar MOA)',
+    personas.data.clientePotencial
+  )
 
-  return blocks.length > 0 ? blocks.join('\n\n---\n\n') : '(Sin respuestas con los filtros seleccionados)'
-}
-
-// ── POST ───────────────────────────────────────────────────────────────────────
-
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}))
-  const filters: SurveyFilters = body.filters ?? {}
-
-  const [clientVoice, potentialVoice] = await Promise.all([
-    getClientVoice(filters),
-    getPotentialVoice(filters),
-  ])
-
-  const { object } = await generateObject({
+  const { object: clienteActual } = await generateObject({
     model: openai('gpt-4o-mini'),
-    schema,
-    system: `Eres un UX researcher experto en Design Thinking aplicado a marcas de salud y bienestar.
-Debes generar EXACTAMENTE DOS declaraciones POV (Point of View) para MOA (entrenadora personal de salud en Martorell, Barcelona):
-
-1. "clienteActual": UN solo POV basado ÚNICAMENTE en las respuestas de CLIENTES ACTUALES (ya entrenan con Patri). No uses datos del bloque de potenciales.
-2. "clientePotencial": UN solo POV basado ÚNICAMENTE en las respuestas de CLIENTES POTENCIALES. No uses datos del bloque de clientes actuales.
-
-FORMATO DE CADA POV (tres campos que se unirán en frase):
-[Usuario] necesita [Necesidad] porque [Insight].
-
-REGLAS:
-- El USUARIO describe un arquetipo específico y humano, no genérico.
-- La NECESIDAD es un verbo en infinitivo o frase verbal que describe qué quiere conseguir. Concreta y accionable.
-- El INSIGHT es el hallazgo emocional o contextual profundo que explica el por qué.
-- Los dos POV deben ser claramente distintos entre sí.
-- Si un bloque de datos está vacío o dice "(Sin respuestas...)", genera un POV prudente que indique la falta de datos o un perfil hipotético muy conservador basado solo en lo disponible.
-- Escribe en español natural y fluido.`,
-    prompt: `=== SOLO PARA "clienteActual" — CLIENTES ACTUALES ===\n${clientVoice}\n\n=== SOLO PARA "clientePotencial" — CLIENTES POTENCIALES ===\n${potentialVoice}`,
+    schema: z.object({ statement: statementSchemaActual }),
+    system: SYSTEM_CLIENTE_ACTUAL,
+    prompt: `=== ÚNICA FUENTE (cliente actual) ===\n\n${textoActual}\n\n===\nGenera el POV en el campo "statement".`,
   })
 
-  return NextResponse.json(object)
+  const { object: clientePotencial } = await generateObject({
+    model: openai('gpt-4o-mini'),
+    schema: z.object({ statement: statementSchemaPotencial }),
+    system: SYSTEM_CLIENTE_POTENCIAL,
+    prompt: `=== ÚNICA FUENTE (cliente potencial) ===\n\n${textoPotencial}\n\n===\nGenera el POV en el campo "statement".`,
+  })
+
+  return NextResponse.json({
+    clienteActual: clienteActual.statement,
+    clientePotencial: clientePotencial.statement,
+  })
 }

@@ -6,17 +6,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export type InsightsSegment = 'clientes' | 'potenciales'
 
-interface ActiveFilters {
-  gender: 'all' | 'men' | 'women' | 'nonBinary'
-  ageRanges: string[]
-  painValues: string[]
-}
-
-interface FilterOptions {
-  ageRanges: string[]
-  painValues: string[]
-}
-
 interface InsightBloque {
   titulo: string
   items: string[]
@@ -25,19 +14,6 @@ interface InsightBloque {
 interface InsightsData {
   resumen: string
   bloques: InsightBloque[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
-
-const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'women', label: 'Mujeres' },
-  { value: 'men', label: 'Hombres' },
-  { value: 'nonBinary', label: 'No binario' },
-]
-
-function toggleArr(arr: string[], v: string) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
 }
 
 /** Quita artefactos que a veces devuelve la IA (cierres `}`, markdown, comillas envolventes). */
@@ -68,140 +44,21 @@ function limpiarInsightsData(raw: InsightsData): InsightsData {
   }
 }
 
-function FiltersPanel({
-  filters,
-  options,
-  onChange,
-  showPain,
-  accent,
-}: {
-  filters: ActiveFilters
-  options: FilterOptions
-  onChange: (f: ActiveFilters) => void
-  showPain: boolean
-  accent: 'amber' | 'orange'
-}) {
-  const activeBtn =
-    accent === 'amber'
-      ? 'bg-amber-600 text-white border-amber-600'
-      : 'bg-orange-600 text-white border-orange-600'
-  const hoverBtn =
-    accent === 'amber'
-      ? 'hover:border-amber-300 hover:text-amber-700'
-      : 'hover:border-orange-300 hover:text-orange-700'
-  const countColor = accent === 'amber' ? 'text-amber-600' : 'text-orange-600'
-  const badgeBg = accent === 'amber' ? 'bg-amber-600' : 'bg-orange-600'
-
-  const isFiltered =
-    filters.gender !== 'all' ||
-    filters.ageRanges.length > 0 ||
-    (showPain && filters.painValues.length > 0)
-  const activeCount =
-    (filters.gender !== 'all' ? 1 : 0) + filters.ageRanges.length + (showPain ? filters.painValues.length : 0)
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          Filtrar encuestas
-          {isFiltered && (
-            <span
-              className={`inline-flex items-center justify-center h-4 w-4 rounded-full text-white text-[10px] font-bold leading-none ${badgeBg}`}
-            >
-              {activeCount}
-            </span>
-          )}
-        </p>
-        {isFiltered && (
-          <button
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 font-medium">Género</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filters, gender: opt.value })}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  filters.gender === opt.value ? activeBtn : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {options.ageRanges.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Franja de edad
-              {filters.ageRanges.length > 0 && <span className={`ml-1 ${countColor}`}>({filters.ageRanges.length})</span>}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.ageRanges.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.ageRanges.includes(r) ? activeBtn : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {showPain && options.painValues.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
-              {filters.painValues.length > 0 && <span className={`ml-1 ${countColor}`}>({filters.painValues.length})</span>}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.painValues.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.painValues.includes(v) ? activeBtn : `bg-white text-gray-600 border-gray-200 ${hoverBtn}`
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 const SEGMENT_META: Record<
   InsightsSegment,
-  { title: string; subtitle: string; otherHref: string; otherLabel: string; accent: 'amber' | 'orange' }
+  { otherHref: string; otherLabel: string; accent: 'amber' | 'orange'; empathyHref: string }
 > = {
   clientes: {
-    title: 'Insights · Clientes',
-    subtitle: 'Hallazgos a partir de la encuesta de clientes actuales de MOA.',
     otherHref: '/insights?tab=potenciales',
     otherLabel: 'Ver insights de clientes potenciales →',
     accent: 'amber',
+    empathyHref: '/empathy/clientes',
   },
   potenciales: {
-    title: 'Insights · Clientes potenciales',
-    subtitle: 'Hallazgos a partir de la encuesta a público objetivo aún no cliente.',
     otherHref: '/insights',
     otherLabel: '← Ver insights de clientes actuales',
     accent: 'orange',
+    empathyHref: '/empathy/potenciales',
   },
 }
 
@@ -217,33 +74,20 @@ export function SurveyInsightsPage({
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
-
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
+  const [hasEmpathyMap, setHasEmpathyMap] = useState(false)
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/insights-survey-saved?segment=${segment}`).then((r) => r.json()).catch(() => ({})),
-      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
-    ]).then(([saved, survey, potential]) => {
+      fetch(`/api/empathy-map-saved?segment=${segment}`).then((r) => r.json()).catch(() => ({})),
+    ]).then(([saved, empathy]) => {
       if (saved?.saved) {
         setData(limpiarInsightsData(saved.saved.data))
         setSavedAt(saved.saved.savedAt)
-        if (saved.saved.filters) {
-          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
-        }
       }
-      const ageSet = new Set<string>([
-        ...(survey?.filterOptions?.ageRanges ?? []),
-        ...(potential?.filterOptions?.ageRanges ?? []),
-      ])
-      setFilterOptions({
-        ageRanges: Array.from(ageSet).sort(),
-        painValues: potential?.filterOptions?.painValues ?? [],
-      })
+      setHasEmpathyMap(Boolean(empathy?.saved?.data))
     }).finally(() => setLoadingSaved(false))
   }, [segment])
 
@@ -253,7 +97,7 @@ export function SurveyInsightsPage({
       const r = await fetch('/api/insights-survey-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segment, data: payload, filters }),
+        body: JSON.stringify({ segment, data: payload }),
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
@@ -263,34 +107,31 @@ export function SurveyInsightsPage({
 
   const generate = async () => {
     setGenerating(true)
-    setGenError(false)
+    setGenError(null)
     try {
       const res = await fetch('/api/insights-survey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segment, filters }),
+        body: JSON.stringify({ segment }),
       })
-      if (!res.ok) throw new Error('Error')
-      const d = await res.json()
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar los insights.')
+        return
+      }
       const payload = limpiarInsightsData({ resumen: d.resumen, bloques: d.bloques })
       setData(payload)
       await saveData(payload)
     } catch {
-      setGenError(true)
+      setGenError('No se pudieron generar los insights. Inténtalo de nuevo.')
     } finally {
       setGenerating(false)
     }
   }
 
-  const isFiltered =
-    filters.gender !== 'all' || filters.ageRanges.length > 0 || (segment === 'potenciales' && filters.painValues.length > 0)
-  const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
-  const showPain = segment === 'potenciales'
-
   const bannerBorder = meta.accent === 'amber' ? 'border-amber-100 bg-amber-50' : 'border-orange-100 bg-orange-50'
   const bannerTitle = meta.accent === 'amber' ? 'text-amber-800' : 'text-orange-800'
   const bannerMuted = meta.accent === 'amber' ? 'text-amber-600' : 'text-orange-600'
-  const chipBg = meta.accent === 'amber' ? 'bg-amber-600' : 'bg-orange-600'
 
   if (loadingSaved) {
     return (
@@ -314,7 +155,7 @@ export function SurveyInsightsPage({
               meta.accent === 'amber' ? 'border-amber-500' : 'border-orange-500'
             }`}
           />
-          <p className="text-sm text-gray-500">Analizando respuestas y extrayendo insights…</p>
+          <p className="text-sm text-gray-500">Leyendo el mapa de empatía y extrayendo insights…</p>
         </div>
         {[1, 2].map((i) => (
           <div key={i} className="rounded-xl border p-5 space-y-2">
@@ -328,11 +169,11 @@ export function SurveyInsightsPage({
 
   if (genError) {
     return (
-      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-600">No se pudieron generar los insights. Inténtalo de nuevo.</p>
+      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="text-sm text-red-600">{genError}</p>
         <button
           onClick={generate}
-          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors self-start sm:self-auto"
         >
           Reintentar
         </button>
@@ -341,6 +182,36 @@ export function SurveyInsightsPage({
   }
 
   if (!data) {
+    if (!hasEmpathyMap) {
+      return (
+        <div className="space-y-5">
+          {!embedTabs && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Link href={meta.otherHref} className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2">
+                {meta.otherLabel}
+              </Link>
+            </div>
+          )}
+          <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-14 text-center space-y-4">
+            <div className="text-4xl">🗺️</div>
+            <p className="font-semibold text-gray-800">Necesitas un mapa de empatía guardado</p>
+            <p className="text-sm text-gray-500 max-w-md mx-auto">
+              Los insights se generan a partir del mapa de empatía de este segmento (ya filtrado allí). Crea el mapa,
+              aplica los filtros que quieras en esa página y guarda antes de volver aquí.
+            </p>
+            <Link
+              href={meta.empathyHref}
+              className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-medium shadow-sm transition-colors ${
+                meta.accent === 'amber' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-orange-600 hover:bg-orange-700'
+              }`}
+            >
+              Ir al mapa de empatía
+            </Link>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-5">
         {!embedTabs && (
@@ -350,19 +221,12 @@ export function SurveyInsightsPage({
             </Link>
           </div>
         )}
-        <FiltersPanel
-          filters={filters}
-          options={filterOptions}
-          onChange={setFilters}
-          showPain={showPain}
-          accent={meta.accent}
-        />
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-14 text-center space-y-4">
           <div className="text-4xl">💡</div>
           <p className="font-semibold text-gray-800">Generar insights</p>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
-            Aplica filtros si quieres afinar el segmento y pulsa el botón. La IA sintetizará patrones y hallazgos
-            accionables para Patri.
+            La IA leerá tu mapa de empatía guardado para este segmento y sintetizará patrones y hallazgos accionables
+            para Patri.
           </p>
           <button
             onClick={generate}
@@ -387,43 +251,19 @@ export function SurveyInsightsPage({
         </div>
       )}
 
-      <FiltersPanel
-        filters={filters}
-        options={filterOptions}
-        onChange={setFilters}
-        showPain={showPain}
-        accent={meta.accent}
-      />
-
       <div className={`rounded-xl border px-4 py-3 space-y-2 ${bannerBorder}`}>
-        <p className={`text-xs font-semibold ${bannerTitle}`}>
-          {isFiltered ? 'Generado con estos filtros:' : 'Generado sin filtros activos'}
-        </p>
-        {isFiltered && (
-          <div className="flex flex-wrap gap-1.5">
-            {filters.gender !== 'all' && (
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipBg}`}>
-                {genderLabel}
-              </span>
-            )}
-            {filters.ageRanges.map((r) => (
-              <span key={r} className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipBg}`}>
-                {r} años
-              </span>
-            ))}
-            {showPain &&
-              filters.painValues.map((v) => (
-                <span key={v} className={`inline-flex items-center px-2 py-0.5 rounded-full text-white text-xs font-medium ${chipBg}`}>
-                  Dolor: {v}
-                </span>
-              ))}
-          </div>
-        )}
+        <p className={`text-xs font-semibold ${bannerTitle}`}>Fuente de datos</p>
         <p className={`text-xs ${bannerMuted}`}>
-          Cambia los filtros y pulsa{' '}
+          Generados a partir del{' '}
+          <Link href={meta.empathyHref} className="font-semibold underline underline-offset-2">
+            mapa de empatía guardado
+          </Link>{' '}
+          (el mapa respeta los filtros definidos en la encuesta de ese segmento). Para otro corte, ajusta filtros en la
+          encuesta, regenera y guarda el mapa, y pulsa{' '}
           <button type="button" onClick={generate} className="font-semibold underline underline-offset-2">
             ↺ Regenerar
-          </button>
+          </button>{' '}
+          aquí.
         </p>
       </div>
 

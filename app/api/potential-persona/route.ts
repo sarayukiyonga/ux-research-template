@@ -1,13 +1,19 @@
-import { streamText } from 'ai'
+import { streamText, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
+import { NextResponse } from 'next/server'
 import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
-export async function POST(req: Request) {
-  const { byQuestion, demographic } = await req.json()
+const SYSTEM = `Eres un investigador UX especializado en salud y bienestar. 
+Analizas encuestas a clientes potenciales para crear perfiles de buyer persona útiles para diseño web y estrategia de captación.
+Responde siempre en español. Sé concreto y basa todo en las respuestas reales.`
 
+function buildPotentialPersonaPrompt(
+  byQuestion: { questionId: number; answers: string[] }[],
+  demographic: { men: string[]; women: string[]; nonBinary: string[] }
+) {
   const totalResponses =
     (demographic?.men?.length ?? 0) +
     (demographic?.women?.length ?? 0) +
@@ -22,12 +28,7 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join('\n\n')
 
-  const result = streamText({
-    model: openai('gpt-4o-mini'),
-    system: `Eres un investigador UX especializado en salud y bienestar. 
-Analizas encuestas a clientes potenciales para crear perfiles de buyer persona útiles para diseño web y estrategia de captación.
-Responde siempre en español. Sé concreto y basa todo en las respuestas reales.`,
-    prompt: `Analiza estas ${totalResponses} respuestas de una encuesta a clientes potenciales de MOA (centro de entrenamiento y salud en Martorell) y genera un Perfil de Cliente Potencial con este formato exacto:
+  const prompt = `Analiza estas ${totalResponses} respuestas de una encuesta a clientes potenciales de MOA (centro de entrenamiento y salud en Martorell) y genera un Perfil de Cliente Potencial con este formato exacto:
 
 ## 🎯 Perfil del cliente potencial
 
@@ -53,7 +54,29 @@ Responde siempre en español. Sé concreto y basa todo en las respuestas reales.
 
 RESPUESTAS DE LA ENCUESTA (${totalResponses} participantes):
 
-${answersText}`,
+${answersText}`
+
+  return prompt
+}
+
+export async function POST(req: Request) {
+  const { byQuestion, demographic, stream = true } = await req.json()
+
+  const prompt = buildPotentialPersonaPrompt(byQuestion, demographic)
+
+  if (!stream) {
+    const { text } = await generateText({
+      model: openai('gpt-4o-mini'),
+      system: SYSTEM,
+      prompt,
+    })
+    return NextResponse.json({ text })
+  }
+
+  const result = streamText({
+    model: openai('gpt-4o-mini'),
+    system: SYSTEM,
+    prompt,
   })
 
   return result.toTextStreamResponse()

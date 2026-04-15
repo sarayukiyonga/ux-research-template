@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 import { DemographicCard } from './DemographicCard'
 import { QuestionCard } from './QuestionCard'
@@ -8,7 +8,8 @@ import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { PersonaCard } from './PersonaCard'
 import { FilterBar, type ActiveFilters, type FilterOptions } from './FilterBar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { loadCache, saveCache, clearCacheByPrefix } from '@/lib/ai-cache'
+import { readSegmentSurveyFilters, writeSegmentSurveyFilters } from '@/lib/segment-survey-filters'
+import { stableFiltersKey, toSurveyAiFiltersPayload } from '@/lib/survey-ai-filters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,8 +41,6 @@ interface GroupState {
   error: string
   savedAt?: string
 }
-
-const CACHE_PREFIX = 'potential_group_q'
 
 const OPEN_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'open')
 const CLOSED_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'closed')
@@ -128,7 +127,32 @@ export function PotentialSurveyDashboard() {
   const [error, setError] = useState('')
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({})
   const [refreshing, setRefreshing] = useState(false)
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<ActiveFilters>(() =>
+    typeof window !== 'undefined' ? readSegmentSurveyFilters('potenciales') : DEFAULT_FILTERS
+  )
+  const [aiBundleSavedAt, setAiBundleSavedAt] = useState('')
+  const [aiSheetHydrating, setAiSheetHydrating] = useState(false)
+  const [personaSheet, setPersonaSheet] = useState({
+    text: '',
+    savedAt: '',
+    loading: false,
+    error: false,
+  })
+
+  const filtersPayload = useMemo(() => toSurveyAiFiltersPayload(filters), [filters])
+  const filtersKey = useMemo(() => stableFiltersKey(filtersPayload), [filtersPayload])
+
+  const latestBundleRef = useRef({
+    personaText: '',
+    groupStates: {} as Record<number, GroupState>,
+  })
+
+  useEffect(() => {
+    latestBundleRef.current = {
+      personaText: personaSheet.text,
+      groupStates,
+    }
+  }, [personaSheet.text, groupStates])
 
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
@@ -137,79 +161,186 @@ export function PotentialSurveyDashboard() {
     }))
   }, [])
 
-  const loadQuestion = useCallback(async (
-    questionId: number,
-    questionTitle: string,
-    answers: string[],
-    force = false
-  ) => {
-    if (answers.length < 4) {
-      setGroupState(questionId, { loading: false, groups: [], error: '' })
-      return
-    }
-    const cacheKey = CACHE_PREFIX + questionId
-    if (!force) {
-      const cached = loadCache<Group[]>(cacheKey)
-      if (cached) {
-        setGroupState(questionId, { loading: false, groups: cached.data, savedAt: cached.savedAt })
-        return
-      }
-    }
-    setGroupState(questionId, { loading: true, error: '', groups: [] })
-    try {
-      const groups = await fetchGroups(questionTitle, answers)
-      const savedAt = saveCache(cacheKey, groups)
-      setGroupState(questionId, { loading: false, groups, savedAt })
-    } catch (e) {
-      setGroupState(questionId, {
-        loading: false,
-        error: e instanceof Error ? e.message : 'Error desconocido',
-        groups: [],
+  const postSurveyAiSave = useCallback(
+    async (groupsRecord: Record<number, Group[]>, persona: string) => {
+      const r = await fetch('/api/survey-ai-saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segment: 'potenciales',
+          filters: filtersPayload,
+          groups: Object.fromEntries(Object.entries(groupsRecord).map(([k, v]) => [String(k), v])),
+          persona,
+          occupations: null,
+        }),
       })
-    }
-  }, [setGroupState])
+      if (!r.ok) throw new Error(await r.text())
+      const d = await r.json()
+      return d.savedAt as string
+    },
+    [filtersPayload]
+  )
 
-  const loadAllGroups = useCallback((surveyData: SurveyData, force = false) => {
-    const getAnswers = (id: number) =>
-      surveyData.byQuestion.find((q) => q.questionId === id)?.answers ?? []
-    const initial: Record<number, GroupState> = {}
-    for (const q of OPEN_QUESTIONS) initial[q.id] = { groups: [], loading: true, error: '' }
-    setGroupStates(initial)
-    ;(async () => {
-      for (const q of OPEN_QUESTIONS) {
-        await loadQuestion(q.id, q.title, getAnswers(q.id), force)
-      }
-    })()
-  }, [loadQuestion])
+  useEffect(() => {
+    if (!data) return
+    let cancelled = false
+    setAiSheetHydrating(true)
+    setPersonaSheet({ text: '', savedAt: '', loading: true, error: false })
+
+    const qs = `segment=potenciales&filters=${encodeURIComponent(JSON.stringify(filtersPayload))}`
+    fetch(`/api/survey-ai-saved?${qs}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        if (d.saved) {
+          const rawGroups = d.saved.groups ?? {}
+          const nextStates: Record<number, GroupState> = {}
+          for (const q of OPEN_QUESTIONS) {
+            const arr = (rawGroups[String(q.id)] ?? rawGroups[q.id] ?? []) as Group[]
+            nextStates[q.id] = {
+              groups: Array.isArray(arr) ? arr : [],
+              loading: false,
+              error: '',
+              savedAt: d.saved.savedAt,
+            }
+          }
+          setGroupStates(nextStates)
+          setPersonaSheet({
+            text: typeof d.saved.persona === 'string' ? d.saved.persona : '',
+            savedAt: d.saved.savedAt,
+            loading: false,
+            error: false,
+          })
+          setAiBundleSavedAt(d.saved.savedAt)
+        } else {
+          const empty: Record<number, GroupState> = {}
+          for (const q of OPEN_QUESTIONS) {
+            empty[q.id] = { groups: [], loading: false, error: '' }
+          }
+          setGroupStates(empty)
+          setPersonaSheet({ text: '', savedAt: '', loading: false, error: false })
+          setAiBundleSavedAt('')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonaSheet({ text: '', savedAt: '', loading: false, error: true })
+          const empty: Record<number, GroupState> = {}
+          for (const q of OPEN_QUESTIONS) {
+            empty[q.id] = { groups: [], loading: false, error: '' }
+          }
+          setGroupStates(empty)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAiSheetHydrating(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [data, filtersKey, filtersPayload])
 
   useEffect(() => {
     setData(null)
     setError('')
+    setAiSheetHydrating(false)
     fetch(filtersToQuery(filters))
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error)
-        else setData(d)
+        else {
+          setAiSheetHydrating(true)
+          setData(d)
+        }
       })
       .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
   }, [filters])
 
-  useEffect(() => {
-    if (!data) return
-    loadAllGroups(data, false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
-
   async function handleRefreshAll() {
     if (!data) return
     setRefreshing(true)
-    clearCacheByPrefix(CACHE_PREFIX)
-    await loadAllGroups(data, true)
-    setRefreshing(false)
+    setPersonaSheet((p) => ({ ...p, loading: true, error: false }))
+    for (const q of OPEN_QUESTIONS) {
+      setGroupState(q.id, { loading: true, error: '', groups: [] })
+    }
+
+    const getAnswers = (id: number) => data.byQuestion.find((x) => x.questionId === id)?.answers ?? []
+
+    try {
+      const personaRes = await fetch('/api/potential-persona', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ byQuestion: data.byQuestion, demographic: data.demographic, stream: false }),
+      })
+      if (!personaRes.ok) throw new Error(await personaRes.text())
+      const personaJson = await personaRes.json()
+      const personaText = typeof personaJson.text === 'string' ? personaJson.text : ''
+
+      const groupResults = await Promise.all(
+        OPEN_QUESTIONS.map(async (q) => {
+          const answers = getAnswers(q.id)
+          if (answers.length < 4) return { id: q.id, groups: [] as Group[] }
+          const groups = await fetchGroups(q.title, answers)
+          return { id: q.id, groups }
+        })
+      )
+
+      const groupsRecord: Record<number, Group[]> = {}
+      for (const { id, groups } of groupResults) {
+        groupsRecord[id] = groups
+      }
+
+      const savedAt = await postSurveyAiSave(groupsRecord, personaText)
+
+      for (const q of OPEN_QUESTIONS) {
+        setGroupState(q.id, {
+          loading: false,
+          groups: groupsRecord[q.id] ?? [],
+          error: '',
+          savedAt,
+        })
+      }
+      setPersonaSheet({ text: personaText, savedAt, loading: false, error: false })
+      setAiBundleSavedAt(savedAt)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error'
+      setPersonaSheet((p) => ({ ...p, loading: false, error: true }))
+      for (const q of OPEN_QUESTIONS) {
+        setGroupState(q.id, { loading: false, groups: [], error: msg })
+      }
+    } finally {
+      setRefreshing(false)
+    }
   }
 
+  const retryOneGroup = useCallback(
+    async (questionId: number, questionTitle: string, answers: string[]) => {
+      if (answers.length < 4) return
+      setGroupState(questionId, { loading: true, error: '', groups: [] })
+      try {
+        const groups = await fetchGroups(questionTitle, answers)
+        const { personaText, groupStates: gs } = latestBundleRef.current
+        const groupsRecord: Record<number, Group[]> = {}
+        for (const q of OPEN_QUESTIONS) {
+          groupsRecord[q.id] = q.id === questionId ? groups : (gs[q.id]?.groups ?? [])
+        }
+        const savedAt = await postSurveyAiSave(groupsRecord, personaText)
+        setGroupState(questionId, { loading: false, groups, error: '', savedAt })
+        setAiBundleSavedAt(savedAt)
+      } catch (e) {
+        setGroupState(questionId, {
+          loading: false,
+          groups: [],
+          error: e instanceof Error ? e.message : 'Error',
+        })
+      }
+    },
+    [setGroupState, postSurveyAiSave]
+  )
+
   function handleFiltersChange(newFilters: ActiveFilters) {
-    clearCacheByPrefix(CACHE_PREFIX)
+    writeSegmentSurveyFilters('potenciales', newFilters)
     setGroupStates({})
     setFilters(newFilters)
   }
@@ -252,6 +383,9 @@ export function PotentialSurveyDashboard() {
           totalAll={data.totalAll}
           onChange={handleFiltersChange}
         />
+        <p className="text-xs text-gray-400 -mt-2">
+          Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño.
+        </p>
         <div className="flex flex-col items-center justify-center min-h-[200px] text-center space-y-3">
           <span className="text-4xl">{isFiltered ? '🔍' : '📭'}</span>
           <p className="text-gray-500 font-medium">
@@ -283,6 +417,10 @@ export function PotentialSurveyDashboard() {
         totalAll={data.totalAll}
         onChange={handleFiltersChange}
       />
+      <p className="text-xs text-gray-400 -mt-2">
+        Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño (misma
+        selección al regenerar en esas páginas).
+      </p>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -302,7 +440,6 @@ export function PotentialSurveyDashboard() {
         </div>
       </div>
 
-      {/* Persona */}
       <PersonaCard
         byQuestion={data.byQuestion}
         demographic={data.demographic}
@@ -310,6 +447,12 @@ export function PotentialSurveyDashboard() {
         title="Perfil del cliente potencial"
         subtitle="Generado con IA a partir de las respuestas de los encuestados"
         cacheKey="persona_potential"
+        sheetBacked
+        sheetText={personaSheet.text}
+        sheetSavedAt={personaSheet.savedAt}
+        sheetLoading={personaSheet.loading || aiSheetHydrating}
+        sheetError={personaSheet.error}
+        hideRefreshButton
       />
 
       {/* Demografía */}
@@ -337,24 +480,28 @@ export function PotentialSurveyDashboard() {
         </div>
       )}
 
-      {/* Cabecera análisis agrupados + botón actualizar */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-1">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-          Análisis agrupados por IA
+          Análisis agrupados por IA · Google Sheets
         </p>
         <button
-          onClick={handleRefreshAll}
-          disabled={refreshing}
-          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          type="button"
+          onClick={() => void handleRefreshAll()}
+          disabled={refreshing || aiSheetHydrating}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
         >
           <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
-          {refreshing ? 'Actualizando…' : 'Actualizar análisis'}
+          {refreshing
+            ? 'Generando y guardando…'
+            : aiBundleSavedAt
+              ? 'Regenerar y guardar en Sheets'
+              : 'Generar y guardar en Sheets'}
         </button>
       </div>
 
       {/* Preguntas abiertas */}
       {OPEN_QUESTIONS.map((q) => {
-        const gs = groupStates[q.id] ?? { groups: [], loading: true, error: '' }
+        const gs = groupStates[q.id] ?? { groups: [], loading: aiSheetHydrating, error: '' }
         const answers = getAnswers(q.id)
         return (
           <div key={q.id} className="space-y-3">
@@ -365,9 +512,9 @@ export function PotentialSurveyDashboard() {
                   shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
                   answers={answers}
                   groups={gs.groups}
-                  loading={gs.loading}
+                  loading={gs.loading || aiSheetHydrating}
                   error={gs.error}
-                  onRetry={() => loadQuestion(q.id, q.title, answers)}
+                  onRetry={() => void retryOneGroup(q.id, q.title, answers)}
                 />
               </div>
             )}

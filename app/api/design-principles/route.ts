@@ -193,12 +193,15 @@ async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
 }
 
 export async function POST(req: Request) {
-  const { formAnswers, filters = {} } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  const formAnswers = body.formAnswers
+  const filtersClientes: SurveyFilters = body.filtersClientes ?? body.filters ?? {}
+  const filtersPotenciales: SurveyFilters = body.filtersPotenciales ?? body.filters ?? {}
 
   const [interview, clientVoice, potentialVoice] = await Promise.all([
     getCeoInterview(),
-    getClientVoice(filters),
-    getPotentialVoice(filters),
+    getClientVoice(filtersClientes),
+    getPotentialVoice(filtersPotenciales),
   ])
 
   const { object } = await generateObject({

@@ -1,12 +1,19 @@
-import { streamText } from 'ai'
+import { streamText, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
+import { NextResponse } from 'next/server'
 import { QUESTIONS } from '@/lib/questions'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
-export async function POST(req: Request) {
-  const { byQuestion, demographic } = await req.json()
+const SYSTEM = `Eres un investigador UX y estratega de marca especializado en salud, bienestar y entrenamiento personal. 
+Tu tarea es crear User Personas a partir de respuestas reales de encuestas.
+Responde siempre en español. Sé empático, humano y orientado a insights accionables para la entrenadora Patri.`
 
+function buildPersonaPrompt(
+  byQuestion: { questionId: number; answers: string[] }[],
+  demographic: { men: string[]; women: string[]; nonBinary: string[] }
+) {
   const totalRespondents =
     (demographic.men?.length ?? 0) +
     (demographic.women?.length ?? 0) +
@@ -15,7 +22,9 @@ export async function POST(req: Request) {
   const demographicSummary = [
     demographic.men?.length ? `Hombres (${demographic.men.length}): ${demographic.men.join(', ')}` : '',
     demographic.women?.length ? `Mujeres (${demographic.women.length}): ${demographic.women.join(', ')}` : '',
-    demographic.nonBinary?.length ? `No binario (${demographic.nonBinary.length}): ${demographic.nonBinary.join(', ')}` : '',
+    demographic.nonBinary?.length
+      ? `No binario (${demographic.nonBinary.length}): ${demographic.nonBinary.join(', ')}`
+      : '',
   ]
     .filter(Boolean)
     .join('\n')
@@ -29,12 +38,7 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join('\n\n')
 
-  const result = streamText({
-    model: openai('gpt-4o-mini'),
-    system: `Eres un investigador UX y estratega de marca especializado en salud, bienestar y entrenamiento personal. 
-Tu tarea es crear User Personas a partir de respuestas reales de encuestas.
-Responde siempre en español. Sé empático, humano y orientado a insights accionables para la entrenadora Patri.`,
-    prompt: `A continuación tienes las respuestas reales de ${totalRespondents} clientes de Patri, entrenadora personal especializada en personas con limitaciones físicas o de salud.
+  const prompt = `A continuación tienes las respuestas reales de ${totalRespondents} clientes de Patri, entrenadora personal especializada en personas con limitaciones físicas o de salud.
 
 **DATOS DEMOGRÁFICOS:**
 ${demographicSummary}
@@ -74,7 +78,29 @@ El instante concreto en que sintió el cambio real. 1-2 frases.
 Qué le cuesta o le da pereza del modelo actual. 1-2 frases.
 
 ### Oportunidades para Patri
-3 bullets concisos con acciones concretas que Patri podría tomar basándose en este perfil.`,
+3 bullets concisos con acciones concretas que Patri podría tomar basándose en este perfil.`
+
+  return { prompt, totalRespondents }
+}
+
+export async function POST(req: Request) {
+  const { byQuestion, demographic, stream = true } = await req.json()
+
+  const { prompt } = buildPersonaPrompt(byQuestion, demographic)
+
+  if (!stream) {
+    const { text } = await generateText({
+      model: openai('gpt-4o-mini'),
+      system: SYSTEM,
+      prompt,
+    })
+    return NextResponse.json({ text })
+  }
+
+  const result = streamText({
+    model: openai('gpt-4o-mini'),
+    system: SYSTEM,
+    prompt,
   })
 
   return result.toTextStreamResponse()

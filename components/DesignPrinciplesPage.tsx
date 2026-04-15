@@ -3,146 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-
-// ── Filter types ───────────────────────────────────────────────────────────────
-
-interface ActiveFilters {
-  gender: 'all' | 'men' | 'women' | 'nonBinary'
-  ageRanges: string[]
-  painValues: string[]
-}
-
-interface FilterOptions {
-  ageRanges: string[]
-  painValues: string[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
-
-const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'women', label: 'Mujeres' },
-  { value: 'men', label: 'Hombres' },
-  { value: 'nonBinary', label: 'No binario' },
-]
-
-function toggleArr(arr: string[], v: string) {
-  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
-}
-
-function FiltersPanel({
-  filters,
-  options,
-  onChange,
-}: {
-  filters: ActiveFilters
-  options: FilterOptions
-  onChange: (f: ActiveFilters) => void
-}) {
-  const isFiltered =
-    filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-
-  const activeCount = (filters.gender !== 'all' ? 1 : 0) + filters.ageRanges.length + filters.painValues.length
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-          Filtrar encuestas
-          {isFiltered && (
-            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-violet-500 text-white text-[10px] font-bold leading-none">
-              {activeCount}
-            </span>
-          )}
-        </p>
-        {isFiltered && (
-          <button
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        {/* Género */}
-        <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 font-medium">Género</p>
-          <div className="flex gap-1.5 flex-wrap">
-            {GENDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filters, gender: opt.value })}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  filters.gender === opt.value
-                    ? 'bg-violet-600 text-white border-violet-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Franja de edad */}
-        {options.ageRanges.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Franja de edad
-              {filters.ageRanges.length > 0 && (
-                <span className="ml-1 text-violet-600">({filters.ageRanges.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.ageRanges.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.ageRanges.includes(r)
-                      ? 'bg-violet-600 text-white border-violet-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Dolor crónico (sólo encuesta potencial) */}
-        {options.painValues.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
-              {filters.painValues.length > 0 && (
-                <span className="ml-1 text-violet-600">({filters.painValues.length})</span>
-              )}
-            </p>
-            <div className="flex gap-1.5 flex-wrap">
-              {options.painValues.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    filters.painValues.includes(v)
-                      ? 'bg-violet-600 text-white border-violet-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+import { DualSegmentFiltersReadBanner } from '@/components/SegmentFiltersReadBanner'
+import { readSegmentSurveyFilters, segmentFiltersToApi } from '@/lib/segment-survey-filters'
 
 // ── Question definitions ───────────────────────────────────────────────────────
 
@@ -519,13 +381,12 @@ function readableOnWhite(hex: string): string {
   return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
 }
 
-function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving, filters }: {
+function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving }: {
   data: ResultsData
   savedAt: string
   onRedo: () => void
   onRegenerate: () => void
   saving: boolean
-  filters: ActiveFilters
 }) {
   return (
     <div className="space-y-5">
@@ -663,43 +524,30 @@ export function DesignPrinciplesPage() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(false)
 
-  // Filters
-  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
-
   // Loading saved results on mount
   const [loadingSaved, setLoadingSaved] = useState(true)
 
   useEffect(() => {
-    // Load saved results and filter options in parallel
-    Promise.all([
-      fetch('/api/design-saved').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
-    ]).then(([saved, survey, potential]) => {
-      if (saved?.saved) {
-        setResults(saved.saved.principles)
-        setSavedAt(saved.saved.savedAt)
-        setSavedFormAnswers(saved.saved.formAnswers ?? '')
-        if (saved.saved.filters) {
-          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
+    fetch('/api/design-saved')
+      .then((r) => r.json())
+      .then((saved) => {
+        if (saved?.saved) {
+          setResults(saved.saved.principles)
+          setSavedAt(saved.saved.savedAt)
+          setSavedFormAnswers(saved.saved.formAnswers ?? '')
         }
-      }
-      // Merge filter options from both surveys
-      const ageSet = new Set<string>([
-        ...(survey?.filterOptions?.ageRanges ?? []),
-        ...(potential?.filterOptions?.ageRanges ?? []),
-      ])
-      setFilterOptions({
-        ageRanges: Array.from(ageSet).sort(),
-        painValues: potential?.filterOptions?.painValues ?? [],
       })
-    }).finally(() => setLoadingSaved(false))
+      .catch(() => {})
+      .finally(() => setLoadingSaved(false))
   }, [])
 
   const saveResults = async (formAnswers: string, principles: ResultsData) => {
     setSaving(true)
     try {
+      const filters = {
+        clientes: segmentFiltersToApi(readSegmentSurveyFilters('clientes')),
+        potenciales: segmentFiltersToApi(readSegmentSurveyFilters('potenciales')),
+      }
       const r = await fetch('/api/design-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -720,7 +568,11 @@ export function DesignPrinciplesPage() {
       const res = await fetch('/api/design-principles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formAnswers, filters }),
+        body: JSON.stringify({
+          formAnswers,
+          filtersClientes: segmentFiltersToApi(readSegmentSurveyFilters('clientes')),
+          filtersPotenciales: segmentFiltersToApi(readSegmentSurveyFilters('potenciales')),
+        }),
       })
       if (!res.ok) throw new Error('Error')
       const d: ResultsData = await res.json()
@@ -798,60 +650,14 @@ export function DesignPrinciplesPage() {
   // ── Results (saved or fresh) ───────────────────────────────────────────────
 
   if (results && !showForm) {
-    const isFiltered =
-      filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
-
-    const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
-
     return (
       <div className="space-y-5">
-        <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
-
-        {/* Filter context banner */}
-        <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 space-y-2">
-          <div className="flex items-start justify-between gap-2 flex-wrap">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-violet-700">
-                {isFiltered ? 'Principios generados con estos filtros:' : 'Principios generados sin filtros activos'}
-              </p>
-              {isFiltered ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {filters.gender !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                      {genderLabel}
-                    </span>
-                  )}
-                  {filters.ageRanges.map((r) => (
-                    <span key={r} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                      {r} años
-                    </span>
-                  ))}
-                  {filters.painValues.map((v) => (
-                    <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
-                      Dolor: {v}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <p className="text-xs text-violet-500">
-                Puedes cambiar los filtros de arriba y pulsar{' '}
-                <button
-                  onClick={() => generate(answers, savedFormAnswers || undefined)}
-                  className="font-semibold underline underline-offset-2 hover:text-violet-700 transition-colors"
-                >
-                  ↺ Regenerar
-                </button>{' '}
-                para actualizar los principios según el perfil que necesites.
-              </p>
-            </div>
-          </div>
-        </div>
+        <DualSegmentFiltersReadBanner accent="emerald" />
 
         <PrinciplesDisplay
           data={results}
           savedAt={savedAt}
           saving={saving}
-          filters={filters}
           onRedo={() => { setShowForm(true); setCurrentIdx(0) }}
           onRegenerate={() => generate(answers, savedFormAnswers || undefined)}
         />
@@ -879,8 +685,7 @@ export function DesignPrinciplesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+      <DualSegmentFiltersReadBanner accent="emerald" />
 
       {/* Progress */}
       <div className="space-y-1.5">

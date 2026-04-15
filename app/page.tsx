@@ -35,23 +35,13 @@ const sections = [
     color: 'blue',
   },
   {
-    href: '/user-persona',
-    emoji: '👤',
-    tag: 'Conocimiento del cliente',
-    tagPulse: false,
-    title: 'User Persona',
-    description:
-      'Perfiles representativos de los clientes actuales y potenciales de MOA: motivaciones, necesidades, puntos de dolor y rasgos de personalidad.',
-    color: 'violet',
-  },
-  {
     href: '/empathy',
     emoji: '🗺️',
     tag: 'Conocimiento del cliente',
     tagPulse: false,
     title: 'Mapa de empatía',
     description:
-      'Qué piensa, siente, ve, oye, dice y hace el cliente: dos pestañas (clientes actuales y potenciales), cada una con su encuesta y filtros.',
+      'Qué piensa, siente, ve, oye, dice y hace el cliente: dos pestañas; el filtrado coincide con el de cada encuesta.',
     color: 'rose',
   },
   {
@@ -61,8 +51,18 @@ const sections = [
     tagPulse: false,
     title: 'Insights',
     description:
-      'Patrones y hallazgos accionables con IA: dos pestañas (clientes actuales y potenciales), cada una con su encuesta y filtros.',
+      'Patrones accionables con IA a partir del mapa de empatía guardado (filtros en las páginas de encuesta).',
     color: 'amber',
+  },
+  {
+    href: '/user-persona',
+    emoji: '👤',
+    tag: 'Conocimiento del cliente',
+    tagPulse: false,
+    title: 'User Persona',
+    description:
+      'Dos perfiles desde insights guardados; edad y género (y más datos de encuesta) siguen el filtrado de /survey y /potential.',
+    color: 'violet',
   },
   {
     href: '/pov',
@@ -71,8 +71,28 @@ const sections = [
     tagPulse: false,
     title: 'Point of View (POV)',
     description:
-      'Dos declaraciones: una de clientes actuales y otra de potenciales, con el patrón [Usuario] necesita [Necesidad] porque [Insight].',
+      'Dos declaraciones generadas a partir de los user persona guardados (cliente actual y potencial), formato Design Thinking.',
     color: 'sky',
+  },
+  {
+    href: '/hmw',
+    emoji: '❓',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'How Might We (HMW)',
+    description:
+      'Preguntas «¿Cómo podríamos…?» generadas a partir de los dos POV guardados: retos de diseño para web y experiencia MOA.',
+    color: 'indigo',
+  },
+  {
+    href: '/user-journey',
+    emoji: '🛤️',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'User Journey Map',
+    description:
+      'Recorrido en la web por cada persona: etapas, dolores por paso y el momento exacto en que la interfaz resuelve el POV guardado.',
+    color: 'teal',
   },
   {
     href: '/design',
@@ -128,6 +148,18 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-amber-300',
     icon: 'bg-amber-100',
     arrow: 'text-amber-400 group-hover:text-amber-600',
+  },
+  indigo: {
+    tag: 'bg-indigo-100 text-indigo-800',
+    border: 'hover:border-indigo-300',
+    icon: 'bg-indigo-100',
+    arrow: 'text-indigo-400 group-hover:text-indigo-600',
+  },
+  teal: {
+    tag: 'bg-teal-100 text-teal-800',
+    border: 'hover:border-teal-300',
+    icon: 'bg-teal-100',
+    arrow: 'text-teal-400 group-hover:text-teal-600',
   },
 }
 

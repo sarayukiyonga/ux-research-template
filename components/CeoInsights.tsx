@@ -115,7 +115,6 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
     }
   }
 
-  // On mount: load saved report first, generate only if none exists
   useEffect(() => {
     fetch('/api/ceo-insights-saved')
       .then((r) => r.json())
@@ -123,13 +122,10 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
         if (d.saved?.text) {
           setInsights(d.saved.text)
           setSavedAt(d.saved.savedAt)
-        } else {
-          generate()
         }
       })
-      .catch(() => generate())
+      .catch(() => {})
       .finally(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -145,19 +141,28 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
           {/* Only show retry if there was an error */}
           {!loading && !streaming && error && (
             <button
-              onClick={generate}
+              onClick={() => void generate()}
               className="shrink-0 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-medium"
             >
               ↺ Reintentar
             </button>
           )}
+          {!loading && !streaming && !error && insights && (
+            <button
+              type="button"
+              onClick={() => void generate()}
+              className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
+            >
+              ↺ Regenerar
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-400 mt-1">
           {savedAt
-            ? `Generado el ${savedAt}`
+            ? `Guardado en Google Sheets · ${savedAt}`
             : streaming
-            ? 'Generando informe…'
-            : 'Generado automáticamente a partir de las respuestas de Patricia'}
+              ? 'Generando informe…'
+              : 'Se guarda en Sheets al terminar. Pulsa Regenerar para volver a generar.'}
         </p>
       </CardHeader>
 
@@ -180,11 +185,33 @@ export function CeoInsights({ qas }: CeoInsightsProps) {
           <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-100 px-4 py-3">
             <p className="text-xs text-red-500">No se pudo generar el informe estratégico.</p>
             <button
-              onClick={generate}
+              type="button"
+              onClick={() => void generate()}
               className="ml-3 text-xs px-3 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors shrink-0"
             >
               Reintentar
             </button>
+          </div>
+        )}
+
+        {!loading && !streaming && !error && !insights && (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-5 py-8 text-center space-y-3">
+            <p className="text-sm text-gray-600">No hay informe guardado en Sheets todavía.</p>
+            <button
+              type="button"
+              onClick={() => void generate()}
+              className="text-xs px-4 py-2 rounded-full bg-violet-600 text-white hover:bg-violet-700 transition-colors font-medium"
+            >
+              Generar y guardar en Sheets
+            </button>
+          </div>
+        )}
+
+        {!loading && streaming && !insights && (
+          <div className="space-y-3 py-2">
+            <Skeleton className="h-5 w-1/3" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
           </div>
         )}
 

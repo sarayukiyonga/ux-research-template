@@ -12,6 +12,14 @@ interface PersonaCardProps {
   title?: string
   subtitle?: string
   cacheKey?: string
+  /** Contenido desde Google Sheets (padre); sin auto-generación ni caché local. */
+  sheetBacked?: boolean
+  sheetText?: string
+  sheetSavedAt?: string
+  sheetLoading?: boolean
+  sheetError?: boolean
+  /** Oculta el botón Actualizar (p. ej. regeneración global arriba). */
+  hideRefreshButton?: boolean
 }
 
 function renderLines(lines: string[]) {
@@ -79,14 +87,29 @@ export function PersonaCard({
   title = 'User Persona — Cliente tipo de Patri',
   subtitle = 'Generado con IA a partir de todas las respuestas',
   cacheKey = 'persona_default',
+  sheetBacked = false,
+  sheetText = '',
+  sheetSavedAt = '',
+  sheetLoading = false,
+  sheetError = false,
+  hideRefreshButton = false,
 }: PersonaCardProps) {
-  const [persona, setPersona] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [persona, setPersona] = useState(sheetBacked ? sheetText : '')
+  const [loading, setLoading] = useState(!sheetBacked)
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState(false)
-  const [savedAt, setSavedAt] = useState('')
+  const [savedAt, setSavedAt] = useState(sheetBacked ? sheetSavedAt : '')
+
+  useEffect(() => {
+    if (!sheetBacked) return
+    setPersona(sheetText)
+    setSavedAt(sheetSavedAt)
+    setLoading(sheetLoading)
+    setError(sheetError)
+  }, [sheetBacked, sheetText, sheetSavedAt, sheetLoading, sheetError])
 
   async function generate(force = false) {
+    if (sheetBacked) return
     if (!force) {
       const cached = loadCache<string>(cacheKey)
       if (cached) {
@@ -136,9 +159,10 @@ export function PersonaCard({
   }
 
   useEffect(() => {
+    if (sheetBacked) return
     generate()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sheetBacked])
 
   return (
     <Card className="w-full border-violet-200 bg-linear-to-br from-violet-50 to-white shadow-sm">
@@ -150,7 +174,7 @@ export function PersonaCard({
               {title}
             </CardTitle>
           </div>
-          {!loading && (persona || error) && (
+          {!sheetBacked && !hideRefreshButton && !loading && (persona || error) && (
             <button
               onClick={() => generate(true)}
               className="shrink-0 text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors font-medium"
@@ -160,7 +184,9 @@ export function PersonaCard({
           )}
         </div>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-xs text-gray-400">{subtitle}</p>
+          <p className="text-xs text-gray-400">
+            {sheetBacked ? 'Guardado en Google Sheets. Regenera con el botón de arriba.' : subtitle}
+          </p>
           {savedAt && !streaming && (
             <span className="text-xs text-gray-300">· Guardado el {savedAt}</span>
           )}
@@ -198,6 +224,12 @@ export function PersonaCard({
               <span className="inline-block h-4 w-0.5 bg-violet-400 animate-pulse ml-0.5" />
             )}
           </div>
+        )}
+
+        {sheetBacked && !loading && !error && !persona && (
+          <p className="text-sm text-gray-500 py-4 text-center">
+            No hay perfil guardado en Sheets para estos filtros. Pulsa «Generar análisis» arriba.
+          </p>
         )}
       </CardContent>
     </Card>
