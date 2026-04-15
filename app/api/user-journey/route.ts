@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 import { fetchSavedPovFromSheets, type POVStatement } from '@/lib/fetch-saved-pov'
+import { fetchSavedHmwFromSheets } from '@/lib/fetch-saved-hmw'
+import { hmwBlockToPlainTextForJourney } from '@/lib/hmw-payload'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -93,6 +95,22 @@ export async function POST() {
     )
   }
 
+  const hmwSaved = await fetchSavedHmwFromSheets()
+  const hmwSoloActual =
+    hmwSaved.ok
+      ? `\n\n=== HOW MIGHT WE — ideas guardadas (solo cliente actual) ===\n${hmwBlockToPlainTextForJourney(
+          hmwSaved.data.clienteActual,
+          'Cliente actual'
+        )}`
+      : ''
+  const hmwSoloPotencial =
+    hmwSaved.ok
+      ? `\n\n=== HOW MIGHT WE — ideas guardadas (solo cliente potencial) ===\n${hmwBlockToPlainTextForJourney(
+          hmwSaved.data.clientePotencial,
+          'Cliente potencial'
+        )}`
+      : ''
+
   const systemBase = `Eres un UX strategist para MOA (Patri, entrenamiento y salud en Martorell).
 
 Debes construir un **User Journey Map** centrado en la **experiencia con la web** de moa.cat (o el sitio principal de MOA): etapas ordenadas desde que la persona tiene el problema/necesidad hasta que **sale de la web** (cierra, abandona o completa la visita).
@@ -115,7 +133,7 @@ Requisitos:
     system: `${systemBase}
 
 Contexto: **CLIENTE ACTUAL** (ya conoce o entrena con Patri). El viaje en web puede incluir renovar confianza, consultar horarios, leer novedades, contactar… No copies el POV literal en cada etapa; úsalo como brújula.`,
-    prompt: `=== USER PERSONA (solo cliente actual) ===\n${textoPersonaActual}\n\n=== POV (solo cliente actual) ===\n${povActual}\n\n===\nDevuelve el mapa en "journey".`,
+    prompt: `=== USER PERSONA (solo cliente actual) ===\n${textoPersonaActual}\n\n=== POV (solo cliente actual) ===\n${povActual}${hmwSoloActual}\n\n===\nDevuelve el mapa en "journey".`,
   })
 
   const textoPersonaPotencial = personaRecordToPlainText(
@@ -130,7 +148,7 @@ Contexto: **CLIENTE ACTUAL** (ya conoce o entrena con Patri). El viaje en web pu
     system: `${systemBase}
 
 Contexto: **CLIENTE POTENCIAL** (aún no es clienta; compara, duda, busca encaje). El viaje suele ir de descubrimiento a decisión de contacto/prueba. El POV guía dónde la web debe generar confianza.`,
-    prompt: `=== USER PERSONA (solo cliente potencial) ===\n${textoPersonaPotencial}\n\n=== POV (solo cliente potencial) ===\n${povPotencial}\n\n===\nDevuelve el mapa en "journey".`,
+    prompt: `=== USER PERSONA (solo cliente potencial) ===\n${textoPersonaPotencial}\n\n=== POV (solo cliente potencial) ===\n${povPotencial}${hmwSoloPotencial}\n\n===\nDevuelve el mapa en "journey".`,
   })
 
   return NextResponse.json({

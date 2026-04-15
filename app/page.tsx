@@ -95,6 +95,16 @@ const sections = [
     color: 'teal',
   },
   {
+    href: '/user-flow',
+    emoji: '🔀',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'User Flow (flujo de usuario)',
+    description:
+      'Diagrama de flujo basado en el User Journey guardado (ramas, CTAs hasta conversión).',
+    color: 'cyan',
+  },
+  {
     href: '/design',
     emoji: '🎨',
     tag: 'Identidad de marca',
@@ -160,6 +170,12 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-teal-300',
     icon: 'bg-teal-100',
     arrow: 'text-teal-400 group-hover:text-teal-600',
+  },
+  cyan: {
+    tag: 'bg-cyan-100 text-cyan-900',
+    border: 'hover:border-cyan-300',
+    icon: 'bg-cyan-100',
+    arrow: 'text-cyan-400 group-hover:text-cyan-600',
   },
 }
 

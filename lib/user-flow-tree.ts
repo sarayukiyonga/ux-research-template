@@ -1,0 +1,203 @@
+import { z } from 'zod'
+
+export const pasoSchema = z.object({
+  orden: z.number().int().min(1).max(24),
+  tituloBolita: z.string().max(36),
+  descripcion: z.string().max(200),
+  tipo: z.enum(['entrada', 'navegacion', 'conversion', 'salida']),
+})
+
+export type FlowPaso = z.infer<typeof pasoSchema>
+
+export type FlowNodo = FlowLineal | FlowDecision
+
+export interface FlowLineal {
+  tipo: 'lineal'
+  pasos: FlowPaso[]
+  clicsEntrePasos: string[]
+  /** Tras el último paso del tramo; null = fin en esa rama. */
+  despues: FlowNodo | null
+}
+
+export interface FlowDecision {
+  tipo: 'decision'
+  tituloDiamante: string
+  descripcion: string
+  ramas: Array<{ etiqueta: string; siguiente: FlowNodo }>
+}
+
+const tituloDiamanteSchema = z.string().max(36)
+
+/** Unión recursiva (Zod 4: evitar `discriminatedUnion` + `lazy`, puede romper inferencia/validación). */
+export const flowNodoSchema: z.ZodType<FlowNodo> = z.lazy(() =>
+  z.union([
+    z.object({
+      tipo: z.literal('lineal'),
+      pasos: z.array(pasoSchema).min(1).max(10),
+      clicsEntrePasos: z.array(z.string().max(100)),
+      despues: z.union([flowNodoSchema, z.null()]),
+    }),
+    z.object({
+      tipo: z.literal('decision'),
+      tituloDiamante: tituloDiamanteSchema.describe('Texto muy corto dentro del rombo (pregunta o condición)'),
+      descripcion: z.string().max(240),
+      ramas: z
+        .array(
+          z.object({
+            etiqueta: z.string().max(80).describe('Etiqueta de la flecha: Sí, No, Primera vez, etc.'),
+            siguiente: flowNodoSchema,
+          })
+        )
+        .min(2)
+        .max(3),
+    }),
+  ])
+)
+
+export const userFlowLineSchema = z.object({
+  arquetipo: z.string().max(90),
+  deDondeEntra: z.string().max(260),
+  objetivoConversion: z.string().max(260),
+  raiz: flowNodoSchema,
+})
+
+export type UserFlowLine = z.infer<typeof userFlowLineSchema>
+
+function alignClics(pasos: { orden: number }[], clics: string[]): string[] {
+  const n = Math.max(0, pasos.length - 1)
+  const out = [...clics].slice(0, n)
+  while (out.length < n) out.push('Continúa en la web')
+  return out
+}
+
+export function normalizeFlowNode(n: FlowNodo): FlowNodo {
+  if (n.tipo === 'lineal') {
+    const pasos = [...n.pasos].sort((a, b) => a.orden - b.orden)
+    return {
+      tipo: 'lineal',
+      pasos,
+      clicsEntrePasos: alignClics(pasos, n.clicsEntrePasos),
+      despues: n.despues == null ? null : normalizeFlowNode(n.despues),
+    }
+  }
+  return {
+    tipo: 'decision',
+    tituloDiamante: n.tituloDiamante,
+    descripcion: n.descripcion,
+    ramas: n.ramas.map((r) => ({
+      etiqueta: r.etiqueta,
+      siguiente: normalizeFlowNode(r.siguiente),
+    })),
+  }
+}
+
+export function normalizeUserFlowLine(raw: UserFlowLine): UserFlowLine {
+  return {
+    ...raw,
+    raiz: normalizeFlowNode(raw.raiz),
+  }
+}
+
+/** Convierte el formato antiguo (solo pasos + clics) al árbol con un único tramo lineal. */
+export function legacyLinealToRaiz(pasos: FlowPaso[], clicsEntrePasos: string[]): FlowNodo {
+  const p = [...pasos].sort((a, b) => a.orden - b.orden)
+  return {
+    tipo: 'lineal',
+    pasos: p,
+    clicsEntrePasos: alignClics(p, clicsEntrePasos),
+    despues: null,
+  }
+}
+
+function isPaso(x: unknown): x is FlowPaso {
+  if (!x || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  const t = o.tipo
+  return (
+    typeof o.orden === 'number' &&
+    typeof o.tituloBolita === 'string' &&
+    typeof o.descripcion === 'string' &&
+    (t === 'entrada' || t === 'navegacion' || t === 'conversion' || t === 'salida')
+  )
+}
+
+export function isFlowNodo(x: unknown): x is FlowNodo {
+  if (!x || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  if (o.tipo === 'lineal') {
+    if (!Array.isArray(o.pasos) || o.pasos.length < 1) return false
+    if (!Array.isArray(o.clicsEntrePasos)) return false
+    if (!o.pasos.every(isPaso)) return false
+    const n = Math.max(0, o.pasos.length - 1)
+    if (o.clicsEntrePasos.length !== n) return false
+    if (o.despues != null && !isFlowNodo(o.despues)) return false
+    return true
+  }
+  if (o.tipo === 'decision') {
+    if (typeof o.tituloDiamante !== 'string' || typeof o.descripcion !== 'string') return false
+    if (!Array.isArray(o.ramas) || o.ramas.length < 2) return false
+    return o.ramas.every(
+      (r: unknown) =>
+        r &&
+        typeof r === 'object' &&
+        typeof (r as Record<string, unknown>).etiqueta === 'string' &&
+        isFlowNodo((r as Record<string, unknown>).siguiente)
+    )
+  }
+  return false
+}
+
+export function isUserFlowLine(x: unknown): x is UserFlowLine {
+  if (!x || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  if (typeof o.arquetipo !== 'string' || typeof o.deDondeEntra !== 'string') return false
+  if (typeof o.objetivoConversion !== 'string') return false
+  if (o.raiz != null && isFlowNodo(o.raiz)) return true
+  // legado
+  if (Array.isArray(o.pasos) && o.pasos.length >= 1 && Array.isArray(o.clicsEntrePasos) && o.pasos.every(isPaso)) {
+    return true
+  }
+  return false
+}
+
+/** Acepta respuesta API nueva (`raiz`) o guardado legado (`pasos` + `clicsEntrePasos`). */
+export function parseUserFlowLine(raw: unknown): UserFlowLine | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.arquetipo !== 'string' || typeof o.deDondeEntra !== 'string' || typeof o.objetivoConversion !== 'string')
+    return null
+
+  if (o.raiz != null && isFlowNodo(o.raiz)) {
+    return normalizeUserFlowLine({
+      arquetipo: o.arquetipo,
+      deDondeEntra: o.deDondeEntra,
+      objetivoConversion: o.objetivoConversion,
+      raiz: o.raiz,
+    })
+  }
+
+  if (Array.isArray(o.pasos) && o.pasos.every(isPaso) && Array.isArray(o.clicsEntrePasos)) {
+    return normalizeUserFlowLine({
+      arquetipo: o.arquetipo,
+      deDondeEntra: o.deDondeEntra,
+      objetivoConversion: o.objetivoConversion,
+      raiz: legacyLinealToRaiz(o.pasos as FlowPaso[], o.clicsEntrePasos as string[]),
+    })
+  }
+
+  return null
+}
+
+export interface UserFlowBundle {
+  clienteActual: UserFlowLine
+  clientePotencial: UserFlowLine
+}
+
+export function parseUserFlowBundle(raw: unknown): UserFlowBundle | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const ca = parseUserFlowLine(o.clienteActual)
+  const cp = parseUserFlowLine(o.clientePotencial)
+  if (!ca || !cp) return null
+  return { clienteActual: ca, clientePotencial: cp }
+}

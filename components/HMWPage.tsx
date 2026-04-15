@@ -1,27 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  HMW_RESPUESTAS_POR_PREGUNTA,
+  type HMWQuestionsPayload,
+  type HMWItem,
+  normalizeHmwPayload,
+  mergeHmwRegeneratedPreservingAnswers,
+} from '@/lib/hmw-payload'
 
-export interface HMWQuestions {
-  clienteActual: string[]
-  clientePotencial: string[]
-}
-
-function normalizeQuestions(raw: unknown): HMWQuestions | null {
-  if (!raw || typeof raw !== 'object') return null
-  const o = raw as Record<string, unknown>
-  const a = o.clienteActual
-  const b = o.clientePotencial
-  if (!Array.isArray(a) || !Array.isArray(b)) return null
-  const strList = (arr: unknown[]) =>
-    arr.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim())
-  const ca = strList(a)
-  const cp = strList(b)
-  if (ca.length === 0 && cp.length === 0) return null
-  return { clienteActual: ca, clientePotencial: cp }
-}
+export type { HMWQuestionsPayload, HMWItem } from '@/lib/hmw-payload'
 
 function hasPovShape(d: unknown): boolean {
   if (!d || typeof d !== 'object') return false
@@ -39,27 +29,56 @@ function hasPovShape(d: unknown): boolean {
 function HMWListBlock({
   title,
   accent,
+  blockKey,
   items,
+  onRespuestaChange,
 }: {
   title: string
   accent: 'indigo' | 'violet'
-  items: string[]
+  blockKey: 'clienteActual' | 'clientePotencial'
+  items: HMWItem[]
+  onRespuestaChange: (
+    block: 'clienteActual' | 'clientePotencial',
+    questionIndex: number,
+    respuestaSlot: 0 | 1 | 2,
+    value: string
+  ) => void
 }) {
   const border = accent === 'indigo' ? 'border-indigo-200 bg-indigo-50/60' : 'border-violet-200 bg-violet-50/60'
   const bullet = accent === 'indigo' ? 'text-indigo-500' : 'text-violet-500'
   const text = accent === 'indigo' ? 'text-indigo-950' : 'text-violet-950'
+  const ring = accent === 'indigo' ? 'focus:border-indigo-400 focus:ring-indigo-200' : 'focus:border-violet-400 focus:ring-violet-200'
 
   return (
-    <div className={`rounded-2xl border-2 ${border} p-5 space-y-3`}>
+    <div className={`rounded-2xl border-2 ${border} p-5 space-y-4`}>
       <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h2>
       {items.length === 0 ? (
         <p className="text-sm text-gray-400">Sin preguntas en este bloque.</p>
       ) : (
-        <ul className="space-y-3">
-          {items.map((q, i) => (
-            <li key={i} className={`flex gap-3 text-sm leading-relaxed ${text}`}>
-              <span className={`shrink-0 font-bold ${bullet}`}>{i + 1}.</span>
-              <span>{q}</span>
+        <ul className="space-y-6">
+          {items.map((item, qi) => (
+            <li key={qi} className={`space-y-3 text-sm leading-relaxed ${text}`}>
+              <div className="flex gap-3">
+                <span className={`shrink-0 font-bold ${bullet}`}>{qi + 1}.</span>
+                <span className="font-medium">{item.pregunta}</span>
+              </div>
+              <div className="pl-7 sm:pl-8 space-y-2.5">
+                {([0, 1, 2] as const).map((slot) => (
+                  <label key={slot} className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Respuesta {slot + 1}
+                    </span>
+                    <textarea
+                      className={`mt-1 w-full min-h-[4.5rem] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 ${ring}`}
+                      rows={3}
+                      maxLength={2000}
+                      value={item.respuestas[slot]}
+                      onChange={(e) => onRespuestaChange(blockKey, qi, slot, e.target.value)}
+                      placeholder="Ideas, notas o direcciones de solución…"
+                    />
+                  </label>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
@@ -69,13 +88,26 @@ function HMWListBlock({
 }
 
 export function HMWPage() {
-  const [questions, setQuestions] = useState<HMWQuestions | null>(null)
+  const [questions, setQuestions] = useState<HMWQuestionsPayload | null>(null)
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
   const [povOk, setPovOk] = useState(false)
+
+  const questionsRef = useRef<HMWQuestionsPayload | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    questionsRef.current = questions
+  }, [questions])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -84,7 +116,7 @@ export function HMWPage() {
     ])
       .then(([hmwSaved, povSaved]) => {
         if (hmwSaved?.saved?.questions) {
-          const n = normalizeQuestions(hmwSaved.saved.questions)
+          const n = normalizeHmwPayload(hmwSaved.saved.questions)
           if (n) {
             setQuestions(n)
             setSavedAt(hmwSaved.saved.savedAt ?? '')
@@ -97,19 +129,47 @@ export function HMWPage() {
       .finally(() => setLoadingSaved(false))
   }, [])
 
-  const saveQuestions = async (data: HMWQuestions) => {
+  const saveQuestions = useCallback(async (data: HMWQuestionsPayload) => {
     setSaving(true)
     try {
       const r = await fetch('/api/hmw-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions: data, filters: { fuente: 'pov' } }),
+        body: JSON.stringify({ questions: data, filters: { fuente: 'pov', version: 2 } }),
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
     } catch {}
     setSaving(false)
-  }
+  }, [])
+
+  const scheduleSave = useCallback(
+    (data: HMWQuestionsPayload) => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        void saveQuestions(data)
+      }, 850)
+    },
+    [saveQuestions]
+  )
+
+  const updateRespuesta = useCallback(
+    (block: 'clienteActual' | 'clientePotencial', questionIndex: number, slot: 0 | 1 | 2, value: string) => {
+      setQuestions((prev) => {
+        if (!prev) return prev
+        const list = [...prev[block]]
+        const row = list[questionIndex]
+        if (!row) return prev
+        const resp: [string, string, string] = [...row.respuestas]
+        resp[slot] = value
+        list[questionIndex] = { ...row, respuestas: resp }
+        const next: HMWQuestionsPayload = { ...prev, [block]: list }
+        scheduleSave(next)
+        return next
+      })
+    },
+    [scheduleSave]
+  )
 
   const generate = async () => {
     setGenerating(true)
@@ -121,13 +181,18 @@ export function HMWPage() {
         setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar las preguntas HMW.')
         return
       }
-      const n = normalizeQuestions(d)
-      if (!n) {
+      const fromApi = normalizeHmwPayload(d)
+      if (!fromApi) {
         setGenError('La respuesta de la IA no tenía el formato esperado.')
         return
       }
-      setQuestions(n)
-      await saveQuestions(n)
+      const merged = mergeHmwRegeneratedPreservingAnswers(fromApi, questionsRef.current)
+      setQuestions(merged)
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      await saveQuestions(merged)
     } catch {
       setGenError('No se pudieron generar las preguntas HMW. Inténtalo de nuevo.')
     } finally {
@@ -192,6 +257,14 @@ export function HMWPage() {
             </Link>{' '}
             (cliente actual y potencial). Si cambias los POV, vuelve aquí y regenera para alinear los retos.
           </p>
+          <p className="mt-2 text-xs text-gray-500">
+            Tras generar, podrás escribir hasta {HMW_RESPUESTAS_POR_PREGUNTA} respuestas por pregunta; se guardan en
+            Sheets y se usan al generar el{' '}
+            <Link href="/user-journey" className="font-semibold text-indigo-600 underline underline-offset-2">
+              User Journey Map
+            </Link>
+            .
+          </p>
         </div>
         {!povOk && (
           <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
@@ -232,13 +305,21 @@ export function HMWPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
         <p>
           Fuente:{' '}
           <Link href="/pov" className="font-semibold text-indigo-600 underline underline-offset-2">
             POV guardados
           </Link>
           . Regenera si actualizas los POV en esa página.
+        </p>
+        <p className="text-xs text-gray-500">
+          Debajo de cada pregunta hay {HMW_RESPUESTAS_POR_PREGUNTA} campos de texto; se guardan automáticamente en
+          Sheets (debounce) y se envían a la IA al generar el{' '}
+          <Link href="/user-journey" className="font-semibold text-indigo-600 underline underline-offset-2">
+            User Journey Map
+          </Link>
+          .
         </p>
       </div>
 
@@ -266,8 +347,20 @@ export function HMWPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <HMWListBlock title="Clientes actuales" accent="indigo" items={questions.clienteActual} />
-        <HMWListBlock title="Clientes potenciales" accent="violet" items={questions.clientePotencial} />
+        <HMWListBlock
+          title="Clientes actuales"
+          accent="indigo"
+          blockKey="clienteActual"
+          items={questions.clienteActual}
+          onRespuestaChange={updateRespuesta}
+        />
+        <HMWListBlock
+          title="Clientes potenciales"
+          accent="violet"
+          blockKey="clientePotencial"
+          items={questions.clientePotencial}
+          onRespuestaChange={updateRespuesta}
+        />
       </div>
     </div>
   )

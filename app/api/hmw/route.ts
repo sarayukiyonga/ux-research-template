@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { fetchSavedPovFromSheets, povPairToPlainTextForHmw } from '@/lib/fetch-saved-pov'
+import type { HMWQuestionsPayload } from '@/lib/hmw-payload'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -59,5 +60,13 @@ Reglas:
     prompt: `=== POV GUARDADOS (única fuente) ===\n\n${textoPov}\n\n===\nGenera las dos listas de HMW en el JSON de salida.`,
   })
 
-  return NextResponse.json(object)
+  const toPayload = (list: string[]): HMWQuestionsPayload['clienteActual'] =>
+    list.map((pregunta) => ({ pregunta, respuestas: ['', '', ''] as [string, string, string] }))
+
+  const payload: HMWQuestionsPayload = {
+    clienteActual: toPayload(object.clienteActual),
+    clientePotencial: toPayload(object.clientePotencial),
+  }
+
+  return NextResponse.json(payload)
 }
