@@ -35,6 +35,8 @@ export interface SurveyRow {
 export interface SurveyFilters {
   gender?: string
   ageRanges?: string[]
+  /** Filtro por respuestas de dolor crónico (encuesta potenciales) */
+  painValues?: string[]
 }
 
 export interface SurveyFilterOptions {

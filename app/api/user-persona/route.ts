@@ -6,6 +6,7 @@ import { google } from 'googleapis'
 import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import type { SurveyFilters } from '@/lib/sheets'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
