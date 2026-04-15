@@ -149,20 +149,52 @@ function FiltersPanel({
 
 // ── Sticky note ────────────────────────────────────────────────────────────────
 
+const NOTE = 44 // px — compact size
+
 function StickyNote({ text, bg }: { text: string; bg: string }) {
+  const [pinned, setPinned] = useState(false)
+
   return (
+    // Outer wrapper reserves the fixed footprint so siblings don't shift
     <div
-      className="flex items-start justify-start p-2 rounded-[3px] shadow-sm text-[10px] leading-[1.35] text-gray-700 overflow-hidden"
-      style={{ backgroundColor: bg, width: 82, height: 82, flexShrink: 0 }}
+      className="group relative cursor-pointer"
+      style={{ width: NOTE, height: NOTE, flexShrink: 0, zIndex: pinned ? 100 : undefined }}
+      onClick={(e) => { e.stopPropagation(); setPinned((p) => !p) }}
     >
-      {text}
+      {/* Compact square — always visible */}
+      <div
+        className="absolute inset-0 rounded-[3px] shadow-sm"
+        style={{ backgroundColor: bg }}
+      />
+
+      {/* Expanded card — appears on hover (desktop) or when pinned (tap) */}
+      <div
+        className={`absolute top-0 left-0 rounded-[4px] shadow-xl z-50 p-2.5 text-[11px] leading-[1.45] text-gray-800 select-none
+          ${pinned ? 'block' : 'hidden group-hover:block'}`}
+        style={{
+          backgroundColor: bg,
+          minWidth: 170,
+          maxWidth: 230,
+          minHeight: NOTE,
+          border: '1.5px solid rgba(255,255,255,0.6)',
+        }}
+      >
+        {text}
+        {/* Close hint for mobile pinned state */}
+        {pinned && (
+          <span className="block mt-1.5 text-[9px] text-gray-500 opacity-70">
+            Toca para cerrar
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
+// Two-column grid of notes (forces 2×N layout regardless of count)
 function NoteGroup({ notes, bg }: { notes: string[]; bg: string }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-[4px]" style={{ width: NOTE * 2 + 4 }}>
       {notes.map((note, i) => (
         <StickyNote key={i} text={note} bg={bg} />
       ))}
@@ -174,7 +206,7 @@ function NoteGroup({ notes, bg }: { notes: string[]; bg: string }) {
 
 function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={`text-[11px] font-semibold text-gray-500 tracking-wide ${className ?? ''}`}>
+    <p className={`text-[10px] font-semibold text-gray-500 tracking-wide uppercase ${className ?? ''}`}>
       {children}
     </p>
   )
@@ -182,7 +214,6 @@ function SectionLabel({ children, className }: { children: React.ReactNode; clas
 
 // ── Visual empathy map ─────────────────────────────────────────────────────────
 
-// Section colors matching screenshot
 const COLORS = {
   piensaSiente: '#D4B8E8',
   ve: '#F9DF7A',
@@ -193,88 +224,91 @@ const COLORS = {
   necesidades: '#A8D9B5',
 }
 
-function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
-  // The map uses a fixed-size canvas. On small screens, it scrolls horizontally.
-  const MAP_SIZE = 640
-  const cx = MAP_SIZE / 2      // center X
-  const cy = MAP_SIZE * 0.43   // center Y (slightly above middle)
+// Layout constants (px). NoteGroup is always NOTE*2+4 = 92px wide.
+// NOTE_H = 2 rows of NOTE + gap = NOTE*2+4 = 92px. Section = NOTE_H + label(16) + gap(6) = 114px.
+const W = 800     // canvas width
+const H = 660     // canvas height
+const cx = 400    // center X
+const cy = 310    // center Y
 
+function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto pb-1">
       <div
         className="relative bg-white border border-gray-200 rounded-2xl"
-        style={{ width: MAP_SIZE, height: MAP_SIZE, flexShrink: 0 }}
+        style={{ width: W, height: H, flexShrink: 0 }}
       >
-        {/* ── SVG lines ── */}
+        {/* ── SVG structural lines ── */}
         <svg
           className="absolute inset-0 pointer-events-none"
-          width={MAP_SIZE}
-          height={MAP_SIZE}
-          viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`}
+          width={W} height={H}
+          viewBox={`0 0 ${W} ${H}`}
         >
-          {/* Outer border already provided by container */}
-          {/* 4 straight lines through center */}
-          <line x1={cx} y1={0} x2={cx} y2={MAP_SIZE} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={0} y1={cy} x2={MAP_SIZE} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-          {/* 4 diagonal lines through center */}
-          <line x1={0} y1={0} x2={MAP_SIZE} y2={MAP_SIZE} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={MAP_SIZE} y1={0} x2={0} y2={MAP_SIZE} stroke="#e5e7eb" strokeWidth="1" />
+          {/* Straight cross */}
+          <line x1={cx} y1={0} x2={cx} y2={H} stroke="#e5e7eb" strokeWidth="1" />
+          <line x1={0} y1={cy} x2={W} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+          {/* Diagonals from corners to center */}
+          <line x1={0}  y1={0} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+          <line x1={W}  y1={0} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+          <line x1={0}  y1={H} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+          <line x1={W}  y1={H} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
         </svg>
 
         {/* ── Center avatar ── */}
         <div
-          className="absolute flex items-center justify-center rounded-full bg-gray-100 border-2 border-white shadow-md text-3xl overflow-hidden"
-          style={{
-            width: 68,
-            height: 68,
-            left: cx - 34,
-            top: cy - 34,
-            zIndex: 10,
-          }}
+          className="absolute flex items-center justify-center rounded-full bg-gray-50 border-2 border-white shadow-md text-2xl"
+          style={{ width: 60, height: 60, left: cx - 30, top: cy - 30, zIndex: 10 }}
         >
           🧍‍♀️
         </div>
 
         {/* ── PIENSA Y SIENTE — top center ── */}
-        <div className="absolute flex flex-col items-center gap-2" style={{ top: 14, left: 148, width: 344 }}>
+        {/* top=14, centered horizontally: left = cx - (92/2) = cx - 46 = 354 */}
+        <div className="absolute flex flex-col items-center gap-1.5" style={{ top: 14, left: cx - 46 }}>
           <SectionLabel>Piensa y siente</SectionLabel>
           <NoteGroup notes={data.piensaSiente} bg={COLORS.piensaSiente} />
         </div>
 
         {/* ── VE — left ── */}
-        <div className="absolute flex flex-col items-start gap-2" style={{ top: 160, left: 14, width: 160 }}>
+        {/* top=148, left=8 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 148, left: 8 }}>
           <NoteGroup notes={data.ve} bg={COLORS.ve} />
           <SectionLabel>Ve</SectionLabel>
         </div>
 
         {/* ── OYE — right ── */}
-        <div className="absolute flex flex-col items-end gap-2" style={{ top: 160, right: 14, width: 160 }}>
+        {/* top=148, right=8 → left = W - 8 - 92 = 700 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 148, left: W - 8 - (NOTE * 2 + 4) }}>
           <NoteGroup notes={data.oye} bg={COLORS.oye} />
-          <SectionLabel className="self-end">Oye</SectionLabel>
+          <SectionLabel>Oye</SectionLabel>
         </div>
 
-        {/* ── DICE — bottom-left center ── */}
-        <div className="absolute flex flex-col items-start gap-2" style={{ top: cy + 50, left: 80, width: 220 }}>
+        {/* ── DICE — bottom-left of center ── */}
+        {/* top=cy+42=352, left=96 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: cy + 42, left: 96 }}>
           <NoteGroup notes={data.dice} bg={COLORS.dice} />
           <SectionLabel>Dice</SectionLabel>
         </div>
 
-        {/* ── HACE — bottom-right center ── */}
-        <div className="absolute flex flex-col items-start gap-2" style={{ top: cy + 50, left: cx + 50, width: 220 }}>
+        {/* ── HACE — bottom-right of center ── */}
+        {/* top=cy+42=352, left=cx+44=444 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: cy + 42, left: cx + 44 }}>
           <NoteGroup notes={data.hace} bg={COLORS.hace} />
           <SectionLabel>Hace</SectionLabel>
         </div>
 
         {/* ── DOLOR / FRUSTRACIONES — bottom left ── */}
-        <div className="absolute flex flex-col items-start gap-2" style={{ bottom: 18, left: 14, width: 210 }}>
+        {/* top=490, left=8 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 490, left: 8 }}>
           <NoteGroup notes={data.dolorFrustraciones} bg={COLORS.dolor} />
           <SectionLabel>Dolor / Frustraciones</SectionLabel>
         </div>
 
         {/* ── NECESIDADES / DESEOS — bottom right ── */}
-        <div className="absolute flex flex-col items-end gap-2" style={{ bottom: 18, right: 14, width: 210 }}>
+        {/* top=490, left = W - 8 - 92 = 700 */}
+        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 490, left: W - 8 - (NOTE * 2 + 4) }}>
           <NoteGroup notes={data.necesidadesDeseos} bg={COLORS.necesidades} />
-          <SectionLabel className="self-end">Necesidades / Deseos</SectionLabel>
+          <SectionLabel>Necesidades / Deseos</SectionLabel>
         </div>
       </div>
     </div>

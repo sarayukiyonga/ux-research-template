@@ -65,10 +65,10 @@ export const maxDuration = 60
 // ── Zod schema ─────────────────────────────────────────────────────────────────
 
 const noteSchema = z
-  .array(z.string().max(80))
+  .array(z.string().max(75))
   .min(3)
-  .max(5)
-  .describe('3-5 notas cortas (máx. 80 caracteres cada una), en primera persona o con cita directa cuando sea posible')
+  .max(4)
+  .describe('3-4 notas muy cortas (máx. 75 caracteres cada una), en primera persona o con cita directa cuando sea posible')
 
 const schema = z.object({
   piensaSiente: noteSchema.describe(
