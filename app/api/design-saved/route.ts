@@ -39,7 +39,7 @@ export async function GET() {
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: CEO_SHEET_ID,
-      range: `${SHEET_NAME}!A2:C2`,
+      range: `${SHEET_NAME}!A2:D2`,
     })
 
     const row = res.data.values?.[0]
@@ -52,6 +52,7 @@ export async function GET() {
         savedAt: row[0] ?? '',
         formAnswers: row[1] ?? '',
         principles: JSON.parse(row[2]),
+        filters: row[3] ? JSON.parse(row[3]) : null,
       },
     })
   } catch (e) {
@@ -64,7 +65,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { formAnswers, principles } = await req.json()
+    const { formAnswers, principles, filters } = await req.json()
     const sheets = google.sheets({ version: 'v4', auth: getAuth() })
     await ensureSheetExists(sheets)
 
@@ -84,12 +85,12 @@ export async function POST(req: Request) {
         valueInputOption: 'RAW',
         data: [
           {
-            range: `${SHEET_NAME}!A1:C1`,
-            values: [['Guardado el', 'Respuestas del formulario', 'Principios (JSON)']],
+            range: `${SHEET_NAME}!A1:D1`,
+            values: [['Guardado el', 'Respuestas del formulario', 'Principios (JSON)', 'Filtros (JSON)']],
           },
           {
-            range: `${SHEET_NAME}!A2:C2`,
-            values: [[savedAt, formAnswers, JSON.stringify(principles)]],
+            range: `${SHEET_NAME}!A2:D2`,
+            values: [[savedAt, formAnswers, JSON.stringify(principles), JSON.stringify(filters ?? {})]],
           },
         ],
       },

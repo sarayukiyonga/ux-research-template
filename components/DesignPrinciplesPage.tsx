@@ -681,6 +681,9 @@ export function DesignPrinciplesPage() {
         setResults(saved.saved.principles)
         setSavedAt(saved.saved.savedAt)
         setSavedFormAnswers(saved.saved.formAnswers ?? '')
+        if (saved.saved.filters) {
+          setFilters({ ...DEFAULT_FILTERS, ...saved.saved.filters })
+        }
       }
       // Merge filter options from both surveys
       const ageSet = new Set<string>([
@@ -700,7 +703,7 @@ export function DesignPrinciplesPage() {
       const r = await fetch('/api/design-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formAnswers, principles }),
+        body: JSON.stringify({ formAnswers, principles, filters }),
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
