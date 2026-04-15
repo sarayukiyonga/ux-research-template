@@ -149,40 +149,51 @@ function FiltersPanel({
 
 // ── Sticky note ────────────────────────────────────────────────────────────────
 
-const NOTE = 44 // px — compact size
+// Note dimensions
+const NOTE = 62   // compact square size (px)
+const GUTTER = 4  // gap between notes (px)
+const GW = NOTE * 2 + GUTTER  // group width for 2-column layout = 128px
 
-function StickyNote({ text, bg }: { text: string; bg: string }) {
+function StickyNote({ text, bg, expandDir = 'right' }: { text: string; bg: string; expandDir?: 'right' | 'left' }) {
   const [pinned, setPinned] = useState(false)
 
+  const expandStyle = expandDir === 'left'
+    ? { top: 0, right: 0 }   // expands leftward
+    : { top: 0, left: 0 }    // expands rightward (default)
+
   return (
-    // Outer wrapper reserves the fixed footprint so siblings don't shift
     <div
       className="group relative cursor-pointer"
       style={{ width: NOTE, height: NOTE, flexShrink: 0, zIndex: pinned ? 100 : undefined }}
       onClick={(e) => { e.stopPropagation(); setPinned((p) => !p) }}
     >
-      {/* Compact square — always visible */}
+      {/* Compact square with small text preview */}
       <div
-        className="absolute inset-0 rounded-[3px] shadow-sm"
-        style={{ backgroundColor: bg }}
-      />
+        className="absolute inset-0 rounded-[3px] shadow-sm overflow-hidden"
+        style={{ backgroundColor: bg, padding: 5 }}
+      >
+        <p className="text-[7.5px] leading-[1.3] text-gray-700 wrap-break-word select-none">
+          {text}
+        </p>
+      </div>
 
-      {/* Expanded card — appears on hover (desktop) or when pinned (tap) */}
+      {/* Expanded card — hover on desktop, pinned on mobile */}
       <div
-        className={`absolute top-0 left-0 rounded-[4px] shadow-xl z-50 p-2.5 text-[11px] leading-[1.45] text-gray-800 select-none
+        className={`absolute rounded-[4px] shadow-xl z-50 p-2.5 text-[12px] leading-normal text-gray-800 select-none
           ${pinned ? 'block' : 'hidden group-hover:block'}`}
         style={{
+          ...expandStyle,
           backgroundColor: bg,
-          minWidth: 170,
-          maxWidth: 230,
+          minWidth: 180,
+          maxWidth: 240,
           minHeight: NOTE,
-          border: '1.5px solid rgba(255,255,255,0.6)',
+          border: '1.5px solid rgba(255,255,255,0.7)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
         }}
       >
         {text}
-        {/* Close hint for mobile pinned state */}
         {pinned && (
-          <span className="block mt-1.5 text-[9px] text-gray-500 opacity-70">
+          <span className="block mt-2 text-[9px] text-gray-500 opacity-60">
             Toca para cerrar
           </span>
         )}
@@ -191,124 +202,180 @@ function StickyNote({ text, bg }: { text: string; bg: string }) {
   )
 }
 
-// Two-column grid of notes (forces 2×N layout regardless of count)
-function NoteGroup({ notes, bg }: { notes: string[]; bg: string }) {
+// Group of notes with configurable columns
+function NoteGroup({ notes, bg, expandDir, cols = 2 }: { notes: string[]; bg: string; expandDir?: 'right' | 'left'; cols?: number }) {
+  const width = cols * NOTE + (cols - 1) * GUTTER
   return (
-    <div className="flex flex-wrap gap-[4px]" style={{ width: NOTE * 2 + 4 }}>
+    <div className="flex flex-wrap" style={{ width, gap: GUTTER }}>
       {notes.map((note, i) => (
-        <StickyNote key={i} text={note} bg={bg} />
+        <StickyNote key={i} text={note} bg={bg} expandDir={expandDir} />
       ))}
     </div>
   )
 }
 
-// ── Section label ──────────────────────────────────────────────────────────────
-
-function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+// Hace layout: mirror of Dice but left-aligned
+function HaceNoteGroup({ notes, bg }: { notes: string[]; bg: string }) {
+  const [first, ...rest] = notes
+  const rows: string[][] = []
+  for (let i = 0; i < rest.length; i += 2) {
+    rows.push(rest.slice(i, i + 2))
+  }
   return (
-    <p className={`text-[10px] font-semibold text-gray-500 tracking-wide uppercase ${className ?? ''}`}>
+    <div className="flex flex-col items-start" style={{ gap: GUTTER }}>
+      <StickyNote text={first} bg={bg} />
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex" style={{ gap: GUTTER }}>
+          {row.map((note, i) => (
+            <StickyNote key={i} text={note} bg={bg} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Dice layout: 1ª nota sola arriba-derecha, resto en filas de 2, todo right-aligned
+function DiceNoteGroup({ notes, bg }: { notes: string[]; bg: string }) {
+  const [first, ...rest] = notes
+  // Split remaining notes into rows of 2
+  const rows: string[][] = []
+  for (let i = 0; i < rest.length; i += 2) {
+    rows.push(rest.slice(i, i + 2))
+  }
+  return (
+    <div className="flex flex-col items-end" style={{ gap: GUTTER }}>
+      {/* First note alone, right-aligned */}
+      <StickyNote text={first} bg={bg} />
+      {/* Remaining notes in rows of 2 */}
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex" style={{ gap: GUTTER }}>
+          {row.map((note, i) => (
+            <StickyNote key={i} text={note} bg={bg} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Section label
+function SectionLabel({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'center' | 'right' }) {
+  return (
+    <p className={`text-[10px] font-semibold text-gray-400 tracking-widest uppercase w-full
+      ${align === 'center' ? 'text-center' : align === 'right' ? 'text-right' : 'text-left'}`}
+    >
       {children}
     </p>
   )
 }
 
-// ── Visual empathy map ─────────────────────────────────────────────────────────
+// ── Section colors ─────────────────────────────────────────────────────────────
 
 const COLORS = {
   piensaSiente: '#D4B8E8',
   ve: '#F9DF7A',
   oye: '#F5BAD8',
-  dice: '#B3E8F8',
+  dice: '#5DD9C4',
   hace: '#B3E8F8',
   dolor: '#F5B8A8',
   necesidades: '#A8D9B5',
 }
 
-// Layout constants (px). NoteGroup is always NOTE*2+4 = 92px wide.
-// NOTE_H = 2 rows of NOTE + gap = NOTE*2+4 = 92px. Section = NOTE_H + label(16) + gap(6) = 114px.
-const W = 800     // canvas width
-const H = 660     // canvas height
-const cx = 400    // center X
-const cy = 310    // center Y
+// ── Visual empathy map ─────────────────────────────────────────────────────────
+
+// Square canvas constants. GW=128, so 2 rows of notes = 128px tall.
+// Section height = 128(notes) + 4(gap) + 14(label) = 146px
+const SQ = 600    // top square size (px)
+const cx = SQ / 2 // 300 — center X
+const cy = 286    // center Y (slightly above midpoint for visual balance)
+
+// Absolute positions for each note group within the square
+const POS = {
+  piensa: { top: 16,      left: cx - GW / 2 },   // centered top
+  ve:     { top: 180,     left: 10 },              // left side
+  oye:    { top: 180,     left: SQ - 10 - GW },   // right side
+  dice:   { bottom: 12, left: cx - GW - 10 },  // bottom-aligned, right edge near cx
+  hace:   { bottom: 12, left: cx + 10 },            // bottom-aligned, left edge near cx
+}
 
 function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
   return (
     <div className="overflow-x-auto pb-1">
       <div
-        className="relative bg-white border border-gray-200 rounded-2xl"
-        style={{ width: W, height: H, flexShrink: 0 }}
+        className="border border-gray-200 rounded-2xl overflow-hidden bg-white"
+        style={{ width: SQ }}
       >
-        {/* ── SVG structural lines ── */}
-        <svg
-          className="absolute inset-0 pointer-events-none"
-          width={W} height={H}
-          viewBox={`0 0 ${W} ${H}`}
-        >
-          {/* Straight cross */}
-          <line x1={cx} y1={0} x2={cx} y2={H} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={0} y1={cy} x2={W} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-          {/* Diagonals from corners to center */}
-          <line x1={0}  y1={0} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={W}  y1={0} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={0}  y1={H} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-          <line x1={W}  y1={H} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
-        </svg>
+        {/* ── TOP SQUARE: 5 sections + avatar ── */}
+        <div className="relative bg-white" style={{ width: SQ, height: SQ }}>
 
-        {/* ── Center avatar ── */}
-        <div
-          className="absolute flex items-center justify-center rounded-full bg-gray-50 border-2 border-white shadow-md text-2xl"
-          style={{ width: 60, height: 60, left: cx - 30, top: cy - 30, zIndex: 10 }}
-        >
-          🧍‍♀️
+          {/* SVG structural lines */}
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={SQ} height={SQ}
+            viewBox={`0 0 ${SQ} ${SQ}`}
+          >
+            {/* Vertical: solo desde el centro hacia abajo */}
+            <line x1={cx} y1={cy} x2={cx} y2={SQ} stroke="#e5e7eb" strokeWidth="1" />
+            {/* Diagonales desde cada esquina hasta el centro */}
+            <line x1={0}   y1={0}  x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+            <line x1={SQ}  y1={0}  x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+            <line x1={0}   y1={SQ} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+            <line x1={SQ}  y1={SQ} x2={cx} y2={cy} stroke="#e5e7eb" strokeWidth="1" />
+          </svg>
+
+          {/* Center avatar */}
+          <div
+            className="absolute flex items-center justify-center rounded-full bg-gray-50 border-2 border-white shadow-md text-2xl"
+            style={{ width: 58, height: 58, left: cx - 29, top: cy - 29, zIndex: 10 }}
+          >
+            🧍‍♀️
+          </div>
+
+          {/* PIENSA Y SIENTE — top center */}
+          <div className="absolute flex flex-col items-center gap-1" style={POS.piensa}>
+            <SectionLabel align="center">Piensa y siente</SectionLabel>
+            <NoteGroup notes={data.piensaSiente} bg={COLORS.piensaSiente} />
+          </div>
+
+          {/* VE — left */}
+          <div className="absolute flex flex-col gap-1" style={POS.ve}>
+            <NoteGroup notes={data.ve} bg={COLORS.ve} />
+            <SectionLabel>Ve</SectionLabel>
+          </div>
+
+          {/* OYE — right */}
+          <div className="absolute flex flex-col gap-1" style={POS.oye}>
+            <NoteGroup notes={data.oye} bg={COLORS.oye} expandDir="left" />
+            <SectionLabel align="right">Oye</SectionLabel>
+          </div>
+
+          {/* DICE — 1 nota top-right + resto abajo, alineado a la derecha del cuadrante izq. */}
+          <div className="absolute flex flex-col gap-1" style={POS.dice}>
+            <DiceNoteGroup notes={data.dice} bg={COLORS.dice} />
+            <SectionLabel>Dice</SectionLabel>
+          </div>
+
+          {/* HACE — 1 nota top-left + resto abajo, alineado a la izquierda del cuadrante der. */}
+          <div className="absolute flex flex-col gap-1" style={POS.hace}>
+            <HaceNoteGroup notes={data.hace} bg={COLORS.hace} />
+            <SectionLabel>Hace</SectionLabel>
+          </div>
         </div>
 
-        {/* ── PIENSA Y SIENTE — top center ── */}
-        {/* top=14, centered horizontally: left = cx - (92/2) = cx - 46 = 354 */}
-        <div className="absolute flex flex-col items-center gap-1.5" style={{ top: 14, left: cx - 46 }}>
-          <SectionLabel>Piensa y siente</SectionLabel>
-          <NoteGroup notes={data.piensaSiente} bg={COLORS.piensaSiente} />
-        </div>
+        {/* ── BOTTOM STRIP: Dolor + Necesidades ── */}
+        <div className="flex border-t border-gray-200">
+          {/* Dolor / Frustraciones — left */}
+          <div className="flex-1 flex flex-col gap-2 p-4 border-r border-gray-200">
+            <SectionLabel>Dolor / Frustraciones</SectionLabel>
+            <NoteGroup notes={data.dolorFrustraciones} bg={COLORS.dolor} cols={4} />
+          </div>
 
-        {/* ── VE — left ── */}
-        {/* top=148, left=8 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 148, left: 8 }}>
-          <NoteGroup notes={data.ve} bg={COLORS.ve} />
-          <SectionLabel>Ve</SectionLabel>
-        </div>
-
-        {/* ── OYE — right ── */}
-        {/* top=148, right=8 → left = W - 8 - 92 = 700 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 148, left: W - 8 - (NOTE * 2 + 4) }}>
-          <NoteGroup notes={data.oye} bg={COLORS.oye} />
-          <SectionLabel>Oye</SectionLabel>
-        </div>
-
-        {/* ── DICE — bottom-left of center ── */}
-        {/* top=cy+42=352, left=96 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: cy + 42, left: 96 }}>
-          <NoteGroup notes={data.dice} bg={COLORS.dice} />
-          <SectionLabel>Dice</SectionLabel>
-        </div>
-
-        {/* ── HACE — bottom-right of center ── */}
-        {/* top=cy+42=352, left=cx+44=444 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: cy + 42, left: cx + 44 }}>
-          <NoteGroup notes={data.hace} bg={COLORS.hace} />
-          <SectionLabel>Hace</SectionLabel>
-        </div>
-
-        {/* ── DOLOR / FRUSTRACIONES — bottom left ── */}
-        {/* top=490, left=8 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 490, left: 8 }}>
-          <NoteGroup notes={data.dolorFrustraciones} bg={COLORS.dolor} />
-          <SectionLabel>Dolor / Frustraciones</SectionLabel>
-        </div>
-
-        {/* ── NECESIDADES / DESEOS — bottom right ── */}
-        {/* top=490, left = W - 8 - 92 = 700 */}
-        <div className="absolute flex flex-col items-start gap-1.5" style={{ top: 490, left: W - 8 - (NOTE * 2 + 4) }}>
-          <NoteGroup notes={data.necesidadesDeseos} bg={COLORS.necesidades} />
-          <SectionLabel>Necesidades / Deseos</SectionLabel>
+          {/* Necesidades / Deseos — right */}
+          <div className="flex-1 flex flex-col gap-2 p-4">
+            <SectionLabel>Necesidades / Deseos</SectionLabel>
+            <NoteGroup notes={data.necesidadesDeseos} bg={COLORS.necesidades} cols={4} />
+          </div>
         </div>
       </div>
     </div>
