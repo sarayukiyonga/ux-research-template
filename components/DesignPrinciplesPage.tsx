@@ -4,6 +4,146 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// ── Filter types ───────────────────────────────────────────────────────────────
+
+interface ActiveFilters {
+  gender: 'all' | 'men' | 'women' | 'nonBinary'
+  ageRanges: string[]
+  painValues: string[]
+}
+
+interface FilterOptions {
+  ageRanges: string[]
+  painValues: string[]
+}
+
+const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
+
+const GENDER_OPTIONS: { value: ActiveFilters['gender']; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'women', label: 'Mujeres' },
+  { value: 'men', label: 'Hombres' },
+  { value: 'nonBinary', label: 'No binario' },
+]
+
+function toggleArr(arr: string[], v: string) {
+  return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
+}
+
+function FiltersPanel({
+  filters,
+  options,
+  onChange,
+}: {
+  filters: ActiveFilters
+  options: FilterOptions
+  onChange: (f: ActiveFilters) => void
+}) {
+  const isFiltered =
+    filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
+
+  const activeCount = (filters.gender !== 'all' ? 1 : 0) + filters.ageRanges.length + filters.painValues.length
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+          Filtrar encuestas
+          {isFiltered && (
+            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-violet-500 text-white text-[10px] font-bold leading-none">
+              {activeCount}
+            </span>
+          )}
+        </p>
+        {isFiltered && (
+          <button
+            onClick={() => onChange(DEFAULT_FILTERS)}
+            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-4">
+        {/* Género */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-gray-400 font-medium">Género</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {GENDER_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onChange({ ...filters, gender: opt.value })}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  filters.gender === opt.value
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Franja de edad */}
+        {options.ageRanges.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-gray-400 font-medium">
+              Franja de edad
+              {filters.ageRanges.length > 0 && (
+                <span className="ml-1 text-violet-600">({filters.ageRanges.length})</span>
+              )}
+            </p>
+            <div className="flex gap-1.5 flex-wrap">
+              {options.ageRanges.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => onChange({ ...filters, ageRanges: toggleArr(filters.ageRanges, r) })}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    filters.ageRanges.includes(r)
+                      ? 'bg-violet-600 text-white border-violet-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dolor crónico (sólo encuesta potencial) */}
+        {options.painValues.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-gray-400 font-medium">
+              Dolor crónico
+              {filters.painValues.length > 0 && (
+                <span className="ml-1 text-violet-600">({filters.painValues.length})</span>
+              )}
+            </p>
+            <div className="flex gap-1.5 flex-wrap">
+              {options.painValues.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onChange({ ...filters, painValues: toggleArr(filters.painValues, v) })}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    filters.painValues.includes(v)
+                      ? 'bg-violet-600 text-white border-violet-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-600'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Question definitions ───────────────────────────────────────────────────────
 
 interface Option {
@@ -296,8 +436,16 @@ interface Principle {
   color: string
 }
 
+interface Group {
+  icon: string
+  name: string
+  color: string
+  principleIndices: number[]
+}
+
 interface ResultsData {
   summary: string
+  groups: Group[]
   principles: Principle[]
 }
 
@@ -343,31 +491,62 @@ function buildFormAnswers(answers: Answers): string {
 
 // ── Results view ───────────────────────────────────────────────────────────────
 
-function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving }: {
+/**
+ * Returns a version of `hex` that achieves at least 4.5:1 contrast ratio
+ * against white (#fff), darkening iteratively as needed (WCAG AA).
+ */
+function readableOnWhite(hex: string): string {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex
+
+  const toLinear = (c: number) => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  const luminance = (r: number, g: number, b: number) =>
+    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  const contrastVsWhite = (lum: number) => 1.05 / (lum + 0.05)
+
+  let r = parseInt(hex.slice(1, 3), 16)
+  let g = parseInt(hex.slice(3, 5), 16)
+  let b = parseInt(hex.slice(5, 7), 16)
+
+  while (contrastVsWhite(luminance(r, g, b)) < 4.5 && (r | g | b) > 0) {
+    r = Math.max(0, Math.round(r * 0.8))
+    g = Math.max(0, Math.round(g * 0.8))
+    b = Math.max(0, Math.round(b * 0.8))
+  }
+
+  return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving, filters }: {
   data: ResultsData
   savedAt: string
   onRedo: () => void
   onRegenerate: () => void
   saving: boolean
+  filters: ActiveFilters
 }) {
   return (
     <div className="space-y-5">
-      {/* Saved indicator */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 flex items-center gap-1.5">
-          {saving ? (
-            <>
-              <span className="inline-block h-3 w-3 border border-gray-300 border-t-violet-500 rounded-full animate-spin" />
-              Guardando…
-            </>
-          ) : savedAt ? (
-            <>
-              <span className="text-green-500">✓</span>
-              Guardado el {savedAt}
-            </>
-          ) : null}
-        </span>
-        <div className="flex gap-2">
+      {/* Saved indicator + actions */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-gray-400 flex items-center gap-1.5">
+            {saving ? (
+              <>
+                <span className="inline-block h-3 w-3 border border-gray-300 border-t-violet-500 rounded-full animate-spin" />
+                Guardando…
+              </>
+            ) : savedAt ? (
+              <>
+                <span className="text-green-500">✓</span>
+                Guardado el {savedAt}
+              </>
+            ) : null}
+          </span>
+        </div>
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={onRegenerate}
             className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
@@ -383,36 +562,86 @@ function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving }: {
         </div>
       </div>
 
+      {/* Thematic group blocks — quick-scan */}
+      {data.groups?.length > 0 && (
+        <div className="space-y-3">
+          {data.groups.map((g, gi) => {
+            const members = g.principleIndices
+              .map((idx) => data.principles[idx])
+              .filter(Boolean)
+            const textColor = readableOnWhite(g.color)
+            return (
+              <div
+                key={gi}
+                className="rounded-2xl border-2 px-5 py-4 space-y-3"
+                style={{ borderColor: g.color + '50', backgroundColor: g.color + '08' }}
+              >
+                {/* Block header */}
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-2xl"
+                    style={{ backgroundColor: g.color + '20' }}
+                  >
+                    {g.icon}
+                  </span>
+                  <p
+                    className="text-sm font-extrabold tracking-wide uppercase"
+                    style={{ color: textColor }}
+                  >
+                    {g.name}
+                  </p>
+                </div>
+
+                {/* Member principles */}
+                <ul className="space-y-1.5 pl-1">
+                  {members.map((p, pi) => (
+                    <li key={pi} className="flex items-center gap-2.5">
+                      <span className="text-base leading-none shrink-0">{p.icon}</span>
+                      <span className="text-sm font-medium text-gray-700">{p.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Summary */}
       <div className="rounded-2xl bg-violet-50 border border-violet-100 px-5 py-4">
         <p className="text-sm text-violet-800 leading-relaxed">{data.summary}</p>
       </div>
 
-      {/* Principles */}
-      <div className="space-y-3">
-        {data.principles.map((p, i) => (
-          <div
-            key={i}
-            className="rounded-2xl border-2 p-5 space-y-3"
-            style={{ borderColor: p.color + '40', backgroundColor: p.color + '06' }}
-          >
-            <div className="flex items-start gap-3">
-              <span className="text-2xl shrink-0">{p.icon}</span>
-              <div>
-                <p className="font-bold text-gray-900">{p.title}</p>
-                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{p.description}</p>
+      {/* Principles — full detail */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+          Detalle completo
+        </p>
+        <div className="space-y-3">
+          {data.principles.map((p, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border-2 p-5 space-y-3"
+              style={{ borderColor: p.color + '40', backgroundColor: p.color + '06' }}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl shrink-0">{p.icon}</span>
+                <div>
+                  <p className="font-bold text-gray-900">{p.title}</p>
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">{p.description}</p>
+                </div>
               </div>
+              <ul className="space-y-1.5 pl-1">
+                {p.guidelines.map((g, j) => (
+                  <li key={j} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                    {g}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="space-y-1.5 pl-1">
-              {p.guidelines.map((g, j) => (
-                <li key={j} className="flex items-start gap-2 text-sm text-gray-700">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                  {g}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
     </div>
@@ -434,21 +663,35 @@ export function DesignPrinciplesPage() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(false)
 
+  // Filters
+  const [filters, setFilters] = useState<ActiveFilters>(DEFAULT_FILTERS)
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ ageRanges: [], painValues: [] })
+
   // Loading saved results on mount
   const [loadingSaved, setLoadingSaved] = useState(true)
 
   useEffect(() => {
-    fetch('/api/design-saved')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.saved) {
-          setResults(d.saved.principles)
-          setSavedAt(d.saved.savedAt)
-          setSavedFormAnswers(d.saved.formAnswers ?? '')
-        }
+    // Load saved results and filter options in parallel
+    Promise.all([
+      fetch('/api/design-saved').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/survey').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/potential-survey').then((r) => r.json()).catch(() => ({})),
+    ]).then(([saved, survey, potential]) => {
+      if (saved?.saved) {
+        setResults(saved.saved.principles)
+        setSavedAt(saved.saved.savedAt)
+        setSavedFormAnswers(saved.saved.formAnswers ?? '')
+      }
+      // Merge filter options from both surveys
+      const ageSet = new Set<string>([
+        ...(survey?.filterOptions?.ageRanges ?? []),
+        ...(potential?.filterOptions?.ageRanges ?? []),
+      ])
+      setFilterOptions({
+        ageRanges: Array.from(ageSet).sort(),
+        painValues: potential?.filterOptions?.painValues ?? [],
       })
-      .catch(() => {})
-      .finally(() => setLoadingSaved(false))
+    }).finally(() => setLoadingSaved(false))
   }, [])
 
   const saveResults = async (formAnswers: string, principles: ResultsData) => {
@@ -474,7 +717,7 @@ export function DesignPrinciplesPage() {
       const res = await fetch('/api/design-principles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formAnswers }),
+        body: JSON.stringify({ formAnswers, filters }),
       })
       if (!res.ok) throw new Error('Error')
       const d: ResultsData = await res.json()
@@ -552,14 +795,64 @@ export function DesignPrinciplesPage() {
   // ── Results (saved or fresh) ───────────────────────────────────────────────
 
   if (results && !showForm) {
+    const isFiltered =
+      filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
+
+    const genderLabel = GENDER_OPTIONS.find((o) => o.value === filters.gender)?.label
+
     return (
-      <PrinciplesDisplay
-        data={results}
-        savedAt={savedAt}
-        saving={saving}
-        onRedo={() => { setShowForm(true); setCurrentIdx(0) }}
-        onRegenerate={() => generate(answers, savedFormAnswers || undefined)}
-      />
+      <div className="space-y-5">
+        <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+
+        {/* Filter context banner */}
+        <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 space-y-2">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-violet-700">
+                {isFiltered ? 'Principios generados con estos filtros:' : 'Principios generados sin filtros activos'}
+              </p>
+              {isFiltered ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {filters.gender !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
+                      {genderLabel}
+                    </span>
+                  )}
+                  {filters.ageRanges.map((r) => (
+                    <span key={r} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
+                      {r} años
+                    </span>
+                  ))}
+                  {filters.painValues.map((v) => (
+                    <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-xs font-medium">
+                      Dolor: {v}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <p className="text-xs text-violet-500">
+                Puedes cambiar los filtros de arriba y pulsar{' '}
+                <button
+                  onClick={() => generate(answers, savedFormAnswers || undefined)}
+                  className="font-semibold underline underline-offset-2 hover:text-violet-700 transition-colors"
+                >
+                  ↺ Regenerar
+                </button>{' '}
+                para actualizar los principios según el perfil que necesites.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <PrinciplesDisplay
+          data={results}
+          savedAt={savedAt}
+          saving={saving}
+          filters={filters}
+          onRedo={() => { setShowForm(true); setCurrentIdx(0) }}
+          onRegenerate={() => generate(answers, savedFormAnswers || undefined)}
+        />
+      </div>
     )
   }
 
@@ -583,6 +876,9 @@ export function DesignPrinciplesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Filters */}
+      <FiltersPanel filters={filters} options={filterOptions} onChange={setFilters} />
+
       {/* Progress */}
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
