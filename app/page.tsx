@@ -35,6 +35,16 @@ const sections = [
     color: 'blue',
   },
   {
+    href: '/pov',
+    emoji: '💬',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'Point of View (POV)',
+    description:
+      'Dos declaraciones: una de clientes actuales y otra de potenciales, con el patrón [Usuario] necesita [Necesidad] porque [Insight].',
+    color: 'sky',
+  },
+  {
     href: '/user-persona',
     emoji: '👤',
     tag: 'Conocimiento del cliente',
@@ -96,6 +106,12 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-rose-300',
     icon: 'bg-rose-100',
     arrow: 'text-rose-400 group-hover:text-rose-600',
+  },
+  sky: {
+    tag: 'bg-sky-100 text-sky-700',
+    border: 'hover:border-sky-300',
+    icon: 'bg-sky-100',
+    arrow: 'text-sky-400 group-hover:text-sky-600',
   },
 }
 
