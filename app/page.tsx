@@ -44,6 +44,16 @@ const sections = [
       'Principios de diseño de MOA generados a partir de la entrevista, las respuestas de los clientes y las decisiones de Patricia.',
     color: 'emerald',
   },
+  {
+    href: '/empathy',
+    emoji: '🗺️',
+    tag: 'Conocimiento del cliente',
+    tagPulse: false,
+    title: 'Mapa de empatía',
+    description:
+      'Qué piensa, siente, ve, oye, dice y hace el cliente de MOA. Generado con IA a partir de las encuestas de clientes actuales y potenciales.',
+    color: 'rose',
+  },
 ]
 
 const colorMap: Record<string, { tag: string; border: string; icon: string; arrow: string }> = {
@@ -70,6 +80,12 @@ const colorMap: Record<string, { tag: string; border: string; icon: string; arro
     border: 'hover:border-emerald-300',
     icon: 'bg-emerald-100',
     arrow: 'text-emerald-400 group-hover:text-emerald-600',
+  },
+  rose: {
+    tag: 'bg-rose-100 text-rose-700',
+    border: 'hover:border-rose-300',
+    icon: 'bg-rose-100',
+    arrow: 'text-rose-400 group-hover:text-rose-600',
   },
 }
 
