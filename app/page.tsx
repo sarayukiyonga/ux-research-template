@@ -35,14 +35,14 @@ const sections = [
     color: 'blue',
   },
   {
-    href: '/design',
-    emoji: '🎨',
-    tag: 'Identidad de marca',
+    href: '/user-persona',
+    emoji: '👤',
+    tag: 'Conocimiento del cliente',
     tagPulse: false,
-    title: 'Principios de diseño',
+    title: 'User Persona',
     description:
-      'Principios de diseño de MOA generados a partir de la entrevista, las respuestas de los clientes y las decisiones de Patricia.',
-    color: 'emerald',
+      'Perfiles representativos de los clientes actuales y potenciales de MOA: motivaciones, necesidades, puntos de dolor y rasgos de personalidad.',
+    color: 'violet',
   },
   {
     href: '/empathy',
@@ -53,6 +53,16 @@ const sections = [
     description:
       'Qué piensa, siente, ve, oye, dice y hace el cliente de MOA. Generado con IA a partir de las encuestas de clientes actuales y potenciales.',
     color: 'rose',
+  },
+  {
+    href: '/design',
+    emoji: '🎨',
+    tag: 'Identidad de marca',
+    tagPulse: false,
+    title: 'Principios de diseño',
+    description:
+      'Principios de diseño de MOA generados a partir de la entrevista, las respuestas de los clientes y las decisiones de Patricia.',
+    color: 'emerald',
   },
 ]
 
