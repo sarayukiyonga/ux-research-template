@@ -203,10 +203,10 @@ function StickyNote({ text, bg, expandDir = 'right' }: { text: string; bg: strin
 }
 
 // Group of notes with configurable columns
-function NoteGroup({ notes, bg, expandDir, cols = 2 }: { notes: string[]; bg: string; expandDir?: 'right' | 'left'; cols?: number }) {
+function NoteGroup({ notes, bg, expandDir, cols = 2, justify = 'start' }: { notes: string[]; bg: string; expandDir?: 'right' | 'left'; cols?: number; justify?: 'start' | 'end' }) {
   const width = cols * NOTE + (cols - 1) * GUTTER
   return (
-    <div className="flex flex-wrap" style={{ width, gap: GUTTER }}>
+    <div className={`flex flex-wrap${justify === 'end' ? ' justify-end' : ''}`} style={{ width, gap: GUTTER }}>
       {notes.map((note, i) => (
         <StickyNote key={i} text={note} bg={bg} expandDir={expandDir} />
       ))}
@@ -284,19 +284,17 @@ const COLORS = {
 
 // ── Visual empathy map ─────────────────────────────────────────────────────────
 
-// Square canvas constants. GW=128, so 2 rows of notes = 128px tall.
-// Section height = 128(notes) + 4(gap) + 14(label) = 146px
-const SQ = 600    // top square size (px)
-const cx = SQ / 2 // 300 — center X
-const cy = 286    // center Y (slightly above midpoint for visual balance)
+// Square canvas constants
+const SQ  = 600           // top square size (px)
+const cx  = SQ / 2        // 300 — center X
+const cy  = 286           // center Y (slightly above midpoint for visual balance)
+const GW3 = NOTE * 3 + GUTTER * 2  // 3-column group width = 194px
 
 // Absolute positions for each note group within the square
 const POS = {
-  piensa: { top: 16,      left: cx - GW / 2 },   // centered top
-  ve:     { top: 180,     left: 10 },              // left side
-  oye:    { top: 180,     left: SQ - 10 - GW },   // right side
-  dice:   { bottom: 12, left: cx - GW - 10 },  // bottom-aligned, right edge near cx
-  hace:   { bottom: 12, left: cx + 10 },            // bottom-aligned, left edge near cx
+  piensa: { top: 16,    left: cx - GW3 / 2 },      // centered top (3 cols)
+  dice:   { bottom: 12, left: cx - GW - 10 },       // bottom-aligned, right edge near cx
+  hace:   { bottom: 12, left: cx + 10 },             // bottom-aligned, left edge near cx
 }
 
 function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
@@ -357,18 +355,18 @@ function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
           {/* PIENSA Y SIENTE — top center */}
           <div className="absolute flex flex-col items-center gap-1" style={POS.piensa}>
             <SectionLabel align="center">Piensa y siente</SectionLabel>
-            <NoteGroup notes={data.piensaSiente} bg={COLORS.piensaSiente} />
+            <NoteGroup notes={data.piensaSiente} bg={COLORS.piensaSiente} cols={3} />
           </div>
 
-          {/* VE — left */}
-          <div className="absolute flex flex-col gap-1" style={POS.ve}>
-            <NoteGroup notes={data.ve} bg={COLORS.ve} />
+          {/* VE — left, vertically centered */}
+          <div className="absolute flex flex-col gap-1" style={{ top: '50%', left: 10, transform: 'translateY(-50%)' }}>
+            <NoteGroup notes={data.ve} bg={COLORS.ve} cols={3} />
             <SectionLabel>Ve</SectionLabel>
           </div>
 
-          {/* OYE — right */}
-          <div className="absolute flex flex-col gap-1" style={POS.oye}>
-            <NoteGroup notes={data.oye} bg={COLORS.oye} expandDir="left" />
+          {/* OYE — right, vertically centered */}
+          <div className="absolute flex flex-col gap-1" style={{ top: '50%', left: SQ - 10 - GW3, transform: 'translateY(-50%)' }}>
+            <NoteGroup notes={data.oye} bg={COLORS.oye} expandDir="left" cols={3} justify="end" />
             <SectionLabel align="right">Oye</SectionLabel>
           </div>
 
