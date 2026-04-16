@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FlowPaso, FlowNodo, UserFlowLine } from '@/lib/user-flow-tree'
@@ -18,6 +18,11 @@ import {
   toJourneyV3,
 } from '@/lib/user-journey-persist'
 import { newCustomJourneyCanalId, normalizeCanalInCatalog } from '@/lib/user-journey-channels'
+import {
+  getIdeasForSegmentChannel,
+  normalizeUserJourneyIdeasPersist,
+  type UserJourneyIdeasPersist,
+} from '@/lib/user-journey-ideas-persist'
 
 export type { FlowPaso, UserFlowLine, UserFlowBundle } from '@/lib/user-flow-tree'
 
@@ -126,46 +131,37 @@ function FlowchartProcessBox({
   )
 }
 
-function FlowArrowConnector({
-  label,
-  strokeClass,
-}: {
-  label: string
-  strokeClass: string
-}) {
-  const uid = useId().replace(/:/g, '')
-  const markerId = `arrow-${uid}`
-
-  return (
-    <div className="flex w-21 shrink-0 flex-col items-center justify-start gap-1 pt-2">
-      <svg width="84" height="22" viewBox="0 0 84 22" className={strokeClass} aria-hidden>
-        <defs>
-          <marker id={markerId} markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L8,3 L0,6 Z" fill="currentColor" />
-          </marker>
-        </defs>
-        <line x1="2" y1="11" x2="76" y2="11" stroke="currentColor" strokeWidth="2" markerEnd={`url(#${markerId})`} />
-      </svg>
-      <p className="max-w-20 text-center text-[9px] font-medium leading-tight text-gray-600">{label || '—'}</p>
-    </div>
-  )
-}
-
+/**
+ * Conector vertical entre nodos (sin marker SVG: evita recortes y fallos de pintado).
+ * Línea + triángulo relleno; el texto va debajo para no solapar la punta.
+ */
 function FlowDownArrow({ label, strokeClass }: { label: string; strokeClass: string }) {
-  const uid = useId().replace(/:/g, '')
-  const markerId = `darrow-${uid}`
-
   return (
-    <div className="flex flex-col items-center gap-1 py-1 shrink-0">
-      <svg width="22" height="52" viewBox="0 0 22 52" className={strokeClass} aria-hidden>
-        <defs>
-          <marker id={markerId} markerWidth="6" markerHeight="8" refX="3" refY="7" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L3,8 L6,0 Z" fill="currentColor" />
-          </marker>
-        </defs>
-        <line x1="11" y1="4" x2="11" y2="44" stroke="currentColor" strokeWidth="2" markerEnd={`url(#${markerId})`} />
+    <div className="flex flex-col items-center gap-1.5 py-2 shrink-0 w-full max-w-[min(100%,18rem)]">
+      <svg
+        width="48"
+        height="56"
+        viewBox="0 0 48 56"
+        className={strokeClass}
+        style={{ overflow: 'visible' }}
+        aria-hidden
+      >
+        <line
+          x1="24"
+          y1="4"
+          x2="24"
+          y2="38"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        <polygon points="24,52 16,40 32,40" fill="currentColor" />
       </svg>
-      <p className="max-w-28 text-center text-[9px] font-semibold leading-tight text-gray-700">{label || '—'}</p>
+      {label ? (
+        <p className="w-full px-1 text-center text-[9px] font-semibold leading-snug text-gray-700">{label}</p>
+      ) : (
+        <p className="text-[9px] text-gray-400">—</p>
+      )}
     </div>
   )
 }
@@ -196,7 +192,8 @@ function FlowDiamond({
   )
 }
 
-function HorizontalLinealSteps({
+/** Tramo lineal en columna (árbol vertical de arriba abajo). */
+function TreeLinealSteps({
   pasos,
   clics,
   accent,
@@ -209,19 +206,19 @@ function HorizontalLinealSteps({
 }) {
   const ordenados = [...pasos].sort((a, b) => a.orden - b.orden)
   return (
-    <>
+    <div className="flex flex-col items-center gap-2 w-full max-w-xs">
       {ordenados.map((p, i) => (
-        <div key={`${p.orden}-${i}`} className="flex items-start">
+        <div key={`${p.orden}-${i}`} className="flex flex-col items-center w-full">
+          {i > 0 && <FlowDownArrow label={clics[i - 1] ?? '—'} strokeClass={stroke} />}
           <div className="flex w-27 shrink-0 flex-col items-center gap-1.5">
             <FlowchartProcessBox title={p.tituloBolita} tipo={p.tipo} accent={accent} />
-            <p className="text-[9px] text-center text-gray-500 leading-snug px-0.5 line-clamp-3" title={p.descripcion}>
+            <p className="text-[9px] text-center text-gray-500 leading-snug px-0.5 line-clamp-4" title={p.descripcion}>
               {p.descripcion}
             </p>
           </div>
-          {i < ordenados.length - 1 && <FlowArrowConnector label={clics[i] ?? '—'} strokeClass={stroke} />}
         </div>
       ))}
-    </>
+    </div>
   )
 }
 
@@ -236,12 +233,10 @@ function RenderFlowNodo({
 }) {
   if (nodo.tipo === 'lineal') {
     return (
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex flex-row flex-wrap items-start">
-          <HorizontalLinealSteps pasos={nodo.pasos} clics={nodo.clicsEntrePasos} accent={accent} stroke={stroke} />
-        </div>
+      <div className="flex flex-col items-center gap-2 w-full">
+        <TreeLinealSteps pasos={nodo.pasos} clics={nodo.clicsEntrePasos} accent={accent} stroke={stroke} />
         {nodo.despues != null && (
-          <div className="flex w-full flex-col items-center border-t border-dashed border-gray-200 pt-3 mt-1">
+          <div className="flex w-full flex-col items-center border-t border-dashed border-gray-200 pt-3 mt-2">
             <FlowDownArrow label="Continúa el flujo" strokeClass={stroke} />
             <RenderFlowNodo nodo={nodo.despues} accent={accent} stroke={stroke} />
           </div>
@@ -251,13 +246,13 @@ function RenderFlowNodo({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-4xl">
+    <div className="flex flex-col items-center gap-3 w-full max-w-4xl mx-auto">
       <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} accent={accent} />
-      <div className="flex w-full flex-row flex-wrap items-start justify-center gap-y-6 gap-x-4 sm:gap-x-8">
+      <div className="flex w-full flex-col sm:flex-row items-stretch sm:items-start justify-center gap-8 sm:gap-10 pt-1">
         {nodo.ramas.map((rama, idx) => (
           <div
             key={`${rama.etiqueta}-${idx}`}
-            className="flex min-w-36 max-w-56 flex-1 flex-col items-center rounded-xl border border-gray-100 bg-white/80 px-2 py-3 shadow-sm"
+            className="flex min-w-0 sm:min-w-36 max-w-sm flex-1 flex-col items-center rounded-xl border border-gray-100 bg-white/80 px-3 py-3 shadow-sm"
           >
             <FlowDownArrow label={rama.etiqueta} strokeClass={stroke} />
             <RenderFlowNodo nodo={rama.siguiente} accent={accent} stroke={stroke} />
@@ -304,7 +299,8 @@ function FlowchartLegend({ accent }: { accent: 'cyan' | 'orange' }) {
         </span>
       </div>
       <p className="mt-2 text-[9px] text-gray-500">
-        Convención según símbolos habituales de diagramas de flujo (
+        El diagrama se lee <strong>de arriba abajo</strong> (árbol): tramos lineales en columna y ramas bajo cada
+        decisión. Convención de símbolos (
         <a href={SMARTDRAW_FLOWCHART_URL} className="underline underline-offset-2 text-cyan-700" target="_blank" rel="noreferrer">
           referencia SmartDraw
         </a>
@@ -350,44 +346,20 @@ function UserFlowchartSection({
       <FlowchartLegend accent={accent} />
 
       <div className="overflow-x-auto pb-2 pt-1">
-        <div className="inline-flex min-w-min flex-col gap-5 px-1 pt-1">
-          <div className="flex flex-row flex-wrap items-start gap-0">
-            <FlowParallelogram borderClass={paraBorder} bgClass={paraBg}>
-              {flow.deDondeEntra}
-            </FlowParallelogram>
+        <div className="flex flex-col items-center gap-4 max-w-3xl mx-auto px-2 pt-1">
+          <FlowParallelogram borderClass={paraBorder} bgClass={paraBg}>
+            {flow.deDondeEntra}
+          </FlowParallelogram>
 
-            <FlowArrowConnector
-              label="Llega a la primera pantalla del flujo (carga / enlace)"
-              strokeClass={stroke}
-            />
+          <FlowDownArrow
+            label="Llega a la primera pantalla del flujo (carga / enlace)"
+            strokeClass={stroke}
+          />
 
-            {raiz.tipo === 'lineal' ? (
-              <div className="flex flex-row flex-wrap items-start">
-                <HorizontalLinealSteps
-                  pasos={raiz.pasos}
-                  clics={raiz.clicsEntrePasos}
-                  accent={accent}
-                  stroke={stroke}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          {raiz.tipo === 'decision' && (
-            <div className="w-full min-w-[min(100%,42rem)]">
-              <RenderFlowNodo nodo={raiz} accent={accent} stroke={stroke} />
-            </div>
-          )}
-
-          {raiz.tipo === 'lineal' && raiz.despues != null && (
-            <div className="flex w-full min-w-[min(100%,48rem)] flex-col items-center border-t border-gray-200 pt-4">
-              <FlowDownArrow label="Continúa el flujo" strokeClass={stroke} />
-              <RenderFlowNodo nodo={raiz.despues} accent={accent} stroke={stroke} />
-            </div>
-          )}
+          <RenderFlowNodo nodo={raiz} accent={accent} stroke={stroke} />
         </div>
       </div>
-      <p className="text-[11px] text-gray-400 sm:hidden">Desplaza horizontalmente para ver ramas y el diagrama →</p>
+      <p className="text-[11px] text-gray-400 sm:hidden">Desplaza si hace falta para ver ramas anchas del diagrama →</p>
     </section>
   )
 }
@@ -506,6 +478,7 @@ export function UserFlowPage() {
   const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
   const [depsOk, setDepsOk] = useState({ persona: false, pov: false, journey: false })
+  const [ideasPersist, setIdeasPersist] = useState<UserJourneyIdeasPersist | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -513,8 +486,9 @@ export function UserFlowPage() {
       fetch('/api/user-persona-saved').then((r) => r.json()).catch(() => ({})),
       fetch('/api/pov-saved').then((r) => r.json()).catch(() => ({})),
       fetch('/api/user-journey-saved').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/user-journey-ideas-saved').then((r) => r.json()).catch(() => ({})),
     ])
-      .then(([fSaved, personaSaved, povSaved, journeySaved]) => {
+      .then(([fSaved, personaSaved, povSaved, journeySaved, ideasSaved]) => {
         let next = parseUserFlowPersist(fSaved?.saved?.flows) ?? emptyFlowV3()
         const jCell = parsePersistedJourneyCell(journeySaved?.saved?.journey)
         const v3j = jCell ? toJourneyV3(jCell) : null
@@ -547,6 +521,8 @@ export function UserFlowPage() {
           pov: hasValidPovSaved(povSaved?.saved?.statements),
           journey: savedJourneyCellHasFlowBundle(journeySaved?.saved?.journey, journeySaved?.saved?.filters),
         })
+        const rawIdeas = ideasSaved?.saved?.ideas
+        setIdeasPersist(rawIdeas ? normalizeUserJourneyIdeasPersist(rawIdeas) : normalizeUserJourneyIdeasPersist(null))
       })
       .finally(() => setLoadingSaved(false))
   }, [])
@@ -712,7 +688,18 @@ export function UserFlowPage() {
     }
   }
 
-  const prereqOk = depsOk.persona && depsOk.pov && depsOk.journey
+  const prereqBase = depsOk.persona && depsOk.pov && depsOk.journey
+  const ideaCountActual = useMemo(() => {
+    if (!flow || !ideasPersist) return 0
+    return getIdeasForSegmentChannel(ideasPersist, 'clienteActual', flow.clienteActual.canalActivoId).length
+  }, [flow, ideasPersist])
+  const ideaCountPotencial = useMemo(() => {
+    if (!flow || !ideasPersist) return 0
+    return getIdeasForSegmentChannel(ideasPersist, 'clientePotencial', flow.clientePotencial.canalActivoId).length
+  }, [flow, ideasPersist])
+  const prereqOne =
+    prereqBase && (segmento === 'clienteActual' ? ideaCountActual > 0 : ideaCountPotencial > 0)
+  const prereqBoth = prereqBase && ideaCountActual > 0 && ideaCountPotencial > 0
 
   if (loadingSaved) {
     return (
@@ -761,9 +748,13 @@ export function UserFlowPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
         <p>
-          El <strong>User Flow</strong> es un diagrama con ramas (óvalos, rectángulos, rombos, paralelogramos) derivado
-          del <strong>User Journey</strong> por <strong>segmento</strong> y <strong>canal</strong>. Puedes tener un
-          diagrama distinto para cada combinación; la IA usa el journey guardado del canal activo en cada segmento.
+          El <strong>User Flow</strong> es un diagrama en <strong>árbol vertical</strong> (óvalos, rectángulos, rombos,
+          paralelogramos) generado a partir de las <strong>ideas de funcionalidades y contenido</strong> guardadas en{' '}
+          <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
+            User Journey
+          </Link>{' '}
+          para el mismo <strong>segmento</strong> y <strong>canal</strong>. El mapa de journey, la persona y el POV
+          afinan el resultado.
         </p>
         <p className="text-xs text-gray-500">
           Símbolos habituales:{' '}
@@ -779,7 +770,7 @@ export function UserFlowPage() {
         </p>
       </div>
 
-      {(!depsOk.persona || !depsOk.pov || !depsOk.journey) && (
+      {(!depsOk.persona || !depsOk.pov || !depsOk.journey || ideaCountActual === 0 || ideaCountPotencial === 0) && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
           <p className="font-medium">Faltan datos guardados</p>
           <ul className="text-xs list-disc pl-4 space-y-1">
@@ -791,6 +782,18 @@ export function UserFlowPage() {
                 guardado con mapas para los canales activos por segmento.
               </li>
             )}
+            {depsOk.journey && ideaCountActual === 0 && (
+              <li>
+                <strong>Ideas</strong> en User Journey (cliente actual, canal activo aquí): al menos una en «
+                Funcionalidades y contenido por canal».
+              </li>
+            )}
+            {depsOk.journey && ideaCountPotencial === 0 && (
+              <li>
+                <strong>Ideas</strong> en User Journey (cliente potencial, canal activo aquí): al menos una en la misma
+                sección.
+              </li>
+            )}
             {!depsOk.persona && <li>User Persona (ambos segmentos).</li>}
             {!depsOk.pov && <li>POV guardados.</li>}
           </ul>
@@ -799,9 +802,13 @@ export function UserFlowPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
         <p>
-          Base:{' '}
+          Prioridad:{' '}
           <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
-            User Journey Map
+            ideas funcionalidad/contenido
+          </Link>
+          {' · apoyo: mapa '}
+          <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
+            Journey
           </Link>
           {' · '}
           <Link href="/user-persona" className="font-semibold text-cyan-700 underline underline-offset-2">
@@ -830,7 +837,7 @@ export function UserFlowPage() {
           </span>
           <button
             type="button"
-            disabled={!prereqOk || generating}
+            disabled={!prereqOne || generating}
             onClick={() => void generateOne()}
             className="text-xs px-3 py-1.5 rounded-full border border-cyan-200 text-cyan-800 bg-cyan-50/80 hover:bg-cyan-100 transition-colors disabled:opacity-45"
           >
@@ -838,7 +845,7 @@ export function UserFlowPage() {
           </button>
           <button
             type="button"
-            disabled={!prereqOk || generating}
+            disabled={!prereqBoth || generating}
             onClick={() => void generate()}
             className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-45"
           >
@@ -858,7 +865,7 @@ export function UserFlowPage() {
         disabled={generating || saving}
       />
 
-      {!flowV3HasAnyDiagram(flow) && prereqOk ? (
+      {!flowV3HasAnyDiagram(flow) && prereqBoth ? (
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">🔀</div>
           <div className="space-y-1">
@@ -871,7 +878,7 @@ export function UserFlowPage() {
           <button
             type="button"
             onClick={() => void generate()}
-            disabled={!prereqOk || generating}
+            disabled={!prereqBoth || generating}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-45 disabled:pointer-events-none"
           >
             ✦ Generar y guardar (ambos segmentos)
@@ -889,11 +896,12 @@ export function UserFlowPage() {
                 en el canal <strong>{canalLabel}</strong>
               </>
             ) : null}
-            . Genera el journey para ese canal en User Journey y pulsa generar aquí.
+            . Genera el mapa en User Journey, añade <strong>ideas</strong> de funcionalidad/contenido para ese canal, y
+            pulsa generar aquí.
           </p>
           <button
             type="button"
-            disabled={!prereqOk || generating}
+            disabled={!prereqOne || generating}
             onClick={() => void generateOne()}
             className="text-xs px-4 py-2 rounded-full bg-white border border-gray-300 font-semibold text-gray-800 hover:bg-gray-100 disabled:opacity-45"
           >

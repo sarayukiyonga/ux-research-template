@@ -24,6 +24,7 @@ import {
   type UserJourneySegmento,
   type UserJourneyV3Persist,
 } from '@/lib/user-journey-persist'
+import { UserJourneyIdeasSection } from '@/components/UserJourneyIdeasSection'
 
 export type { JourneyEtapa, JourneyForPersona, UserJourneyBundle } from '@/lib/user-journey-bundle'
 
@@ -1027,6 +1028,8 @@ export function UserJourneyPage() {
         clavePovLabel={clavePovLabel}
         rolBloqueTitulo={rolBloqueTitulo}
       />
+
+      <UserJourneyIdeasSection persist={panelPersist} segmento={segmento} />
 
       <EtapaEditModal
         open={editOpen}

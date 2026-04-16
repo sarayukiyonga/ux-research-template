@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { PdfDashboardFullExport } from '@/components/PdfDashboardFullExport'
 
 const sections = [
   {
@@ -203,6 +204,7 @@ export default function DashboardPage() {
           <p className="mt-2 text-gray-500 text-sm">
             Panel de análisis · Marca y estrategia
           </p>
+          <PdfDashboardFullExport />
         </div>
 
         {/* Section cards */}
