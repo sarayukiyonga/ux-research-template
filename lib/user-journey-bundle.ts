@@ -35,12 +35,12 @@ function isEtapa(x: unknown): x is JourneyEtapa {
   )
 }
 
-function isJourneyForPersona(x: unknown): x is JourneyForPersona {
+export function isJourneyForPersona(x: unknown): x is JourneyForPersona {
   if (!x || typeof x !== 'object') return false
   const o = x as Record<string, unknown>
   if (typeof o.etiquetaPersona !== 'string' || typeof o.sintesis !== 'string') return false
   if (typeof o.etapaOrdenPovResuelto !== 'number') return false
-  if (!Array.isArray(o.etapas) || o.etapas.length < 4) return false
+  if (!Array.isArray(o.etapas) || o.etapas.length < 3) return false
   return o.etapas.every(isEtapa)
 }
 

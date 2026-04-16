@@ -74,6 +74,13 @@ const PersonaSchema = z.object({
     redesSociales: z.number().min(1).max(5),
     comprasOnline: z.number().min(1).max(5),
   }),
+  canalesBusquedaSolucion: z
+    .array(z.string().max(80))
+    .min(2)
+    .max(10)
+    .describe(
+      'Medios o canales por los que esta persona **busca información o soluciones** a sus necesidades (p. ej. Google/web, Instagram, recomendación del médico, boca a boca en el barrio, WhatsApp, email). Infiero de **encuesta filtrada** (barreras, confianza, cómo descubren servicios) y de **insights**; nombres breves y realistas para el segmento.'
+    ),
 })
 
 const schema = z.object({
@@ -386,7 +393,9 @@ Fuentes por persona:
 "clienteActual" solo mezcla INSIGHTS clientes + ENCUESTA clientes + entrevista. No uses el bloque de potenciales.
 "clientePotencial" solo mezcla INSIGHTS potenciales + ENCUESTA potenciales + entrevista.
 
-Los dos perfiles deben distinguirse claramente. Español natural. Nombres locales plausibles.`,
+Los dos perfiles deben distinguirse claramente. Español natural. Nombres locales plausibles.
+
+Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).`,
     prompt: `=== ENTREVISTA — PATRICIA / MOA ===\n${interview}
 
 === DATOS ENCUESTA FILTRADOS — CLIENTES ACTUALES (demografía y muestras; mismo corte que en /survey) ===

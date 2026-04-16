@@ -84,6 +84,12 @@ export function personaRecordToPlainText(sectionTitle: string, p: Record<string,
   const gen = typeof p.genero === 'string' ? p.genero : ''
   const tags = Array.isArray(p.tags) ? (p.tags as string[]).join(', ') : ''
 
+  const canales = (p as Record<string, unknown>).canalesBusquedaSolucion
+  const canalesTxt =
+    Array.isArray(canales) && canales.some((x) => typeof x === 'string' && (x as string).trim())
+      ? `Canales / medios para buscar soluciones a sus necesidades:\n${stringifyList(canales)}`
+      : ''
+
   return [
     `### ${sectionTitle}`,
     `Nombre: ${p.nombre ?? ''}`,
@@ -93,10 +99,13 @@ export function personaRecordToPlainText(sectionTitle: string, p: Record<string,
     `Ocupación: ${occ}`,
     `Tags: ${tags}`,
     `Frase (1ª persona): ${frase}`,
+    canalesTxt,
     `Motivaciones:\n${stringifyList(p.motivaciones)}`,
     `Necesidades:\n${stringifyList(p.necesidades)}`,
     `Puntos de dolor:\n${stringifyList(p.puntosDeDolor)}`,
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** Texto para el modelo: un bloque por persona. */

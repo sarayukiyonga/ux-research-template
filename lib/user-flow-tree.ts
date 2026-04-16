@@ -1,4 +1,11 @@
 import { z } from 'zod'
+import {
+  DEFAULT_USER_JOURNEY_CANAL_ID,
+  defaultJourneyCanalCatalogo,
+  normalizeCanalInCatalog,
+  type JourneyCanalDef,
+} from '@/lib/user-journey-channels'
+import { mergeCatalogosUnique, type UserJourneyV3Persist } from '@/lib/user-journey-persist'
 
 export const pasoSchema = z.object({
   orden: z.number().int().min(1).max(24),
@@ -196,8 +203,134 @@ export interface UserFlowBundle {
 export function parseUserFlowBundle(raw: unknown): UserFlowBundle | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
+  if ((o as { version?: unknown }).version === 3) return null
   const ca = parseUserFlowLine(o.clienteActual)
   const cp = parseUserFlowLine(o.clientePotencial)
   if (!ca || !cp) return null
   return { clienteActual: ca, clientePotencial: cp }
+}
+
+export interface SegmentoFlowState {
+  catalogo: JourneyCanalDef[]
+  canalActivoId: string
+  diagramas: Record<string, UserFlowLine>
+}
+
+export interface UserFlowV3Persist {
+  version: 3
+  clienteActual: SegmentoFlowState
+  clientePotencial: SegmentoFlowState
+}
+
+function isSegmentoFlowState(x: unknown): x is SegmentoFlowState {
+  if (!x || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  if (!Array.isArray(o.catalogo) || o.catalogo.length === 0) return false
+  if (!o.catalogo.every((c) => c && typeof c === 'object' && typeof (c as JourneyCanalDef).id === 'string')) {
+    return false
+  }
+  if (typeof o.canalActivoId !== 'string' || !o.canalActivoId.trim()) return false
+  if (!o.diagramas || typeof o.diagramas !== 'object') return false
+  return true
+}
+
+export function isUserFlowV3Persist(v: unknown): v is UserFlowV3Persist {
+  if (!v || typeof v !== 'object') return false
+  const o = v as Record<string, unknown>
+  if (o.version !== 3) return false
+  return isSegmentoFlowState(o.clienteActual) && isSegmentoFlowState(o.clientePotencial)
+}
+
+function normalizeDiagramasMap(raw: Record<string, unknown>): Record<string, UserFlowLine> {
+  const out: Record<string, UserFlowLine> = {}
+  for (const [k, v] of Object.entries(raw)) {
+    const line = parseUserFlowLine(v)
+    if (line) out[k] = line
+  }
+  return out
+}
+
+export function normalizeUserFlowV3(p: UserFlowV3Persist): UserFlowV3Persist {
+  const normSeg = (s: SegmentoFlowState): SegmentoFlowState => ({
+    catalogo: s.catalogo,
+    canalActivoId: normalizeCanalInCatalog(s.canalActivoId, s.catalogo),
+    diagramas: normalizeDiagramasMap(s.diagramas as unknown as Record<string, unknown>),
+  })
+  return {
+    version: 3,
+    clienteActual: normSeg(p.clienteActual),
+    clientePotencial: normSeg(p.clientePotencial),
+  }
+}
+
+export function migrateFlowBundleToV3(bundle: UserFlowBundle): UserFlowV3Persist {
+  const cat = defaultJourneyCanalCatalogo()
+  const wid = DEFAULT_USER_JOURNEY_CANAL_ID
+  return {
+    version: 3,
+    clienteActual: {
+      catalogo: [...cat],
+      canalActivoId: wid,
+      diagramas: { [wid]: normalizeUserFlowLine(bundle.clienteActual) },
+    },
+    clientePotencial: {
+      catalogo: [...cat],
+      canalActivoId: wid,
+      diagramas: { [wid]: normalizeUserFlowLine(bundle.clientePotencial) },
+    },
+  }
+}
+
+export function parseUserFlowPersist(raw: unknown): UserFlowV3Persist | null {
+  if (!raw || typeof raw !== 'object') return null
+  if (isUserFlowV3Persist(raw)) {
+    return normalizeUserFlowV3(raw)
+  }
+  const legacy = parseUserFlowBundle(raw)
+  if (legacy) return migrateFlowBundleToV3(legacy)
+  return null
+}
+
+export function syncFlowCatalogFromJourneyV3(
+  flow: UserFlowV3Persist,
+  journey: UserJourneyV3Persist
+): UserFlowV3Persist {
+  const out: UserFlowV3Persist = {
+    version: 3,
+    clienteActual: {
+      ...flow.clienteActual,
+      catalogo: mergeCatalogosUnique(flow.clienteActual.catalogo, journey.clienteActual.catalogo),
+    },
+    clientePotencial: {
+      ...flow.clientePotencial,
+      catalogo: mergeCatalogosUnique(flow.clientePotencial.catalogo, journey.clientePotencial.catalogo),
+    },
+  }
+  out.clienteActual.canalActivoId = normalizeCanalInCatalog(
+    flow.clienteActual.canalActivoId,
+    out.clienteActual.catalogo
+  )
+  out.clientePotencial.canalActivoId = normalizeCanalInCatalog(
+    flow.clientePotencial.canalActivoId,
+    out.clientePotencial.catalogo
+  )
+  return normalizeUserFlowV3(out)
+}
+
+export function getFlowLineForSegmentChannel(
+  flow: UserFlowV3Persist,
+  segment: 'clienteActual' | 'clientePotencial',
+  canalId: string
+): UserFlowLine | null {
+  return flow[segment].diagramas[canalId] ?? null
+}
+
+export function emptyFlowV3(): UserFlowV3Persist {
+  const cat = defaultJourneyCanalCatalogo()
+  const seg = (): SegmentoFlowState => ({
+    catalogo: [...cat],
+    canalActivoId: DEFAULT_USER_JOURNEY_CANAL_ID,
+    diagramas: {},
+  })
+  return { version: 3, clienteActual: seg(), clientePotencial: seg() }
 }

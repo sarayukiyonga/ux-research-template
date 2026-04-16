@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AutoTextarea } from '@/components/ui/auto-textarea'
 import { UserPersonaInsightsSource } from '@/components/UserPersonaInsightsSource'
 import { readSegmentSurveyFilters, segmentFiltersToApi } from '@/lib/segment-survey-filters'
 
@@ -36,12 +37,278 @@ interface Persona {
   puntosDeDolor: string[]
   personalidad: Personalidad
   habilidadesTecnicas: HabilidadesTecnicas
+  /** Medios que usa para informarse o resolver necesidades (encuesta + insights; editable). */
+  canalesBusquedaSolucion?: string[]
 }
 
 interface UserPersonas {
   clienteActual: Persona
   clientePotencial: Persona
 }
+
+function normalizePersona(raw: Record<string, unknown>): Persona {
+  const p = raw as unknown as Persona
+  const c = raw.canalesBusquedaSolucion
+  const canalesBusquedaSolucion = Array.isArray(c)
+    ? c
+        .filter((x): x is string => typeof x === 'string')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : []
+  return { ...p, canalesBusquedaSolucion }
+}
+
+function normalizePersonasPayload(raw: unknown): UserPersonas | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  if (!o.clienteActual || !o.clientePotencial || typeof o.clienteActual !== 'object' || typeof o.clientePotencial !== 'object')
+    return null
+  return {
+    clienteActual: normalizePersona(o.clienteActual as Record<string, unknown>),
+    clientePotencial: normalizePersona(o.clientePotencial as Record<string, unknown>),
+  }
+}
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  )
+}
+
+function linesToList(s: string): string[] {
+  return s
+    .split(/\r?\n/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+}
+
+function listToLines(arr: string[]): string {
+  return arr.join('\n')
+}
+
+function PersonaInlineEditor({
+  draft,
+  onChange,
+  accent,
+}: {
+  draft: Persona
+  onChange: (next: Persona) => void
+  accent: string
+}) {
+  const patch = (partial: Partial<Persona>) => onChange({ ...draft, ...partial })
+
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Nombre</span>
+          <input
+            type="text"
+            value={draft.nombre}
+            onChange={(e) => patch({ nombre: e.target.value.slice(0, 80) })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Edad</span>
+          <input
+            type="number"
+            min={18}
+            max={99}
+            value={draft.edad}
+            onChange={(e) => patch({ edad: Math.min(99, Math.max(18, parseInt(e.target.value, 10) || 18)) })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Género (persona)</span>
+          <select
+            value={draft.genero}
+            onChange={(e) => patch({ genero: e.target.value as Persona['genero'] })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+          >
+            <option value="mujer">Mujer</option>
+            <option value="hombre">Hombre</option>
+            <option value="no_binario">No binario</option>
+          </select>
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-[10px] font-medium text-gray-500">Frase (1ª persona)</span>
+          <AutoTextarea
+            value={draft.frase}
+            onChange={(e) => patch({ frase: e.target.value.slice(0, 130) })}
+            rows={2}
+            maxLength={130}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Educación</span>
+          <input
+            type="text"
+            value={draft.educacion}
+            onChange={(e) => patch({ educacion: e.target.value.slice(0, 120) })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Ubicación</span>
+          <input
+            type="text"
+            value={draft.ubicacion}
+            onChange={(e) => patch({ ubicacion: e.target.value.slice(0, 120) })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-[10px] font-medium text-gray-500">Ocupación</span>
+          <input
+            type="text"
+            value={draft.ocupacion}
+            onChange={(e) => patch({ ocupacion: e.target.value.slice(0, 120) })}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-[10px] font-medium text-gray-500">Tags (coma entre cada uno)</span>
+          <input
+            type="text"
+            value={draft.tags.join(', ')}
+            onChange={(e) =>
+              patch({
+                tags: e.target.value
+                  .split(',')
+                  .map((t) => t.trim())
+                  .filter(Boolean)
+                  .slice(0, 8)
+                  .map((t) => t.slice(0, 20)),
+              })
+            }
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Motivaciones (una por línea)</span>
+          <AutoTextarea
+            value={listToLines(draft.motivaciones)}
+            onChange={(e) => patch({ motivaciones: linesToList(e.target.value).slice(0, 8) })}
+            rows={5}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Necesidades (una por línea)</span>
+          <AutoTextarea
+            value={listToLines(draft.necesidades)}
+            onChange={(e) => patch({ necesidades: linesToList(e.target.value).slice(0, 8) })}
+            rows={5}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="text-[10px] font-medium text-gray-500">Puntos de dolor (uno por línea)</span>
+          <AutoTextarea
+            value={listToLines(draft.puntosDeDolor)}
+            onChange={(e) => patch({ puntosDeDolor: linesToList(e.target.value).slice(0, 8) })}
+            rows={5}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono"
+          />
+        </label>
+      </div>
+
+      <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Personalidad (1–5)</p>
+        <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
+          {(
+            [
+              ['introvertidoExtrovertido', 'Introvertido → Extrovertido'],
+              ['pensamientoSentimiento', 'Analítico → Emocional'],
+              ['organizadoEspontaneo', 'Organizado → Espontáneo'],
+              ['seguroInseguro', 'Seguro → Ansioso'],
+              ['intuitivoObservador', 'Intuitivo → Observador'],
+            ] as const
+          ).map(([key, lab]) => (
+            <label key={key} className="flex items-center gap-3">
+              <span className="w-40 shrink-0 text-[10px] leading-tight">{lab}</span>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={draft.personalidad[key]}
+                onChange={(e) => {
+                  const v = Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 3))
+                  patch({
+                    personalidad: {
+                      ...draft.personalidad,
+                      [key]: v,
+                    },
+                  })
+                }}
+                className="flex-1 accent-violet-600"
+                style={{ accentColor: accent }}
+              />
+              <span className="w-4 text-center font-mono text-[10px]">{draft.personalidad[key]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Habilidades técnicas (1–5)</p>
+        {(['internet', 'redesSociales', 'comprasOnline'] as const).map((key) => (
+          <label key={key} className="flex items-center gap-3 text-xs text-gray-600">
+            <span className="w-32 shrink-0 capitalize">{key === 'redesSociales' ? 'Redes sociales' : key === 'comprasOnline' ? 'Compras online' : 'Internet'}</span>
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={draft.habilidadesTecnicas[key]}
+              onChange={(e) =>
+                patch({
+                  habilidadesTecnicas: {
+                    ...draft.habilidadesTecnicas,
+                    [key]: parseInt(e.target.value, 10),
+                  },
+                })
+              }
+              className="flex-1"
+              style={{ accentColor: accent }}
+            />
+            <span className="w-4 text-center font-mono text-[10px]">{draft.habilidadesTecnicas[key]}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const SUGERENCIAS_CANALES_BUSQUEDA = [
+  'Búsqueda web / Google',
+  'Instagram u otras redes',
+  'Recomendación médica o fisioterapeuta',
+  'Boca a boca / conocidos',
+  'WhatsApp',
+  'Email o newsletter',
+  'Centro o gimnasio cercano',
+  'Llamada telefónica',
+]
 
 // ── Trait bar component ─────────────────────────────────────────────────────────
 
@@ -107,117 +374,320 @@ const AVATAR_EMOJIS: Record<string, string> = {
   no_binario: '🧑',
 }
 
-function PersonaCard({ persona, type }: { persona: Persona; type: 'clienteActual' | 'clientePotencial' }) {
+function PersonaCanalesSection({
+  items,
+  accent,
+  onChange,
+}: {
+  items: string[]
+  accent: string
+  onChange: (next: string[]) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const addOne = (raw: string) => {
+    const t = raw.trim().slice(0, 80)
+    if (!t || items.includes(t) || items.length >= 12) return
+    onChange([...items, t])
+    setDraft('')
+  }
+  const removeAt = (idx: number) => {
+    onChange(items.filter((_, i) => i !== idx))
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+          📡 Canales para buscar soluciones
+        </p>
+        <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+          Dónde se informa o busca ayuda para cubrir sus necesidades (basado en encuesta e insights; puedes afinar la
+          lista).
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((c, i) => (
+          <span
+            key={`${c}-${i}`}
+            className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[11px] font-medium border border-gray-200 bg-white text-gray-800"
+          >
+            {c}
+            <button
+              type="button"
+              onClick={() => removeAt(i)}
+              className="rounded-full p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50"
+              aria-label={`Quitar ${c}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {items.length === 0 ? <span className="text-xs text-gray-400 italic">Ninguno definido — añade desde sugerencias o texto libre.</span> : null}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-[10px] text-gray-400 w-full">Sugerencias rápidas</span>
+        {SUGERENCIAS_CANALES_BUSQUEDA.map((s) => (
+          <button
+            key={s}
+            type="button"
+            disabled={items.includes(s) || items.length >= 12}
+            onClick={() => addOne(s)}
+            className="text-[10px] rounded-full px-2 py-1 border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-35"
+          >
+            + {s}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 items-end">
+        <label className="flex-1 min-w-[10rem] space-y-1">
+          <span className="text-[10px] font-medium text-gray-500">Añadir canal (texto libre)</span>
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addOne(draft)
+              }
+            }}
+            maxLength={80}
+            placeholder="p. ej. Grupo de Facebook local"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!draft.trim() || items.length >= 12}
+          onClick={() => addOne(draft)}
+          className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+          style={{ backgroundColor: accent }}
+        >
+          Añadir
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PersonaCard({
+  persona,
+  type,
+  onSavePersona,
+}: {
+  persona: Persona
+  type: 'clienteActual' | 'clientePotencial'
+  onSavePersona?: (p: Persona) => void
+}) {
   const isClient = type === 'clienteActual'
   const accent = isClient ? '#7c3aed' : '#ea580c'
   const accentLight = isClient ? '#ede9fe' : '#ffedd5'
   const accentText = isClient ? 'text-violet-700' : 'text-orange-600'
-  const accentBg = isClient ? 'bg-violet-50' : 'bg-orange-50'
   const accentBorder = isClient ? 'border-violet-200' : 'border-orange-200'
   const label = isClient ? 'Cliente actual' : 'Cliente potencial'
+  const canales = persona.canalesBusquedaSolucion ?? []
+
+  const [draft, setDraft] = useState<Persona | null>(null)
+  const canalesEditRef = useRef<HTMLDivElement>(null)
+  const didScrollToCanales = useRef(false)
+
+  const startEdit = () => {
+    didScrollToCanales.current = false
+    const raw = JSON.parse(JSON.stringify(persona)) as Persona
+    setDraft({
+      ...raw,
+      canalesBusquedaSolucion: [...(raw.canalesBusquedaSolucion ?? [])],
+    })
+  }
+
+  useEffect(() => {
+    if (!draft) {
+      didScrollToCanales.current = false
+      return
+    }
+    if (didScrollToCanales.current) return
+    didScrollToCanales.current = true
+    requestAnimationFrame(() => {
+      canalesEditRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [draft])
+
+  const handleSaveEdit = () => {
+    if (!draft || !onSavePersona) return
+    if (draft.motivaciones.length < 1 || draft.necesidades.length < 1 || draft.puntosDeDolor.length < 1) {
+      window.alert('Motivaciones, necesidades y puntos de dolor deben tener al menos una línea cada una.')
+      return
+    }
+    if (draft.tags.length < 1) {
+      window.alert('Añade al menos un tag (separados por coma).')
+      return
+    }
+    if (!draft.nombre.trim()) {
+      window.alert('El nombre no puede estar vacío.')
+      return
+    }
+    onSavePersona(draft)
+    setDraft(null)
+  }
+
+  const cancelEdit = () => setDraft(null)
 
   return (
     <div className={`rounded-2xl border-2 ${accentBorder} bg-white overflow-hidden`}>
-      {/* Header strip */}
-      <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: accentLight }}>
-        <span className={`text-xs font-semibold uppercase tracking-wider ${accentText}`}>{label}</span>
-        <span className="text-xs text-gray-400">{persona.edad} años · {persona.ubicacion}</span>
-      </div>
-
-      <div className="p-5 grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-5">
-
-        {/* ── LEFT COLUMN: identity ── */}
-        <div className="flex flex-col gap-4">
-          {/* Avatar + name */}
-          <div className="flex flex-col items-center gap-2 text-center">
-            <div
-              className="h-20 w-20 rounded-full flex items-center justify-center text-4xl border-4 border-white shadow-md"
-              style={{ backgroundColor: accentLight }}
-            >
-              {AVATAR_EMOJIS[persona.genero] ?? '🧑'}
-            </div>
-            <div>
-              <p className="text-xl font-bold text-gray-900">{persona.nombre}</p>
-              <p className="text-xs text-gray-500 mt-0.5 italic leading-snug max-w-[180px]">
-                &ldquo;{persona.frase}&rdquo;
-              </p>
-            </div>
-          </div>
-
-          {/* Personal data */}
-          <div className="rounded-xl bg-gray-50 p-3 space-y-1.5 text-xs">
-            <DataRow icon="🎂" label="Edad" value={`${persona.edad} años`} />
-            <DataRow icon="🎓" label="Estudios" value={persona.educacion} />
-            <DataRow icon="📍" label="Ubicación" value={persona.ubicacion} />
-            <DataRow icon="💼" label="Ocupación" value={persona.ocupacion} />
-          </div>
-
-          {/* Tags */}
-          <div className="flex flex-wrap gap-1.5">
-            {persona.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
-                style={{ backgroundColor: accentLight, color: accent, borderColor: `${accent}33` }}
+      <div className="px-5 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ backgroundColor: accentLight }}>
+        <span className={`text-xs font-semibold uppercase tracking-wider ${accentText}`}>
+          {label}
+          {draft ? <span className="font-normal text-gray-500 normal-case"> · editando</span> : null}
+        </span>
+        <div className="flex items-center gap-2 ml-auto">
+          {draft ? (
+            <>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                className="text-xs font-semibold rounded-lg px-3 py-1.5 text-white shadow-sm hover:opacity-90"
+                style={{ backgroundColor: accent }}
               >
-                {tag}
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="text-xs font-medium rounded-lg px-3 py-1.5 border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              {onSavePersona ? (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="inline-flex items-center justify-center rounded-lg p-2 text-gray-500 border border-transparent hover:bg-white/70 hover:text-gray-900 hover:border-gray-200/80 transition-colors"
+                  aria-label="Editar perfil"
+                  title="Editar perfil"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+              ) : null}
+              <span className="text-xs text-gray-400">
+                {persona.edad} años · {persona.ubicacion}
               </span>
-            ))}
-          </div>
-        </div>
-
-        {/* ── RIGHT COLUMN: insights ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          {/* Motivaciones */}
-          <InsightBlock
-            title="Motivaciones"
-            items={persona.motivaciones}
-            dotColor={accent}
-            icon="⚡"
-          />
-
-          {/* Necesidades */}
-          <InsightBlock
-            title="Necesidades"
-            items={persona.necesidades}
-            dotColor={accent}
-            icon="🎯"
-          />
-
-          {/* Puntos de dolor */}
-          <InsightBlock
-            title="Puntos de dolor"
-            items={persona.puntosDeDolor}
-            dotColor="#ef4444"
-            icon="😣"
-          />
-
-          {/* Personalidad + Habilidades */}
-          <div className="space-y-4">
-            <div className="rounded-xl border border-gray-100 p-3 space-y-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                🧠 Personalidad
-              </p>
-              <TraitBar leftLabel="Introvertido" rightLabel="Extrovertido" value={persona.personalidad.introvertidoExtrovertido} color={accent} />
-              <TraitBar leftLabel="Analítico" rightLabel="Emocional" value={persona.personalidad.pensamientoSentimiento} color={accent} />
-              <TraitBar leftLabel="Organizado" rightLabel="Espontáneo" value={persona.personalidad.organizadoEspontaneo} color={accent} />
-              <TraitBar leftLabel="Seguro" rightLabel="Ansioso" value={persona.personalidad.seguroInseguro} color={accent} />
-              <TraitBar leftLabel="Intuitivo" rightLabel="Observador" value={persona.personalidad.intuitivoObservador} color={accent} />
-            </div>
-
-            <div className="rounded-xl border border-gray-100 p-3 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                💻 Habilidades técnicas
-              </p>
-              <SkillDots label="Internet" value={persona.habilidadesTecnicas.internet} color={accent} />
-              <SkillDots label="Redes sociales" value={persona.habilidadesTecnicas.redesSociales} color={accent} />
-              <SkillDots label="Compras online" value={persona.habilidadesTecnicas.comprasOnline} color={accent} />
-            </div>
-          </div>
-
+            </>
+          )}
         </div>
       </div>
+
+      {draft ? (
+        <div className="p-5 space-y-5">
+          <div ref={canalesEditRef} className="scroll-mt-4">
+            <p className="text-[11px] font-medium text-gray-500 mb-2">
+              Canales para buscar soluciones — edita aquí o más abajo el resto del perfil; todo se guarda con
+              &nbsp;<strong className="text-gray-700">Guardar</strong>.
+            </p>
+            <PersonaCanalesSection
+              items={draft.canalesBusquedaSolucion ?? []}
+              accent={accent}
+              onChange={(nextCanales) =>
+                setDraft((d) => (d ? { ...d, canalesBusquedaSolucion: nextCanales } : null))
+              }
+            />
+          </div>
+          <PersonaInlineEditor draft={draft} onChange={setDraft} accent={accent} />
+        </div>
+      ) : (
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-5">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div
+                  className="h-20 w-20 rounded-full flex items-center justify-center text-4xl border-4 border-white shadow-md"
+                  style={{ backgroundColor: accentLight }}
+                >
+                  {AVATAR_EMOJIS[persona.genero] ?? '🧑'}
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-gray-900">{persona.nombre}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 italic leading-snug max-w-[180px]">
+                    &ldquo;{persona.frase}&rdquo;
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-gray-50 p-3 space-y-1.5 text-xs">
+                <DataRow icon="🎂" label="Edad" value={`${persona.edad} años`} />
+                <DataRow icon="🎓" label="Estudios" value={persona.educacion} />
+                <DataRow icon="📍" label="Ubicación" value={persona.ubicacion} />
+                <DataRow icon="💼" label="Ocupación" value={persona.ocupacion} />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {persona.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-full text-[10px] font-medium border"
+                    style={{ backgroundColor: accentLight, color: accent, borderColor: `${accent}33` }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InsightBlock title="Motivaciones" items={persona.motivaciones} dotColor={accent} icon="⚡" />
+              <InsightBlock title="Necesidades" items={persona.necesidades} dotColor={accent} icon="🎯" />
+              <InsightBlock title="Puntos de dolor" items={persona.puntosDeDolor} dotColor="#ef4444" icon="😣" />
+
+              <div className="space-y-4">
+                <div className="rounded-xl border border-gray-100 p-3 space-y-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                    🧠 Personalidad
+                  </p>
+                  <TraitBar leftLabel="Introvertido" rightLabel="Extrovertido" value={persona.personalidad.introvertidoExtrovertido} color={accent} />
+                  <TraitBar leftLabel="Analítico" rightLabel="Emocional" value={persona.personalidad.pensamientoSentimiento} color={accent} />
+                  <TraitBar leftLabel="Organizado" rightLabel="Espontáneo" value={persona.personalidad.organizadoEspontaneo} color={accent} />
+                  <TraitBar leftLabel="Seguro" rightLabel="Ansioso" value={persona.personalidad.seguroInseguro} color={accent} />
+                  <TraitBar leftLabel="Intuitivo" rightLabel="Observador" value={persona.personalidad.intuitivoObservador} color={accent} />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 p-3 space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                    💻 Habilidades técnicas
+                  </p>
+                  <SkillDots label="Internet" value={persona.habilidadesTecnicas.internet} color={accent} />
+                  <SkillDots label="Redes sociales" value={persona.habilidadesTecnicas.redesSociales} color={accent} />
+                  <SkillDots label="Compras online" value={persona.habilidadesTecnicas.comprasOnline} color={accent} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {canales.length > 0 ? (
+            <div className="rounded-xl border border-gray-100 p-3 bg-gray-50/30">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                📡 Canales para buscar soluciones
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                {canales.map((c, i) => (
+                  <li
+                    key={`${i}-${c}`}
+                    className="text-[11px] px-2 py-1 rounded-full bg-white border border-gray-100 text-gray-700"
+                  >
+                    {c}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-gray-400 mt-2">Pulsa el lápiz arriba para editar canales y el perfil.</p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic px-1">
+              📡 Sin canales definidos — pulsa el lápiz para añadir por dónde busca soluciones.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -284,7 +754,8 @@ export function UserPersonaPage() {
     ])
       .then(([saved, ic, ip]) => {
         if (saved?.saved?.personas) {
-          setPersonas(saved.saved.personas)
+          const n = normalizePersonasPayload(saved.saved.personas)
+          if (n) setPersonas(n)
           setSavedAt(saved.saved.savedAt)
         }
         setInsightsClientesOk(hasValidInsightsPayload(ic?.saved?.data))
@@ -312,6 +783,15 @@ export function UserPersonaPage() {
     setSaving(false)
   }
 
+  const savePersonaSegment = (seg: 'clienteActual' | 'clientePotencial', next: Persona) => {
+    setPersonas((prev) => {
+      if (!prev) return prev
+      const merged: UserPersonas = { ...prev, [seg]: next }
+      void savePersonas(merged)
+      return merged
+    })
+  }
+
   const generate = async () => {
     setGenerating(true)
     setGenError(null)
@@ -329,7 +809,11 @@ export function UserPersonaPage() {
         setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar los perfiles.')
         return
       }
-      const personasPayload = d as UserPersonas
+      const personasPayload = normalizePersonasPayload(d)
+      if (!personasPayload) {
+        setGenError('La respuesta de la IA no tiene el formato esperado.')
+        return
+      }
       setPersonas(personasPayload)
       await savePersonas(personasPayload)
     } catch {
@@ -488,8 +972,8 @@ export function UserPersonaPage() {
       </div>
 
       {/* Persona cards */}
-      <PersonaCard persona={personas.clienteActual} type="clienteActual" />
-      <PersonaCard persona={personas.clientePotencial} type="clientePotencial" />
+      <PersonaCard persona={personas.clienteActual} type="clienteActual" onSavePersona={(p) => savePersonaSegment('clienteActual', p)} />
+      <PersonaCard persona={personas.clientePotencial} type="clientePotencial" onSavePersona={(p) => savePersonaSegment('clientePotencial', p)} />
     </div>
   )
 }

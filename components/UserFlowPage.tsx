@@ -3,9 +3,21 @@
 import { useState, useEffect, useId, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { FlowPaso, FlowNodo, UserFlowLine, UserFlowBundle } from '@/lib/user-flow-tree'
-import { parseUserFlowBundle } from '@/lib/user-flow-tree'
-import { isUserJourneyBundle } from '@/lib/user-journey-bundle'
+import type { FlowPaso, FlowNodo, UserFlowLine } from '@/lib/user-flow-tree'
+import {
+  emptyFlowV3,
+  getFlowLineForSegmentChannel,
+  parseUserFlowPersist,
+  syncFlowCatalogFromJourneyV3,
+  type UserFlowV3Persist,
+} from '@/lib/user-flow-tree'
+import {
+  parsePersistedJourneyCell,
+  parseUserJourneySavedFilters,
+  savedJourneyCellHasFlowBundle,
+  toJourneyV3,
+} from '@/lib/user-journey-persist'
+import { newCustomJourneyCanalId, normalizeCanalInCatalog } from '@/lib/user-journey-channels'
 
 export type { FlowPaso, UserFlowLine, UserFlowBundle } from '@/lib/user-flow-tree'
 
@@ -18,6 +30,13 @@ function hasValidPersonasSaved(personas: unknown): boolean {
   const check = (p: Record<string, unknown>) =>
     typeof p.nombre === 'string' && Array.isArray(p.motivaciones) && p.motivaciones.length > 0
   return check(ca as Record<string, unknown>) && check(cp as Record<string, unknown>)
+}
+
+function flowV3HasAnyDiagram(f: UserFlowV3Persist): boolean {
+  return (
+    Object.keys(f.clienteActual.diagramas).length > 0 ||
+    Object.keys(f.clientePotencial.diagramas).length > 0
+  )
 }
 
 function hasValidPovSaved(statements: unknown): boolean {
@@ -295,7 +314,17 @@ function FlowchartLegend({ accent }: { accent: 'cyan' | 'orange' }) {
   )
 }
 
-function UserFlowchartSection({ flow, segmentLabel, accent }: { flow: UserFlowLine; segmentLabel: string; accent: 'cyan' | 'orange' }) {
+function UserFlowchartSection({
+  flow,
+  segmentLabel,
+  canalSubtitle,
+  accent,
+}: {
+  flow: UserFlowLine
+  segmentLabel: string
+  canalSubtitle?: string
+  accent: 'cyan' | 'orange'
+}) {
   const stroke = accent === 'cyan' ? 'text-cyan-700' : 'text-orange-700'
   const paraBorder = accent === 'cyan' ? 'border-violet-500' : 'border-violet-600'
   const paraBg = 'bg-violet-50/90'
@@ -304,7 +333,12 @@ function UserFlowchartSection({ flow, segmentLabel, accent }: { flow: UserFlowLi
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">{segmentLabel}</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {segmentLabel}
+          {canalSubtitle ? (
+            <span className="block text-sm font-normal text-gray-500 mt-0.5">Canal: {canalSubtitle}</span>
+          ) : null}
+        </h2>
         <p className="text-sm text-gray-500">{flow.arquetipo}</p>
       </div>
 
@@ -358,8 +392,114 @@ function UserFlowchartSection({ flow, segmentLabel, accent }: { flow: UserFlowLi
   )
 }
 
+function SegmentFlowPanel({
+  flow,
+  segmento,
+  nuevoCanalLabel,
+  onNuevoCanalLabel,
+  onSelectSegment,
+  onSelectCanal,
+  onAddCanal,
+  disabled,
+}: {
+  flow: UserFlowV3Persist
+  segmento: 'clienteActual' | 'clientePotencial'
+  nuevoCanalLabel: string
+  onNuevoCanalLabel: (s: string) => void
+  onSelectSegment: (s: 'clienteActual' | 'clientePotencial') => void
+  onSelectCanal: (id: string) => void
+  onAddCanal: () => void
+  disabled?: boolean
+}) {
+  const seg = flow[segmento]
+  const tabOn =
+    segmento === 'clienteActual'
+      ? 'border-cyan-600 bg-cyan-50 text-cyan-900'
+      : 'border-orange-500 bg-orange-50 text-orange-950'
+  const tabOff = 'border-gray-200 text-gray-600 hover:bg-gray-50'
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
+      <div>
+        <h2 className="text-sm font-bold text-gray-900">Segmento y canal del diagrama</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Un diagrama por <strong>tipo de cliente</strong> y <strong>canal</strong>. Los canales se sincronizan con el
+          User Journey; puedes añadir más solo en este segmento.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          disabled={disabled}
+          onClick={() => onSelectSegment('clienteActual')}
+          className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
+            segmento === 'clienteActual' ? tabOn : tabOff
+          }`}
+        >
+          Cliente actual
+        </button>
+        <button
+          type="button"
+          role="tab"
+          disabled={disabled}
+          onClick={() => onSelectSegment('clientePotencial')}
+          className={`text-xs font-semibold rounded-full px-3 py-1.5 border ${
+            segmento === 'clientePotencial' ? tabOn : tabOff
+          }`}
+        >
+          Cliente potencial
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {seg.catalogo.map((c) => {
+          const tiene = Boolean(seg.diagramas[c.id])
+          const active = seg.canalActivoId === c.id
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelectCanal(c.id)}
+              className={`text-xs font-medium rounded-full px-3 py-1.5 border ${
+                active ? tabOn : tabOff
+              } ${disabled ? 'opacity-45' : ''}`}
+            >
+              {c.label}
+              {tiene ? ' · diagrama' : ''}
+            </button>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2 items-end border-t border-gray-100 pt-3">
+        <label className="flex-1 min-w-[12rem] space-y-1">
+          <span className="text-[11px] font-medium text-gray-500">Canal adicional (solo este segmento)</span>
+          <input
+            type="text"
+            value={nuevoCanalLabel}
+            onChange={(e) => onNuevoCanalLabel(e.target.value)}
+            maxLength={80}
+            disabled={disabled}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Nombre del canal"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={disabled || !nuevoCanalLabel.trim()}
+          onClick={() => onAddCanal()}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+        >
+          Añadir
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export function UserFlowPage() {
-  const [bundle, setBundle] = useState<UserFlowBundle | null>(null)
+  const [flow, setFlow] = useState<UserFlowV3Persist | null>(null)
+  const [segmento, setSegmento] = useState<'clienteActual' | 'clientePotencial'>('clienteActual')
+  const [nuevoCanalLabel, setNuevoCanalLabel] = useState('')
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -375,29 +515,58 @@ export function UserFlowPage() {
       fetch('/api/user-journey-saved').then((r) => r.json()).catch(() => ({})),
     ])
       .then(([fSaved, personaSaved, povSaved, journeySaved]) => {
-        if (fSaved?.saved?.flows) {
-          const n = parseUserFlowBundle(fSaved.saved.flows)
-          if (n) {
-            setBundle(n)
-            setSavedAt(fSaved.saved.savedAt ?? '')
-          }
+        let next = parseUserFlowPersist(fSaved?.saved?.flows) ?? emptyFlowV3()
+        const jCell = parsePersistedJourneyCell(journeySaved?.saved?.journey)
+        const v3j = jCell ? toJourneyV3(jCell) : null
+        if (v3j) next = syncFlowCatalogFromJourneyV3(next, v3j)
+        const filt = parseUserJourneySavedFilters(journeySaved?.saved?.filters)
+        next = {
+          ...next,
+          clienteActual: {
+            ...next.clienteActual,
+            canalActivoId: normalizeCanalInCatalog(
+              filt.canalPorSegmento?.clienteActual ?? next.clienteActual.canalActivoId,
+              next.clienteActual.catalogo
+            ),
+          },
+          clientePotencial: {
+            ...next.clientePotencial,
+            canalActivoId: normalizeCanalInCatalog(
+              filt.canalPorSegmento?.clientePotencial ?? next.clientePotencial.canalActivoId,
+              next.clientePotencial.catalogo
+            ),
+          },
         }
+        if (filt.segmentoActivo === 'clienteActual' || filt.segmentoActivo === 'clientePotencial') {
+          setSegmento(filt.segmentoActivo)
+        }
+        setFlow(next)
+        if (typeof fSaved?.saved?.savedAt === 'string') setSavedAt(fSaved.saved.savedAt)
         setDepsOk({
           persona: hasValidPersonasSaved(personaSaved?.saved?.personas),
           pov: hasValidPovSaved(povSaved?.saved?.statements),
-          journey: isUserJourneyBundle(journeySaved?.saved?.journey),
+          journey: savedJourneyCellHasFlowBundle(journeySaved?.saved?.journey, journeySaved?.saved?.filters),
         })
       })
       .finally(() => setLoadingSaved(false))
   }, [])
 
-  const saveBundle = async (data: UserFlowBundle) => {
+  const buildFilters = (f: UserFlowV3Persist, seg: typeof segmento) => ({
+    fuente: 'persona+pov+journey',
+    segmentoActivo: seg,
+    canalPorSegmento: {
+      clienteActual: f.clienteActual.canalActivoId,
+      clientePotencial: f.clientePotencial.canalActivoId,
+    },
+  })
+
+  const saveFlow = async (data: UserFlowV3Persist, seg: typeof segmento = segmento) => {
     setSaving(true)
     try {
       const r = await fetch('/api/user-flow-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flows: data, filters: { fuente: 'persona+pov+journey' } }),
+        body: JSON.stringify({ flows: data, filters: buildFilters(data, seg) }),
       })
       const d = await r.json()
       if (d.savedAt) setSavedAt(d.savedAt)
@@ -405,11 +574,67 @@ export function UserFlowPage() {
     setSaving(false)
   }
 
+  const handleSelectSegment = async (s: typeof segmento) => {
+    setSegmento(s)
+    if (flow) await saveFlow(flow, s)
+  }
+
+  const handleSelectCanal = async (id: string) => {
+    if (!flow) return
+    const seg = flow[segmento]
+    const nid = normalizeCanalInCatalog(id, seg.catalogo)
+    const next: UserFlowV3Persist = { ...flow, [segmento]: { ...seg, canalActivoId: nid } }
+    setFlow(next)
+    await saveFlow(next)
+  }
+
+  const handleAddCanal = async () => {
+    if (!flow) return
+    const label = nuevoCanalLabel.trim()
+    if (!label) return
+    const id = newCustomJourneyCanalId()
+    const seg = flow[segmento]
+    const next: UserFlowV3Persist = {
+      ...flow,
+      [segmento]: {
+        ...seg,
+        catalogo: [...seg.catalogo, { id, label, esPreset: false }],
+        canalActivoId: id,
+        diagramas: { ...seg.diagramas },
+      },
+    }
+    setNuevoCanalLabel('')
+    setFlow(next)
+    await saveFlow(next)
+  }
+
+  const mergeGeneratedFlow = (
+    prev: UserFlowV3Persist,
+    seg: typeof segmento,
+    canalId: string,
+    line: UserFlowLine
+  ): UserFlowV3Persist => ({
+    ...prev,
+    [seg]: {
+      ...prev[seg],
+      diagramas: { ...prev[seg].diagramas, [canalId]: line },
+    },
+  })
+
   const generate = async () => {
+    if (!flow) return
     setGenerating(true)
     setGenError(null)
     try {
-      const res = await fetch('/api/user-flow', { method: 'POST' })
+      const canalPorSegmento = {
+        clienteActual: flow.clienteActual.canalActivoId,
+        clientePotencial: flow.clientePotencial.canalActivoId,
+      }
+      const res = await fetch('/api/user-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canalPorSegmento }),
+      })
       const text = await res.text()
       let d: Record<string, unknown>
       try {
@@ -427,18 +652,61 @@ export function UserFlowPage() {
         setGenError(typeof err === 'string' ? err : `Error ${res.status} al generar el User Flow.`)
         return
       }
-      const n = parseUserFlowBundle(d)
-      if (!n) {
-        setGenError(
-          'La respuesta no coincide con el formato esperado (árbol con raiz). Prueba a regenerar; si persiste, revisa la consola del servidor.'
-        )
+      if (d.version !== 3 || !d.clienteActual || !d.clientePotencial) {
+        setGenError('La respuesta no tiene el formato v3 esperado.')
         return
       }
-      setBundle(n)
-      await saveBundle(n)
+      const cps = d.canalPorSegmento as { clienteActual?: string; clientePotencial?: string }
+      const ca = typeof cps?.clienteActual === 'string' ? cps.clienteActual : flow.clienteActual.canalActivoId
+      const cp = typeof cps?.clientePotencial === 'string' ? cps.clientePotencial : flow.clientePotencial.canalActivoId
+      let next = flow
+      next = mergeGeneratedFlow(next, 'clienteActual', ca, d.clienteActual as UserFlowLine)
+      next = mergeGeneratedFlow(next, 'clientePotencial', cp, d.clientePotencial as UserFlowLine)
+      setFlow(next)
+      await saveFlow(next)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error de red o desconocido.'
       setGenError(`No se pudo generar el flujo: ${msg}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const generateOne = async () => {
+    if (!flow) return
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const canalPorSegmento = {
+        clienteActual: flow.clienteActual.canalActivoId,
+        clientePotencial: flow.clientePotencial.canalActivoId,
+      }
+      const res = await fetch('/api/user-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segmento, canalPorSegmento }),
+      })
+      const text = await res.text()
+      let d: Record<string, unknown>
+      try {
+        d = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        setGenError(res.ok ? 'Respuesta no JSON.' : `Error ${res.status}`)
+        return
+      }
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'Error al generar.')
+        return
+      }
+      if (d.version !== 3 || d.segmento !== segmento || !d.flow || typeof d.canalId !== 'string') {
+        setGenError('Respuesta incompleta del servidor.')
+        return
+      }
+      const next = mergeGeneratedFlow(flow, segmento, d.canalId as string, d.flow as UserFlowLine)
+      setFlow(next)
+      await saveFlow(next)
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Error de red')
     } finally {
       setGenerating(false)
     }
@@ -459,93 +727,76 @@ export function UserFlowPage() {
     )
   }
 
-  if (generating) {
+  if (!flow) {
     return (
-      <div className="space-y-5 py-4 text-center">
-        <div className="inline-block h-6 w-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500">Generando diagramas de flujo para ambos segmentos…</p>
+      <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+        No se pudo cargar el estado del User Flow. Recarga la página.
       </div>
     )
   }
 
-  if (genError) {
-    return (
-      <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-red-600">{genError}</p>
-        <button
-          type="button"
-          onClick={() => void generate()}
-          className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-        >
-          Reintentar
-        </button>
-      </div>
-    )
-  }
-
-  if (!bundle) {
-    return (
-      <div className="space-y-5">
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
-          <p>
-            El <strong>User Flow</strong> es un <strong>diagrama de flujo con ramas</strong>: óvalo (inicio/fin),
-            rectángulo (proceso), <strong>rombo</strong> (decisión con 2–3 caminos), paralelogramo (canal de entrada) y
-            flechas etiquetadas hasta la <strong>conversión</strong>.
-          </p>
-          <p className="text-xs text-gray-500">
-            Convención de símbolos (
-            <a href={SMARTDRAW_FLOWCHART_URL} className="font-semibold text-cyan-700 underline underline-offset-2" target="_blank" rel="noreferrer">
-              SmartDraw
-            </a>
-            ). El diagrama se genera a partir del{' '}
-            <strong>User Journey Map guardado</strong> (etapas, dolores, web↔POV), con{' '}
-            <strong>User Persona</strong> y <strong>POV</strong> como contexto. Sin journey guardado no se puede generar.
-          </p>
-        </div>
-
-        {(!depsOk.persona || !depsOk.pov || !depsOk.journey) && (
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
-            <p className="font-medium">Faltan datos guardados</p>
-            <ul className="text-xs list-disc pl-4 space-y-1">
-              {!depsOk.journey && (
-                <li>
-                  <Link href="/user-journey" className="font-semibold underline underline-offset-2">
-                    User Journey Map
-                  </Link>{' '}
-                  guardado (cliente actual y potencial).
-                </li>
-              )}
-              {!depsOk.persona && <li>User Persona (ambos segmentos).</li>}
-              {!depsOk.pov && <li>POV guardados.</li>}
-            </ul>
-          </div>
-        )}
-
-        <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
-          <div className="text-5xl">🔀</div>
-          <div className="space-y-1">
-            <p className="font-semibold text-gray-800">User Flow (diagrama de flujo)</p>
-            <p className="text-sm text-gray-500 max-w-lg mx-auto leading-relaxed">
-              Dos diagramas derivados del journey: etapas en orden, conversiones alineadas con el POV en la web y
-              ramas donde el recorrido lo permita. Flujos antiguos en Sheets siguen visibles hasta que regeneres con
-              journey obligatorio.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void generate()}
-            disabled={!prereqOk}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-45 disabled:pointer-events-none"
-          >
-            ✦ Generar y guardar flujos
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const accent = segmento === 'clienteActual' ? 'cyan' : 'orange'
+  const segmentLabel = segmento === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'
+  const activeCanalId = flow[segmento].canalActivoId
+  const activeLine = getFlowLineForSegmentChannel(flow, segmento, activeCanalId)
+  const canalLabel = flow[segmento].catalogo.find((c) => c.id === activeCanalId)?.label
 
   return (
     <div className="space-y-12">
+      {genError ? (
+        <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <p className="text-sm text-red-600">{genError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setGenError(null)
+              void generate()
+            }}
+            className="shrink-0 text-xs px-4 py-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+          >
+            Reintentar (ambos segmentos)
+          </button>
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
+        <p>
+          El <strong>User Flow</strong> es un diagrama con ramas (óvalos, rectángulos, rombos, paralelogramos) derivado
+          del <strong>User Journey</strong> por <strong>segmento</strong> y <strong>canal</strong>. Puedes tener un
+          diagrama distinto para cada combinación; la IA usa el journey guardado del canal activo en cada segmento.
+        </p>
+        <p className="text-xs text-gray-500">
+          Símbolos habituales:{' '}
+          <a
+            href={SMARTDRAW_FLOWCHART_URL}
+            className="font-semibold text-cyan-700 underline underline-offset-2"
+            target="_blank"
+            rel="noreferrer"
+          >
+            SmartDraw
+          </a>
+          .
+        </p>
+      </div>
+
+      {(!depsOk.persona || !depsOk.pov || !depsOk.journey) && (
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
+          <p className="font-medium">Faltan datos guardados</p>
+          <ul className="text-xs list-disc pl-4 space-y-1">
+            {!depsOk.journey && (
+              <li>
+                <Link href="/user-journey" className="font-semibold underline underline-offset-2">
+                  User Journey Map
+                </Link>{' '}
+                guardado con mapas para los canales activos por segmento.
+              </li>
+            )}
+            {!depsOk.persona && <li>User Persona (ambos segmentos).</li>}
+            {!depsOk.pov && <li>POV guardados.</li>}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
         <p>
           Base:{' '}
@@ -561,9 +812,14 @@ export function UserFlowPage() {
             POV
           </Link>
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-400">
-            {saving ? (
+            {generating ? (
+              <span className="inline-flex items-center gap-1 text-cyan-700">
+                <span className="inline-block h-3 w-3 border border-cyan-200 border-t-cyan-600 rounded-full animate-spin" />
+                Generando…
+              </span>
+            ) : saving ? (
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-3 w-3 border border-gray-300 border-t-cyan-500 rounded-full animate-spin" />
                 Guardando…
@@ -574,16 +830,85 @@ export function UserFlowPage() {
           </span>
           <button
             type="button"
-            onClick={() => void generate()}
-            className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
+            disabled={!prereqOk || generating}
+            onClick={() => void generateOne()}
+            className="text-xs px-3 py-1.5 rounded-full border border-cyan-200 text-cyan-800 bg-cyan-50/80 hover:bg-cyan-100 transition-colors disabled:opacity-45"
           >
-            ↺ Regenerar
+            Generar solo este segmento · canal
+          </button>
+          <button
+            type="button"
+            disabled={!prereqOk || generating}
+            onClick={() => void generate()}
+            className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-45"
+          >
+            ↺ Regenerar ambos segmentos
           </button>
         </div>
       </div>
 
-      <UserFlowchartSection flow={bundle.clienteActual} segmentLabel="Cliente actual" accent="cyan" />
-      <UserFlowchartSection flow={bundle.clientePotencial} segmentLabel="Cliente potencial" accent="orange" />
+      <SegmentFlowPanel
+        flow={flow}
+        segmento={segmento}
+        nuevoCanalLabel={nuevoCanalLabel}
+        onNuevoCanalLabel={setNuevoCanalLabel}
+        onSelectSegment={(s) => void handleSelectSegment(s)}
+        onSelectCanal={(id) => void handleSelectCanal(id)}
+        onAddCanal={() => void handleAddCanal()}
+        disabled={generating || saving}
+      />
+
+      {!flowV3HasAnyDiagram(flow) && prereqOk ? (
+        <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
+          <div className="text-5xl">🔀</div>
+          <div className="space-y-1">
+            <p className="font-semibold text-gray-800">User Flow (diagrama de flujo)</p>
+            <p className="text-sm text-gray-500 max-w-lg mx-auto leading-relaxed">
+              Genera diagramas para los canales activos de cada segmento (o solo el segmento y canal seleccionados).
+              Cada canal puede tener su propio diagrama guardado en Sheets.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void generate()}
+            disabled={!prereqOk || generating}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors shadow-sm disabled:opacity-45 disabled:pointer-events-none"
+          >
+            ✦ Generar y guardar (ambos segmentos)
+          </button>
+        </div>
+      ) : null}
+
+      {!activeLine && flowV3HasAnyDiagram(flow) ? (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-8 text-center text-sm text-gray-600 space-y-3">
+          <p>
+            No hay diagrama guardado para <strong>{segmentLabel}</strong>
+            {canalLabel ? (
+              <>
+                {' '}
+                en el canal <strong>{canalLabel}</strong>
+              </>
+            ) : null}
+            . Genera el journey para ese canal en User Journey y pulsa generar aquí.
+          </p>
+          <button
+            type="button"
+            disabled={!prereqOk || generating}
+            onClick={() => void generateOne()}
+            className="text-xs px-4 py-2 rounded-full bg-white border border-gray-300 font-semibold text-gray-800 hover:bg-gray-100 disabled:opacity-45"
+          >
+            Generar diagrama para este segmento y canal
+          </button>
+        </div>
+      ) : null}
+      {activeLine ? (
+        <UserFlowchartSection
+          flow={activeLine}
+          segmentLabel={segmentLabel}
+          canalSubtitle={canalLabel}
+          accent={accent}
+        />
+      ) : null}
     </div>
   )
 }
