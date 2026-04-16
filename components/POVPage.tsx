@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AutoTextarea } from '@/components/ui/auto-textarea'
 import { POVPersonaSource } from '@/components/POVPersonaSource'
 
 // ── POV statement types ────────────────────────────────────────────────────────
@@ -159,7 +160,7 @@ function POVEditableCard({
   const field = (key: keyof POVStatement, label: string, rows: number, maxLength: number) => (
     <label className="block">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-800/70">{label}</span>
-      <textarea
+      <AutoTextarea
         className={`mt-1 w-full rounded-lg border border-sky-200/90 bg-white/90 px-3 py-2 text-sm text-sky-950 shadow-sm placeholder:text-sky-300 focus:outline-none focus:ring-2 ${ring}`}
         rows={rows}
         maxLength={maxLength}

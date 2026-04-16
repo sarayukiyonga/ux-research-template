@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AutoTextarea } from '@/components/ui/auto-textarea'
 import { SegmentFiltersReadBanner } from '@/components/SegmentFiltersReadBanner'
 import { readSegmentSurveyFilters, segmentFiltersToApi } from '@/lib/segment-survey-filters'
 
@@ -508,10 +509,10 @@ function EmpathyDetailList({
                   />
                   {isEditing ? (
                     <div className="min-w-0 flex-1 space-y-2">
-                      <textarea
+                      <AutoTextarea
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
-                        rows={5}
+                        rows={2}
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
                         aria-label={`Editar nota: ${label}`}
                       />
@@ -569,10 +570,10 @@ function EmpathyDetailList({
             <div className="space-y-2 border-t border-black/5 pt-3">
               <label className="block">
                 <span className="sr-only">Texto de la nueva nota</span>
-                <textarea
+                <AutoTextarea
                   value={newDraft}
                   onChange={(e) => setNewDraft(e.target.value)}
-                  rows={4}
+                  rows={2}
                   placeholder="Escribe la nueva nota…"
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
                   maxLength={4000}

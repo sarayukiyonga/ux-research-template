@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
+import { sanitizeInsightsPayload, type InsightsSurveyPayload } from '@/lib/insights-sanitize'
 
 /** Misma forma que guarda `SurveyInsightsPage` / `insights-survey-saved`. */
 export interface InsightBloqueSaved {
@@ -71,7 +72,7 @@ export async function fetchSavedInsights(segment: InsightsSavedSegment): Promise
 
   if (!isInsightsPayload(parsed)) return { ok: false, code: 'invalid_shape' }
 
-  return { ok: true, data: parsed }
+  return { ok: true, data: sanitizeInsightsPayload(parsed as InsightsSurveyPayload) }
 }
 
 export function insightsToPlainText(data: InsightsSavedPayload): string {

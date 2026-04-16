@@ -53,7 +53,7 @@ Tu tarea: convertir cada POV en una lista de preguntas **How Might We (HMW)** en
 
 Reglas:
 - Cada pregunta debe empezar exactamente por **"¿Cómo podríamos"** (tilde en "cómo"), seguida de un reto concreto de diseño (interfaz, contenidos, flujos, confianza, accesibilidad, prueba social, onboarding, etc.).
-- Las preguntas del bloque "clienteActual" deben derivarse **solo** del POV de clientes actuales (continuidad, confianza ya existente, experiencia en producto digital de MOA).
+- Las preguntas del bloque "clienteActual" deben derivarse **solo** del POV de clientes actuales (continuidad, confianza ya existente con Patri/MOA). **No asumas** que existe web, app o «plataforma» salvo que el POV lo mencione de forma explícita.
 - Las de "clientePotencial" **solo** del POV de potenciales (captación, dudas previas, primera impresión). Deben ser claramente distintas de las del otro bloque.
 - Evita genéricos vacíos ("¿Cómo podríamos mejorar la web?"). Sé específico al dolor/necesidad/insight del POV.
 - No copies el POV entero dentro de la pregunta; tradúcelo a retos de diseño.`,
@@ -61,7 +61,7 @@ Reglas:
   })
 
   const toPayload = (list: string[]): HMWQuestionsPayload['clienteActual'] =>
-    list.map((pregunta) => ({ pregunta, respuestas: ['', '', ''] as [string, string, string] }))
+    list.map((pregunta) => ({ pregunta, respuestas: [''] }))
 
   const payload: HMWQuestionsPayload = {
     clienteActual: toPayload(object.clienteActual),

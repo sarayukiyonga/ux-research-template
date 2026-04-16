@@ -28,7 +28,8 @@ export function UserPersonaInsightsSource({
     <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 space-y-2">
       <p className="text-xs font-semibold text-violet-800">Origen de los perfiles</p>
       <p className="text-xs text-violet-700 leading-relaxed">
-        Narrativa (motivaciones, necesidades, dolor…): <strong>insights guardados</strong> por segmento.{' '}
+        Narrativa (motivaciones, necesidades, dolor, canales y touchpoints…): <strong>insights guardados</strong> por
+        segmento.{' '}
         <strong>Edad, género y ocupación</strong> (y otros recuentos de encuesta) usan el <strong>mismo filtrado</strong>{' '}
         que en <Link href="/survey" className="underline font-medium">/survey</Link> y{' '}
         <Link href="/potential" className="underline font-medium">/potential</Link>.

@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { empathyMapToPlainText, fetchSavedEmpathyMap } from '@/lib/fetch-saved-empathy-map'
+import { sanitizeInsightsPayload } from '@/lib/insights-sanitize'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -10,19 +11,19 @@ export const maxDuration = 60
 type Segment = 'clientes' | 'potenciales'
 
 const bloqueSchema = z.object({
-  titulo: z.string().max(70).describe('Título corto del tema de insights'),
+  titulo: z.string().max(110).describe('Título corto del tema de insights'),
   items: z
-    .array(z.string().max(240))
+    .array(z.string().max(900))
     .min(3)
     .max(6)
-    .describe('3-6 hallazgos concretos y accionables para la entrenadora'),
+    .describe('3-6 hallazgos concretos y accionables; cada ítem una frase o párrafo breve COMPLETO (sin truncar a mitad).'),
 })
 
 const schema = z.object({
   resumen: z
     .string()
-    .max(450)
-    .describe('Párrafo ejecutivo que sintetiza lo más importante (máx. 450 caracteres)'),
+    .max(2800)
+    .describe('Párrafo ejecutivo que sintetiza lo más importante; texto completo, sin cortar a mitad de frase.'),
   bloques: z
     .array(bloqueSchema)
     .min(5)
@@ -77,9 +78,10 @@ Estructura de salida:
 - "resumen": síntesis ejecutiva.
 - "bloques": temas con título + lista de insights (cada uno una idea completa en una frase).
 
-PROHIBIDO en cualquier texto visible: llaves, corchetes, comillas JSON sueltas, fragmentos de código, bloques markdown con backticks, o signos de cierre duplicados al final de una frase. Solo español natural.`,
+PROHIBIDO en cualquier texto visible: llaves {}, corchetes [], comillas JSON sueltas, fragmentos como "}, {" o "'], [", bloques markdown con backticks, o pegamento de arrays. Solo español natural. No truncar frases: si un ítem es largo, que siga siendo una idea completa.`,
     prompt: `=== MAPA DE EMPATÍA (${segment === 'clientes' ? 'clientes actuales' : 'clientes potenciales'}) ===\n\n${mapaTexto}`,
   })
 
-  return NextResponse.json({ segment, ...object })
+  const cleaned = sanitizeInsightsPayload(object)
+  return NextResponse.json({ segment, ...cleaned })
 }
