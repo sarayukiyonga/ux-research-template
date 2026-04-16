@@ -1,5 +1,6 @@
 import { streamText } from 'ai'
 import { openai } from '@ai-sdk/openai'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -17,7 +18,8 @@ export async function POST(req: Request) {
     model: openai('gpt-4o-mini'),
     system: `Eres un consultor estratégico de marca y negocio especializado en centros de salud y bienestar.
 Analiza entrevistas a CEOs y fundadoras para extraer insights accionables.
-Responde siempre en español. Sé directo, concreto y orientado a la acción.`,
+Ceñe el modelo operativo a lo que **Patricia describe en la entrevista** (no proyectes un negocio “solo digital” si ella habla de presencial, grupo o espacio físico).
+Responde siempre en español. Sé directo, concreto y orientado a la acción.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
     prompt: `Analiza esta entrevista a Patricia Dorado, fundadora de MOA (centro de entrenamiento y salud en Martorell):
 
 ${content}

@@ -3,7 +3,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 
@@ -93,20 +94,10 @@ function getAuth() {
   })
 }
 
-async function getCeoInterview(): Promise<string> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: CEO_SHEET_ID,
-    range: 'A:N',
-  })
-  const rows = res.data.values ?? []
-  const dataRow = rows[1]
-  if (!dataRow) throw new Error('Sin datos en la hoja CEO')
-
-  return CEO_QUESTIONS.map((q) => {
-    const answer = dataRow[q.columnIndex]?.trim() ?? ''
-    return `[${q.themeLabel}] ${q.question}\nPatricia: "${answer}"`
-  }).join('\n\n---\n\n')
+async function requireCeoInterviewForDesign(): Promise<string> {
+  const t = await fetchCeoInterviewPlaintext()
+  if (t === '(Sin datos de entrevista CEO)') throw new Error('Sin datos en la hoja CEO')
+  return t
 }
 
 // Questions most relevant for design: how they arrived, trust, post-session feeling, group value
@@ -199,7 +190,7 @@ export async function POST(req: Request) {
   const filtersPotenciales: SurveyFilters = body.filtersPotenciales ?? body.filters ?? {}
 
   const [interview, clientVoice, potentialVoice] = await Promise.all([
-    getCeoInterview(),
+    requireCeoInterviewForDesign(),
     getClientVoice(filtersClientes),
     getPotentialVoice(filtersPotenciales),
   ])
@@ -232,6 +223,7 @@ Los principios deben ser válidos en cualquier soporte: web, app, espacio físic
 Cuando los clientes actuales y potenciales coincidan en algo, refuérzalo. Cuando haya diferencias entre lo que esperan los potenciales y lo que valoran los actuales, úsalas para afinar el principio.
 Usa las propias palabras de Patricia y de los clientes siempre que puedas.
 NO inventes nada que no se pueda trazar a las cuatro fuentes.
+${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}
 Responde siempre en español.`,
     prompt: `FUENTE 1 — ENTREVISTA A PATRICIA DORADO, FUNDADORA DE MOA:
 

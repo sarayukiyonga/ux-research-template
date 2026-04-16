@@ -2,13 +2,14 @@ import { streamText, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { NextResponse } from 'next/server'
 import { QUESTIONS } from '@/lib/questions'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const SYSTEM = `Eres un investigador UX y estratega de marca especializado en salud, bienestar y entrenamiento personal. 
 Tu tarea es crear User Personas a partir de respuestas reales de encuestas.
-Responde siempre en español. Sé empático, humano y orientado a insights accionables para la entrenadora Patri.`
+Responde siempre en español. Sé empático, humano y orientado a insights accionables para la entrenadora Patri.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 
 function buildPersonaPrompt(
   byQuestion: { questionId: number; answers: string[] }[],

@@ -1,6 +1,7 @@
 import { streamText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { QUESTIONS } from '@/lib/questions'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     system: `Eres un analista experto en bienestar, salud y entrenamiento personal. 
 Analiza las respuestas de una encuesta a clientes de una entrenadora personal especializada en personas mayores o con limitaciones físicas. 
 Sé empático, preciso y orientado a insights accionables para la entrenadora.
-Responde siempre en español.`,
+Responde siempre en español.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
     prompt: `Pregunta de la encuesta: "${question.title}"
 
 Respuestas de los ${answers.length} participantes:

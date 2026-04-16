@@ -16,6 +16,8 @@ import {
   type HMWRespuestaMarca,
   normalizeHmwPayload,
   mergeHmwRegeneratedPreservingAnswers,
+  mergeHmwRegeneratedPreservingAnswersOneBlock,
+  normalizeHmwItemArray,
 } from '@/lib/hmw-payload'
 
 export type { HMWQuestionsPayload, HMWItem, HMWRespuestaMarca } from '@/lib/hmw-payload'
@@ -113,6 +115,12 @@ function HMWListBlock({
   onPickMejorIa,
   pendingMejorIaKey,
   iaBusy,
+  preguntasGenError,
+  onDismissPreguntasGenError,
+  onRegeneratePreguntas,
+  generatingPreguntas,
+  onGenerarRespuestasIa,
+  generatingRespuestasIa,
 }: {
   title: string
   accent: 'indigo' | 'violet'
@@ -148,6 +156,12 @@ function HMWListBlock({
   onPickMejorIa: (block: 'clienteActual' | 'clientePotencial', questionIndex: number) => void
   pendingMejorIaKey: string | null
   iaBusy: boolean
+  preguntasGenError: string | null
+  onDismissPreguntasGenError: () => void
+  onRegeneratePreguntas: () => void
+  generatingPreguntas: boolean
+  onGenerarRespuestasIa: () => void
+  generatingRespuestasIa: boolean
 }) {
   const [editingPreguntaIndex, setEditingPreguntaIndex] = useState<number | null>(null)
   const preguntaBackupRef = useRef('')
@@ -213,6 +227,44 @@ function HMWListBlock({
           title="Añadir pregunta"
         >
           <PlusIcon className="h-4 w-4" />
+        </button>
+      </div>
+      {preguntasGenError ? (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="min-w-0">{preguntasGenError}</p>
+          <button
+            type="button"
+            onClick={onDismissPreguntasGenError}
+            className="shrink-0 self-start sm:self-auto text-[11px] font-semibold underline underline-offset-2 text-red-800"
+          >
+            Cerrar
+          </button>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void onRegeneratePreguntas()}
+          disabled={iaBusy || generatingPreguntas}
+          className={`text-[11px] sm:text-xs px-2.5 py-1.5 rounded-full font-medium transition-colors disabled:opacity-45 disabled:pointer-events-none ${
+            accent === 'indigo'
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-violet-600 text-white hover:bg-violet-700'
+          }`}
+        >
+          {generatingPreguntas ? '…' : '↺'} Regenerar preguntas (este bloque)
+        </button>
+        <button
+          type="button"
+          onClick={() => void onGenerarRespuestasIa()}
+          disabled={iaBusy || generatingRespuestasIa}
+          className={`text-[11px] sm:text-xs px-2.5 py-1.5 rounded-full font-medium border transition-colors disabled:opacity-45 disabled:pointer-events-none ${
+            accent === 'indigo'
+              ? 'border-indigo-200 text-indigo-800 bg-white hover:bg-indigo-50'
+              : 'border-violet-200 text-violet-900 bg-white hover:bg-violet-50'
+          }`}
+        >
+          {generatingRespuestasIa ? '…' : '✦'} Respuestas (IA, este bloque)
         </button>
       </div>
       {items.length === 0 ? (
@@ -387,9 +439,18 @@ export function HMWPage() {
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  /** Ámbito del último error al regenerar preguntas (solo UI). */
+  const [genErrorScope, setGenErrorScope] = useState<'clienteActual' | 'clientePotencial' | 'both' | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
   const [povOk, setPovOk] = useState(false)
-  const [generatingRespuestasIa, setGeneratingRespuestasIa] = useState(false)
+  /** null | bloque | 'both' = regenerar preguntas en los dos bloques a la vez. */
+  const [generatingQuestionsBlock, setGeneratingQuestionsBlock] = useState<
+    null | 'clienteActual' | 'clientePotencial' | 'both'
+  >(null)
+  /** null | bloque | 'both' = generar respuestas IA en ambos bloques. */
+  const [generatingRespuestasBlock, setGeneratingRespuestasBlock] = useState<
+    null | 'clienteActual' | 'clientePotencial' | 'both'
+  >(null)
   const [respuestasIaError, setRespuestasIaError] = useState<string | null>(null)
   const [pendingMejorIaKey, setPendingMejorIaKey] = useState<string | null>(null)
   const [mejorIaError, setMejorIaError] = useState<string | null>(null)
@@ -680,9 +741,11 @@ export function HMWPage() {
     [saveQuestions]
   )
 
+  /** Primera generación: ambos bloques, sin datos previos en pantalla. */
   const generate = async () => {
     setGenerating(true)
     setGenError(null)
+    setGenErrorScope(null)
     try {
       const res = await fetch('/api/hmw', { method: 'POST' })
       const d = await res.json().catch(() => ({}))
@@ -709,10 +772,120 @@ export function HMWPage() {
     }
   }
 
-  const generateRespuestasIa = async () => {
+  const generatePreguntasForBlock = async (block: 'clienteActual' | 'clientePotencial') => {
+    setGeneratingQuestionsBlock(block)
+    setGenError(null)
+    setGenErrorScope(null)
+    try {
+      const res = await fetch('/api/hmw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segmento: block }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar las preguntas HMW.')
+        setGenErrorScope(block)
+        return
+      }
+      const rawArr = (d as Record<string, unknown>)[block]
+      if (!Array.isArray(rawArr)) {
+        setGenError('La respuesta de la IA no tenía el formato esperado.')
+        setGenErrorScope(block)
+        return
+      }
+      const fresh = normalizeHmwItemArray(rawArr)
+      if (fresh.length === 0) {
+        setGenError('La IA no devolvió preguntas para este bloque.')
+        setGenErrorScope(block)
+        return
+      }
+      const merged = mergeHmwRegeneratedPreservingAnswersOneBlock(block, fresh, questionsRef.current)
+      setQuestions(merged)
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      await saveQuestions(merged)
+    } catch {
+      setGenError('No se pudieron generar las preguntas HMW. Inténtalo de nuevo.')
+      setGenErrorScope(block)
+    } finally {
+      setGeneratingQuestionsBlock(null)
+    }
+  }
+
+  const generatePreguntasBothBlocks = async () => {
+    setGeneratingQuestionsBlock('both')
+    setGenError(null)
+    setGenErrorScope(null)
+    try {
+      const res = await fetch('/api/hmw', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenError(typeof d.error === 'string' ? d.error : 'No se pudieron generar las preguntas HMW.')
+        setGenErrorScope('both')
+        return
+      }
+      const fromApi = normalizeHmwPayload(d)
+      if (!fromApi) {
+        setGenError('La respuesta de la IA no tenía el formato esperado.')
+        setGenErrorScope('both')
+        return
+      }
+      const merged = mergeHmwRegeneratedPreservingAnswers(fromApi, questionsRef.current)
+      setQuestions(merged)
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      await saveQuestions(merged)
+    } catch {
+      setGenError('No se pudieron generar las preguntas HMW. Inténtalo de nuevo.')
+      setGenErrorScope('both')
+    } finally {
+      setGeneratingQuestionsBlock(null)
+    }
+  }
+
+  const generateRespuestasIaForBlock = async (block: 'clienteActual' | 'clientePotencial') => {
     const current = questionsRef.current
     if (!current) return
-    setGeneratingRespuestasIa(true)
+    setGeneratingRespuestasBlock(block)
+    setRespuestasIaError(null)
+    try {
+      const res = await fetch('/api/hmw-respuestas-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: current, segmento: block }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRespuestasIaError(typeof d.error === 'string' ? d.error : 'No se pudieron generar las respuestas con IA.')
+        return
+      }
+      const merged = normalizeHmwPayload(d.questions)
+      if (!merged) {
+        setRespuestasIaError('La respuesta de la IA no tenía el formato esperado.')
+        return
+      }
+      setQuestions(merged)
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      await saveQuestions(merged)
+    } catch {
+      setRespuestasIaError('Error de red al generar respuestas con IA. Inténtalo de nuevo.')
+    } finally {
+      setGeneratingRespuestasBlock(null)
+    }
+  }
+
+  const generateRespuestasIaBothBlocks = async () => {
+    const current = questionsRef.current
+    if (!current) return
+    setGeneratingRespuestasBlock('both')
     setRespuestasIaError(null)
     try {
       const res = await fetch('/api/hmw-respuestas-ia', {
@@ -739,7 +912,7 @@ export function HMWPage() {
     } catch {
       setRespuestasIaError('Error de red al generar respuestas con IA. Inténtalo de nuevo.')
     } finally {
-      setGeneratingRespuestasIa(false)
+      setGeneratingRespuestasBlock(null)
     }
   }
 
@@ -791,7 +964,11 @@ export function HMWPage() {
     []
   )
 
-  const iaBusy = generatingRespuestasIa || pendingMejorIaKey !== null
+  const iaBusy =
+    generating ||
+    generatingQuestionsBlock !== null ||
+    generatingRespuestasBlock !== null ||
+    pendingMejorIaKey !== null
 
   if (loadingSaved) {
     return (
@@ -824,7 +1001,7 @@ export function HMWPage() {
     )
   }
 
-  if (genError) {
+  if (genError && !questions) {
     return (
       <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-sm text-red-600">{genError}</p>
@@ -908,8 +1085,9 @@ export function HMWPage() {
         </p>
         <p className="text-xs text-gray-500">
           Puedes añadir retos con el +, editar con el lápiz o borrar con la papelera; por pregunta hay al menos una
-          respuesta y puedes sumar más con el + bajo los textos (máx. {HMW_RESPUESTAS_MAX}). El botón «Generar
-          respuestas (IA)» usa los{' '}
+          respuesta y puedes sumar más con el + bajo los textos (máx. {HMW_RESPUESTAS_MAX}). En cada columna puedes
+          regenerar **solo ese bloque** o generar **respuestas IA solo para ese bloque**; arriba siguen los atajos para
+          **ambos bloques a la vez**. La IA de respuestas usa los{' '}
           <Link href="/empathy" className="font-semibold text-indigo-600 underline underline-offset-2">
             mapas de empatía
           </Link>
@@ -981,8 +1159,33 @@ export function HMWPage() {
         </div>
       ) : null}
 
+      {genError && genErrorScope === 'both' ? (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p>{genError}</p>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => void generatePreguntasBothBlocks()}
+              className="text-[11px] font-semibold underline underline-offset-2 text-red-900"
+            >
+              Reintentar (ambos bloques)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGenError(null)
+                setGenErrorScope(null)
+              }}
+              className="text-[11px] font-semibold underline underline-offset-2 text-red-700"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-xs text-gray-400 flex items-center gap-1.5">
+        <span className="text-xs text-gray-400 flex flex-wrap items-center gap-x-3 gap-y-1">
           {saving ? (
             <>
               <span className="inline-block h-3 w-3 border border-gray-300 border-t-indigo-400 rounded-full animate-spin" />
@@ -994,13 +1197,35 @@ export function HMWPage() {
               Guardado en Sheets · {savedAt}
             </>
           ) : null}
-          {generatingRespuestasIa ? (
+          {generatingRespuestasBlock ? (
             <>
               <span className="inline-block h-3 w-3 border border-gray-300 border-t-violet-500 rounded-full animate-spin" />
-              <span className="text-violet-600">Generando respuestas con IA…</span>
+              <span className="text-violet-600">
+                Generando respuestas (IA)
+                {generatingRespuestasBlock === 'both'
+                  ? ' · ambos bloques'
+                  : generatingRespuestasBlock === 'clienteActual'
+                    ? ' · clientes actuales'
+                    : ' · clientes potenciales'}
+                …
+              </span>
             </>
           ) : null}
-          {pendingMejorIaKey && !generatingRespuestasIa ? (
+          {generatingQuestionsBlock ? (
+            <>
+              <span className="inline-block h-3 w-3 border border-gray-300 border-t-indigo-400 rounded-full animate-spin" />
+              <span className="text-indigo-600">
+                Regenerando preguntas
+                {generatingQuestionsBlock === 'both'
+                  ? ' · ambos bloques'
+                  : generatingQuestionsBlock === 'clienteActual'
+                    ? ' · clientes actuales'
+                    : ' · clientes potenciales'}
+                …
+              </span>
+            </>
+          ) : null}
+          {pendingMejorIaKey && !generatingRespuestasBlock ? (
             <>
               <span className="inline-block h-3 w-3 border border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
               <span className="text-emerald-700">Elegiendo mejor respuesta…</span>
@@ -1010,19 +1235,19 @@ export function HMWPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => void generateRespuestasIa()}
+            onClick={() => void generateRespuestasIaBothBlocks()}
             disabled={iaBusy}
             className="text-xs px-3 py-1.5 rounded-full bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:pointer-events-none"
           >
-            ✦ Generar respuestas (IA)
+            ✦ Respuestas (IA) — ambos bloques
           </button>
           <button
             type="button"
-            onClick={() => void generate()}
+            onClick={() => void generatePreguntasBothBlocks()}
             disabled={iaBusy}
             className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-45 disabled:pointer-events-none"
           >
-            ↺ Regenerar preguntas
+            ↺ Preguntas — ambos bloques
           </button>
         </div>
       </div>
@@ -1044,6 +1269,19 @@ export function HMWPage() {
           onPickMejorIa={(b, qi) => void pickMejorRespuestaIa(b, qi)}
           pendingMejorIaKey={pendingMejorIaKey}
           iaBusy={iaBusy}
+          preguntasGenError={genError && genErrorScope === 'clienteActual' ? genError : null}
+          onDismissPreguntasGenError={() => {
+            setGenError(null)
+            setGenErrorScope(null)
+          }}
+          onRegeneratePreguntas={() => void generatePreguntasForBlock('clienteActual')}
+          generatingPreguntas={
+            generatingQuestionsBlock === 'clienteActual' || generatingQuestionsBlock === 'both'
+          }
+          onGenerarRespuestasIa={() => void generateRespuestasIaForBlock('clienteActual')}
+          generatingRespuestasIa={
+            generatingRespuestasBlock === 'clienteActual' || generatingRespuestasBlock === 'both'
+          }
         />
         <HMWListBlock
           title="Clientes potenciales"
@@ -1061,6 +1299,19 @@ export function HMWPage() {
           onPickMejorIa={(b, qi) => void pickMejorRespuestaIa(b, qi)}
           pendingMejorIaKey={pendingMejorIaKey}
           iaBusy={iaBusy}
+          preguntasGenError={genError && genErrorScope === 'clientePotencial' ? genError : null}
+          onDismissPreguntasGenError={() => {
+            setGenError(null)
+            setGenErrorScope(null)
+          }}
+          onRegeneratePreguntas={() => void generatePreguntasForBlock('clientePotencial')}
+          generatingPreguntas={
+            generatingQuestionsBlock === 'clientePotencial' || generatingQuestionsBlock === 'both'
+          }
+          onGenerarRespuestasIa={() => void generateRespuestasIaForBlock('clientePotencial')}
+          generatingRespuestasIa={
+            generatingRespuestasBlock === 'clientePotencial' || generatingRespuestasBlock === 'both'
+          }
         />
       </div>
 

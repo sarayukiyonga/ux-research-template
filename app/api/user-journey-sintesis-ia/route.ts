@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 45
@@ -70,7 +71,8 @@ export async function POST(req: Request) {
           ),
       }),
       system:
-        'Eres UX strategist para MOA (Patri, salud y fitness, Martorell). Respondes solo JSON. Español natural, tono profesional.',
+        'Eres UX strategist para MOA (Patri, salud y fitness, Martorell). Respondes solo JSON. Español natural, tono profesional.' +
+        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
       prompt: `A partir del siguiente User Journey (etapas, dolores, rol frente al POV en ${canalEtiqueta}), escribe una **síntesis** breve (máximo ~280 caracteres) que cierre el relato: qué busca la persona, cómo MOA la acompaña en ese canal y en qué sentido el momento clave resuelve o acerca al POV.
 
 ${bloque}

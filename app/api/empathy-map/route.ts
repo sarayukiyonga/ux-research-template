@@ -3,7 +3,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 
@@ -98,18 +99,6 @@ const schema = z.object({
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-async function getCeoInterview(): Promise<string> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: CEO_SHEET_ID, range: 'A:N' })
-  const rows = res.data.values ?? []
-  const dataRow = rows[1]
-  if (!dataRow) return '(Sin datos de entrevista CEO)'
-  return CEO_QUESTIONS.map((q) => {
-    const answer = dataRow[q.columnIndex]?.trim() ?? ''
-    return `[${q.themeLabel}] ${q.question}\nPatricia: "${answer}"`
-  }).join('\n\n---\n\n')
-}
-
 const CLIENT_EMPATHY_COLS: { title: string; colIndex: number }[] = [
   { title: '¿Qué te decían los médicos o tu entorno sobre tu salud antes de conocer a la entrenadora?', colIndex: 5 },
   { title: '¿Qué actividad te costaba más realizar antes de empezar a entrenar?', colIndex: 6 },
@@ -201,7 +190,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'segment requerido: clientes | potenciales' }, { status: 400 })
   }
 
-  const interview = await getCeoInterview()
+  const interview = await fetchCeoInterviewPlaintext()
   const surveyVoice =
     segment === 'clientes' ? await getClientVoice(filters) : await getPotentialVoice(filters)
 
@@ -215,7 +204,7 @@ export async function POST(req: Request) {
     schema,
     system: `Eres un UX researcher experto en mapas de empatía aplicados a marcas de salud y bienestar.
 Construyes UN mapa de empatía para MOA (entrenadora personal de salud en Martorell) usando:
-1. Entrevista a Patricia Dorado (contexto de marca y visión; úsala con moderación, sin sustituir la voz del encuestado).
+1. Entrevista a Patricia Dorado (cómo opera MOA, tono de marca, **peso presencial vs online**; fuente de verdad operativa — **no la contradigas**; sin sustituir la voz literal del encuestado en las notas).
 2. ${audiencia}
 
 INSTRUCCIONES PARA CADA SECCIÓN:
@@ -231,7 +220,7 @@ FORMATO DE CADA NOTA:
 - Máximo 80 caracteres por nota
 - Directas y concretas, no abstractas
 - En primera persona o como cita cuando sea posible
-- Sin repetición entre secciones`,
+- Sin repetición entre secciones${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
     prompt: `=== ENTREVISTA A LA FUNDADORA (contexto) ===\n${interview}\n\n=== VOZ DE ENCUESTA (${segment === 'clientes' ? 'CLIENTES ACTUALES' : 'CLIENTES POTENCIALES'}) ===\n${surveyVoice}`,
   })
 

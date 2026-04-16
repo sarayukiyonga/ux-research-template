@@ -9,7 +9,7 @@ export const JOURNEY_BASE_CANAL_ID = 'journey_base' as const
 export const USER_JOURNEY_CANALES = [
   {
     id: 'web',
-    label: 'Web (moa.cat)',
+    label: 'web',
     descripcionCorta: 'el sitio web',
     focoExperiencia:
       'navegación por páginas, formularios, CTAs, testimonios en pantalla y abandono o cierre de la visita en el navegador',
@@ -84,6 +84,18 @@ const JOURNEY_BASE_DEF: JourneyCanalDef = {
 
 export function defaultJourneyCanalCatalogo(): JourneyCanalDef[] {
   return [JOURNEY_BASE_DEF, ...USER_JOURNEY_CANALES.map((c) => ({ id: c.id, label: c.label, esPreset: true }))]
+}
+
+/** Alinea etiquetas de presets con el código (p. ej. tras renombrar un canal) sin tocar canales personalizados. */
+export function syncPresetCanalLabelsInCatalog(catalogo: JourneyCanalDef[]): JourneyCanalDef[] {
+  return catalogo.map((c) => {
+    if (c.id === JOURNEY_BASE_CANAL_ID) {
+      return { ...c, label: JOURNEY_BASE_DEF.label, esPreset: true }
+    }
+    const preset = USER_JOURNEY_CANALES.find((p) => p.id === c.id)
+    if (preset) return { ...c, label: preset.label, esPreset: true }
+    return c
+  })
 }
 
 /** Asegura el canal base en catálogos guardados antes de existir `journey_base`. */

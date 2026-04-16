@@ -3,7 +3,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS, QUESTIONS } from '@/lib/questions'
 import {
   POTENTIAL_SHEET_ID,
@@ -332,18 +333,6 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
   return lines.join('\n\n')
 }
 
-async function getCeoInterview(): Promise<string> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: CEO_SHEET_ID, range: 'A:N' })
-  const rows = res.data.values ?? []
-  const dataRow = rows[1]
-  if (!dataRow) return '(Sin datos de entrevista)'
-  return CEO_QUESTIONS.map((q) => {
-    const answer = dataRow[q.columnIndex]?.trim() ?? ''
-    return `[${q.themeLabel}] ${q.question}\nPatricia: "${answer}"`
-  }).join('\n\n---\n\n')
-}
-
 const ERR: Record<string, string> = {
   no_sheet: 'No hay hoja de insights guardados para este segmento.',
   empty: 'Los insights guardados están vacíos. Genera y guarda insights en la página Insights.',
@@ -357,7 +346,7 @@ export async function POST(req: Request) {
   const filtersPotenciales: SurveyFilters = body.filtersPotenciales ?? body.filters ?? {}
 
   const [interview, insClientes, insPotenciales, ctxClientes, ctxPotenciales] = await Promise.all([
-    getCeoInterview(),
+    fetchCeoInterviewPlaintext(),
     fetchSavedInsights('clientes'),
     fetchSavedInsights('potenciales'),
     buildClientSurveyContext(filtersClientes),
@@ -388,14 +377,14 @@ export async function POST(req: Request) {
 Fuentes por persona:
 1) INSIGHTS guardados del segmento → motivaciones, necesidades, dolor, tono, tags, frase.
 2) DATOS ENCUESTA FILTRADOS del mismo segmento → **edad** y **genero** del schema deben ceñirse a la moda y franjas recuentes indicadas ahí (GÉNERO_MODA, EDAD_FRANJA_MODA / sugerencia entera). Ocupación/educación/ubicación: prioriza hechos de la encuesta cuando existan (p. ej. ocupaciones citadas); si no hay dato, infiere con moderación coherente con insights + entrevista.
-3) Entrevista a Patricia → contexto de marca y matices.
+3) Entrevista a Patricia → contexto de marca, **cómo se presta el servicio** (presencial vs online) y matices; **no la contradigas** con suposiciones de negocio digital.
 
 "clienteActual" solo mezcla INSIGHTS clientes + ENCUESTA clientes + entrevista. No uses el bloque de potenciales.
 "clientePotencial" solo mezcla INSIGHTS potenciales + ENCUESTA potenciales + entrevista.
 
 Los dos perfiles deben distinguirse claramente. Español natural. Nombres locales plausibles.
 
-Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).`,
+Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
     prompt: `=== ENTREVISTA — PATRICIA / MOA ===\n${interview}
 
 === DATOS ENCUESTA FILTRADOS — CLIENTES ACTUALES (demografía y muestras; mismo corte que en /survey) ===

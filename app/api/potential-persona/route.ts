@@ -2,13 +2,14 @@ import { streamText, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { NextResponse } from 'next/server'
 import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const SYSTEM = `Eres un investigador UX especializado en salud y bienestar. 
 Analizas encuestas a clientes potenciales para crear perfiles de buyer persona útiles para diseño web y estrategia de captación.
-Responde siempre en español. Sé concreto y basa todo en las respuestas reales.`
+Responde siempre en español. Sé concreto y basa todo en las respuestas reales.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 
 function buildPotentialPersonaPrompt(
   byQuestion: { questionId: number; answers: string[] }[],

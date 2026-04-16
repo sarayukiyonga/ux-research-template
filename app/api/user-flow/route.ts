@@ -16,6 +16,7 @@ import {
 } from '@/lib/user-journey-persist'
 import { userFlowLineSchema, normalizeUserFlowLine } from '@/lib/user-flow-tree'
 import { getCanalPromptFields } from '@/lib/user-journey-channels'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -57,7 +58,8 @@ Reglas:
 - Responde en español.
 - Incluye **al menos una decisión** en el árbol.
 - Como máximo **2 decisiones** en cadena por rama.
-- Los **orden** de los pasos del diagrama deben poder seguir la **secuencia de orden de etapas** del journey (puedes agrupar dos etapas en un solo rectángulo si es un mismo paso, pero indícalo en la descripción).`
+- Los **orden** de los pasos del diagrama deben poder seguir la **secuencia de orden de etapas** del journey (puedes agrupar dos etapas en un solo rectángulo si es un mismo paso, pero indícalo en la descripción).
+${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 }
 
 async function generateOneFlow(opts: {

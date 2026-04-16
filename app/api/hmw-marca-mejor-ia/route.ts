@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { HMW_MARCA_MOTIVO_MAX_LEN, HMW_RESPUESTAS_MAX, normalizeHmwPayload } from '@/lib/hmw-payload'
 import { hmwIaContextToMarkdown, loadHmwIaContextOrFail } from '@/lib/hmw-ia-context'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 45
@@ -103,7 +104,8 @@ Elige **un solo** \`mejorIndice\`: la respuesta que mejor equilibre **impacto pa
       model: openai('gpt-4o-mini'),
       schema,
       system:
-        'Eres diseñador de producto en MOA (Patri, Martorell). Devuelves solo el JSON pedido. español neutro. No inventas activos digitales (web, app, plataforma) que no consten en el contexto del usuario.',
+        'Eres diseñador de producto en MOA (Patri, Martorell). Devuelves solo el JSON pedido. español neutro. No inventas activos digitales (web, app, plataforma) que no consten en el contexto del usuario.' +
+        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
       prompt,
     })
 

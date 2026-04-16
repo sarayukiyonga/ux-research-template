@@ -6,6 +6,7 @@ import {
   defaultJourneyCanalCatalogo,
   ensureBaseChannelInCatalog,
   isKnownUserJourneyCanalId,
+  syncPresetCanalLabelsInCatalog,
   type JourneyCanalDef,
   normalizeCanalInCatalog,
 } from '@/lib/user-journey-channels'
@@ -128,8 +129,8 @@ export function createEmptyJourneyV3(): UserJourneyV3Persist {
 
 /** Catálogos guardados antes de `journey_base`: añade el canal base y normaliza el activo. */
 export function withJourneyBaseInCatalogs(v3: UserJourneyV3Persist): UserJourneyV3Persist {
-  const caCat = ensureBaseChannelInCatalog(v3.clienteActual.catalogo)
-  const cpCat = ensureBaseChannelInCatalog(v3.clientePotencial.catalogo)
+  const caCat = syncPresetCanalLabelsInCatalog(ensureBaseChannelInCatalog(v3.clienteActual.catalogo))
+  const cpCat = syncPresetCanalLabelsInCatalog(ensureBaseChannelInCatalog(v3.clientePotencial.catalogo))
   return {
     ...v3,
     clienteActual: {

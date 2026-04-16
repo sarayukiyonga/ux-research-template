@@ -974,6 +974,22 @@ export function UserPersonaPage() {
       {/* Persona cards */}
       <PersonaCard persona={personas.clienteActual} type="clienteActual" onSavePersona={(p) => savePersonaSegment('clienteActual', p)} />
       <PersonaCard persona={personas.clientePotencial} type="clientePotencial" onSavePersona={(p) => savePersonaSegment('clientePotencial', p)} />
+
+      <div className="rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-sm text-violet-950">
+          <p className="font-semibold text-violet-900">Siguiente paso</p>
+          <p className="text-xs text-violet-800/90 mt-1 leading-relaxed">
+            Define los <strong>POV</strong> (punto de vista) para cliente actual y potencial: encajan con las personas y
+            los usarás en HMW, User Journey y User Flow.
+          </p>
+        </div>
+        <Link
+          href="/pov"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition-colors"
+        >
+          Ir a POV →
+        </Link>
+      </div>
     </div>
   )
 }

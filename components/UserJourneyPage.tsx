@@ -11,6 +11,7 @@ import {
   JOURNEY_BASE_CANAL_ID,
   defaultJourneyCanalCatalogo,
   getCanalPromptFields,
+  isKnownUserJourneyCanalId,
   normalizeCanalInCatalog,
   newCustomJourneyCanalId,
 } from '@/lib/user-journey-channels'
@@ -101,6 +102,15 @@ function PencilIcon({ className }: { className?: string }) {
   )
 }
 
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
 function TrashIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
@@ -113,6 +123,14 @@ function TrashIcon({ className }: { className?: string }) {
   )
 }
 
+/** Canal borrable: explícitamente propio, o sin marca de preset y no es id de preset del sistema. */
+function isRemovableCustomCanal(c: { id: string; esPreset?: boolean }): boolean {
+  if (c.esPreset === true) return false
+  if (c.esPreset === false) return true
+  if (c.id === JOURNEY_BASE_CANAL_ID || isKnownUserJourneyCanalId(c.id)) return false
+  return true
+}
+
 function SegmentCanalPanel({
   persist,
   segmento,
@@ -121,6 +139,7 @@ function SegmentCanalPanel({
   onSelectSegment,
   onSelectCanal,
   onAddCustomCanal,
+  onRemoveCanal,
   disabled,
 }: {
   persist: UserJourneyV3Persist
@@ -130,6 +149,7 @@ function SegmentCanalPanel({
   onSelectSegment: (s: UserJourneySegmento) => void
   onSelectCanal: (id: string) => void
   onAddCustomCanal: () => void
+  onRemoveCanal: (id: string) => void
   disabled?: boolean
 }) {
   const seg = persist[segmento]
@@ -147,7 +167,8 @@ function SegmentCanalPanel({
         <p className="text-xs text-gray-500 mt-1 leading-relaxed">
           <strong>Recorrido base</strong>: mapa end-to-end sin un solo medio (HMW + persona + POV). Los demás canales
           detallan la experiencia en <strong>cada medio</strong> (web, WhatsApp, etc.). Puedes añadir canales
-          personalizados. El <strong>User Flow</strong> usa el canal guardado <strong>por segmento</strong>.
+          personalizados y borrarlos con la <strong className="font-semibold">X</strong> (solo los propios). El{' '}
+          <strong>User Flow</strong> usa el canal guardado <strong>por segmento</strong>.
         </p>
       </div>
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Segmento">
@@ -182,20 +203,49 @@ function SegmentCanalPanel({
           {seg.catalogo.map((c) => {
             const tiene = Boolean(seg.mapas[c.id])
             const active = seg.canalActivoId === c.id
+            const esPropio = isRemovableCustomCanal(c)
+            const pillClass = `text-xs font-medium rounded-full border transition-colors ${
+              active ? tabOn : tabOff
+            } ${disabled ? 'opacity-45' : ''} ${tiene && !active ? 'border-dashed border-gray-300' : ''}`
             return (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                disabled={disabled}
-                onClick={() => onSelectCanal(c.id)}
-                className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
-                  active ? tabOn : tabOff
-                } ${disabled ? 'opacity-45 pointer-events-none' : ''} ${tiene && !active ? 'border-dashed border-gray-300' : ''}`}
+                className={`inline-flex max-w-full items-stretch overflow-hidden rounded-full ${pillClass} ${
+                  disabled ? 'pointer-events-none' : ''
+                }`}
               >
-                {c.label}
-                {c.esPreset ? null : <span className="text-gray-400"> · propio</span>}
-                {tiene ? <span className={accent === 'teal' ? 'text-teal-800' : 'text-orange-900'}> · mapa</span> : null}
-              </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onSelectCanal(c.id)}
+                  className={`min-w-0 flex-1 px-3 py-1.5 text-left ${active ? '' : 'hover:bg-gray-50'}`}
+                >
+                  <span className="font-medium">{c.label}</span>
+                  {esPropio ? <span className="text-gray-400"> · propio</span> : null}
+                  {tiene ? (
+                    <span className={accent === 'teal' ? 'text-teal-800' : 'text-orange-900'}> · mapa</span>
+                  ) : null}
+                </button>
+                {esPropio ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    title={`Eliminar canal «${c.label}»`}
+                    aria-label={`Eliminar canal ${c.label}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemoveCanal(c.id)
+                    }}
+                    className={`shrink-0 border-l border-black/10 px-2 flex items-center justify-center transition-colors ${
+                      accent === 'teal'
+                        ? 'text-teal-800 hover:bg-teal-100/80 active:bg-teal-200/80'
+                        : 'text-orange-950 hover:bg-orange-100/80 active:bg-orange-200/80'
+                    } ${active ? '' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
             )
           })}
         </div>
@@ -621,6 +671,33 @@ export function UserJourneyPage() {
     await savePersist(next)
   }
 
+  const handleRemoveCanal = async (canalId: string) => {
+    if (!persist) return
+    const seg = persist[segmento]
+    const canal = seg.catalogo.find((c) => c.id === canalId)
+    if (!canal || !isRemovableCustomCanal(canal)) return
+    if (!window.confirm(`¿Eliminar el canal «${canal.label}»? Se borrará también el mapa guardado para este canal en este segmento.`)) {
+      return
+    }
+    const newCatalogo = seg.catalogo.filter((c) => c.id !== canalId)
+    const newMapas = { ...seg.mapas }
+    delete newMapas[canalId]
+    const preferido =
+      seg.canalActivoId === canalId ? JOURNEY_BASE_CANAL_ID : seg.canalActivoId
+    const canalActivoId = normalizeCanalInCatalog(preferido, newCatalogo)
+    const next: UserJourneyV3Persist = {
+      ...persist,
+      [segmento]: {
+        ...seg,
+        catalogo: newCatalogo,
+        canalActivoId,
+        mapas: newMapas,
+      },
+    }
+    setPersist(next)
+    await savePersist(next)
+  }
+
   const commitJourney = async (nextJourney: JourneyForPersona) => {
     if (!persist) return
     const seg = persist[segmento]
@@ -788,6 +865,7 @@ export function UserJourneyPage() {
           onSelectSegment={() => {}}
           onSelectCanal={() => {}}
           onAddCustomCanal={() => {}}
+          onRemoveCanal={() => {}}
           disabled
         />
         <div className="text-center space-y-2 py-4">
@@ -812,6 +890,7 @@ export function UserJourneyPage() {
           onSelectSegment={(s) => void handleSelectSegment(s)}
           onSelectCanal={(id) => void handleSelectCanal(id)}
           onAddCustomCanal={() => void handleAddCustomCanal()}
+          onRemoveCanal={(id) => void handleRemoveCanal(id)}
         />
         <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-sm text-red-600">{genError}</p>
@@ -863,6 +942,7 @@ export function UserJourneyPage() {
           onSelectSegment={(s) => void handleSelectSegment(s)}
           onSelectCanal={(id) => void handleSelectCanal(id)}
           onAddCustomCanal={() => void handleAddCustomCanal()}
+          onRemoveCanal={(id) => void handleRemoveCanal(id)}
         />
         {intro}
         {(!depsOk.persona || !depsOk.pov) && (
@@ -901,6 +981,7 @@ export function UserJourneyPage() {
         onSelectSegment={(s) => void handleSelectSegment(s)}
         onSelectCanal={(id) => void handleSelectCanal(id)}
         onAddCustomCanal={() => void handleAddCustomCanal()}
+        onRemoveCanal={(id) => void handleRemoveCanal(id)}
       />
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex flex-wrap items-center justify-between gap-2">
         <p>

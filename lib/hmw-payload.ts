@@ -136,6 +136,12 @@ function normalizeBlock(arr: unknown[]): HMWItem[] {
   return arr.map(itemFromUnknown).filter((x): x is HMWItem => x != null)
 }
 
+/** Normaliza un solo array de ítems HMW (p. ej. respuesta parcial de la API). */
+export function normalizeHmwItemArray(arr: unknown): HMWItem[] {
+  if (!Array.isArray(arr)) return []
+  return normalizeBlock(arr)
+}
+
 /** Acepta JSON guardado antiguo (solo string[]) o nuevo ({ pregunta, respuestas }). */
 export function normalizeHmwPayload(raw: unknown): HMWQuestionsPayload | null {
   if (!raw || typeof raw !== 'object') return null
@@ -182,6 +188,17 @@ export function mergeHmwRegeneratedPreservingAnswers(
     clienteActual: block(fresh.clienteActual, previous.clienteActual),
     clientePotencial: block(fresh.clientePotencial, previous.clientePotencial),
   }
+}
+
+/** Tras regenerar solo un bloque de preguntas, conserva respuestas/marcas alineadas por índice de pregunta. */
+export function mergeHmwRegeneratedPreservingAnswersOneBlock(
+  block: 'clienteActual' | 'clientePotencial',
+  freshBlock: HMWItem[],
+  previous: HMWQuestionsPayload | null
+): HMWQuestionsPayload {
+  const prev = previous ?? { clienteActual: [], clientePotencial: [] }
+  const freshFull: HMWQuestionsPayload = { ...prev, [block]: freshBlock }
+  return mergeHmwRegeneratedPreservingAnswers(freshFull, prev)
 }
 
 export function hmwBlockToPlainTextForJourney(items: HMWItem[], titulo: string): string {

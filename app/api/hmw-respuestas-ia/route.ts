@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { hmwIaContextToMarkdown, loadHmwIaContextOrFail } from '@/lib/hmw-ia-context'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import {
   HMW_MARCA_MOTIVO_MAX_LEN,
   HMW_RESPUESTAS_MAX,
@@ -76,24 +77,23 @@ function padQuestionsToIaSlots(q: HMWQuestionsPayload): HMWQuestionsPayload {
   }
 }
 
+type AiRespuestasRow = {
+  respuestas: string[]
+  respuestasMarcas: Array<z.infer<typeof marcaIaSchema>>
+  respuestasMarcaMotivos: string[]
+}
+
 function mergeRespuestasFromAi(
   target: HMWQuestionsPayload,
   ai: {
-    clienteActual: Array<{
-      respuestas: string[]
-      respuestasMarcas: Array<z.infer<typeof marcaIaSchema>>
-      respuestasMarcaMotivos: string[]
-    }>
-    clientePotencial: Array<{
-      respuestas: string[]
-      respuestasMarcas: Array<z.infer<typeof marcaIaSchema>>
-      respuestasMarcaMotivos: string[]
-    }>
-  }
+    clienteActual?: AiRespuestasRow[]
+    clientePotencial?: AiRespuestasRow[]
+  },
+  onlyBlock?: 'clienteActual' | 'clientePotencial' | null
 ): HMWQuestionsPayload {
   const mapBlock = (block: 'clienteActual' | 'clientePotencial') =>
     target[block].map((it, i) => {
-      const row = ai[block][i]
+      const row = ai[block]?.[i]
       const got = [...(row?.respuestas ?? [])]
       while (got.length < HMW_RESPUESTAS_MAX) got.push('')
       got.length = HMW_RESPUESTAS_MAX
@@ -118,6 +118,13 @@ function mergeRespuestasFromAi(
       else delete next.respuestasMarcaMotivos
       return next
     })
+
+  if (onlyBlock === 'clienteActual' || onlyBlock === 'clientePotencial') {
+    return {
+      ...target,
+      [onlyBlock]: mapBlock(onlyBlock),
+    }
+  }
   return {
     clienteActual: mapBlock('clienteActual'),
     clientePotencial: mapBlock('clientePotencial'),
@@ -141,11 +148,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cuerpo JSON no válido.' }, { status: 400 })
   }
 
-  const rawQuestions = (body as Record<string, unknown>)?.questions
+  const rawBody = body as Record<string, unknown>
+  const rawQuestions = rawBody?.questions
   const questions = normalizeHmwPayload(rawQuestions)
   if (!questions) {
     return NextResponse.json({ error: 'Falta "questions" con el HMW actual o el formato no es válido.' }, { status: 400 })
   }
+
+  const segmento =
+    rawBody.segmento === 'clienteActual' || rawBody.segmento === 'clientePotencial' ? rawBody.segmento : null
 
   const loaded = await loadHmwIaContextOrFail()
   if (!loaded.ok) {
@@ -156,10 +167,28 @@ export async function POST(req: Request) {
 
   const questionsForIa = padQuestionsToIaSlots(questions)
 
-  const schema = z.object({
-    clienteActual: blockSchemaIa(questionsForIa.clienteActual.length),
-    clientePotencial: blockSchemaIa(questionsForIa.clientePotencial.length),
-  })
+  const schema =
+    segmento === 'clienteActual'
+      ? z.object({ clienteActual: blockSchemaIa(questionsForIa.clienteActual.length) })
+      : segmento === 'clientePotencial'
+        ? z.object({ clientePotencial: blockSchemaIa(questionsForIa.clientePotencial.length) })
+        : z.object({
+            clienteActual: blockSchemaIa(questionsForIa.clienteActual.length),
+            clientePotencial: blockSchemaIa(questionsForIa.clientePotencial.length),
+          })
+
+  const bloqueActual = `## Bloque CLIENTE ACTUAL — preguntas HMW (rellena solo "respuestas" por índice)
+${listQuestionsForPrompt('cliente actual', questionsForIa.clienteActual)}`
+
+  const bloquePotencial = `## Bloque CLIENTE POTENCIAL — preguntas HMW
+${listQuestionsForPrompt('cliente potencial', questionsForIa.clientePotencial)}`
+
+  const tareasBloque =
+    segmento === 'clienteActual'
+      ? `Solo rellena el bloque **CLIENTE ACTUAL**. Devuelve JSON con un único array "clienteActual" con la **misma longitud** que las preguntas de ese bloque.`
+      : segmento === 'clientePotencial'
+        ? `Solo rellena el bloque **CLIENTE POTENCIAL**. Devuelve JSON con un único array "clientePotencial" con la **misma longitud** que las preguntas de ese bloque.`
+        : `Devuelve JSON con dos arrays (clienteActual, clientePotencial) con la **misma longitud** que las listas de arriba.`
 
   const userPrompt = `Eres en MOA (Patri, salud y fitness, Martorell). Tienes que rellenar las **respuestas / notas de diseño** de cada pregunta HMW ya definida, sin cambiar el enunciado de las preguntas.
 
@@ -167,18 +196,10 @@ ${contextMd}
 
 ---
 
-## Bloque CLIENTE ACTUAL — preguntas HMW (rellena solo "respuestas" por índice)
-${listQuestionsForPrompt('cliente actual', questionsForIa.clienteActual)}
-
----
-
-## Bloque CLIENTE POTENCIAL — preguntas HMW
-${listQuestionsForPrompt('cliente potencial', questionsForIa.clientePotencial)}
-
----
-
+${segmento === 'clientePotencial' ? '' : `${bloqueActual}\n\n---\n\n`}
+${segmento === 'clienteActual' ? '' : `${bloquePotencial}\n\n---\n\n`}
 Instrucciones finales:
-- Devuelve JSON que cumpla el esquema: dos arrays (clienteActual, clientePotencial) con la **misma longitud** que las listas de arriba y, para **cada** pregunta, **"respuestas"**, **"respuestasMarcas"** y **"respuestasMarcaMotivos"** (los tres con **exactamente ${HMW_RESPUESTAS_MAX}** elementos).
+- ${tareasBloque} Para **cada** pregunta del bloque a rellenar: **"respuestas"**, **"respuestasMarcas"** y **"respuestasMarcaMotivos"** (los tres con **exactamente ${HMW_RESPUESTAS_MAX}** elementos).
 - En **respuestasMarcas**: usa **exactamente una** vez \`mejor\` por pregunta (la respuesta que recomiendas priorizar), salvo que todas las cadenas de respuesta sean vacías (entonces todas \`ninguna\`). Marca como \`no_viable\` cada idea que Patri deba descartar por coste/tiempo/riesgo; el resto \`ninguna\`. Una misma posición no puede ser \`mejor\` y \`no_viable\` a la vez (elige una).
 - En **respuestasMarcaMotivos**: coherente con cada marca; solo texto útil donde haya \`mejor\` o \`no_viable\`; "" en el resto. En los motivos **no afirmes** que Patri ya tiene web, app o plataforma si eso **no** aparece de forma explícita en el contexto de arriba.
 - Para **todas** las preguntas aplica el mismo criterio: genera **hasta ${HMW_RESPUESTAS_MAX} ideas distintas** cuando el contexto lo permita; no te quedes en una sola si puedes aportar más ángulos útiles (p. ej. UX, contenido, confianza, accesibilidad, captación).
@@ -197,11 +218,12 @@ Las cadenas vacías "" solo al final del array, nunca intercaladas entre ideas c
       model: openai('gpt-4o-mini'),
       schema,
       system:
-        'Eres un diseñador de producto digital senior en MOA (Patri, Martorell). Respondes solo con el JSON pedido; español neutro o de España. En cada pregunta: "respuestas" ordenadas por prioridad (impacto usuaria, luego viabilidad Patri); "respuestasMarcas" con exactamente una "mejor" y "no_viable" en ideas inviables; "respuestasMarcaMotivos" con explicaciones breves solo donde corresponda. No inventes canales digitales ni "plataforma existente" que no figuren en el contexto del prompt.',
+        'Eres un diseñador de producto digital senior en MOA (Patri, Martorell). Respondes solo con el JSON pedido; español neutro o de España. En cada pregunta: "respuestas" ordenadas por prioridad (impacto usuaria, luego viabilidad Patri); "respuestasMarcas" con exactamente una "mejor" y "no_viable" en ideas inviables; "respuestasMarcaMotivos" con explicaciones breves solo donde corresponda. No inventes canales digitales ni "plataforma existente" que no figuren en el contexto del prompt.' +
+        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
       prompt: userPrompt,
     })
 
-    const merged = mergeRespuestasFromAi(questions, object)
+    const merged = mergeRespuestasFromAi(questions, object, segmento)
     return NextResponse.json({ questions: merged })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error desconocido'

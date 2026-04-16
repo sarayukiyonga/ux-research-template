@@ -17,6 +17,8 @@ import {
   type JourneyCanalDef,
 } from '@/lib/user-journey-channels'
 import type { UserJourneySegmento } from '@/lib/user-journey-persist'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -151,7 +153,8 @@ ${
 Requisitos:
 ${requisitoRol}
 - **Una** etapa debe marcar con claridad el **momento clave** en que MOA más contribuye al POV, **alineado con el HMW**.
-- Español de España, tono profesional y empático.`
+- Español de España, tono profesional y empático.
+${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 }
 
 function povToLine(label: string, s: POVStatement): string {
@@ -266,6 +269,8 @@ export async function POST(req: Request) {
     )
   }
 
+  const ceoInterview = await fetchCeoInterviewPlaintext()
+
   const systemBase = buildSystemBase(canal, journeyBaseMode, esClienteActual)
 
   const personaBlock =
@@ -311,7 +316,10 @@ export async function POST(req: Request) {
       ? `Canal: **${canal.label}** · **Cliente actual**. Mapa del uso de este medio **siendo ya clienta** de MOA; coherente con los hábitos de la persona si aparecen abajo.`
       : `Canal de trabajo: **${canal.label}**. Las etapas deben describir la experiencia en **este** medio; coherente con los hábitos de búsqueda de la persona si aparecen abajo.`
 
-  const prompt = `${modoIntro}
+  const prompt = `=== ENTREVISTA — PATRICIA / MOA (modelo de servicio; ceñir el relato a lo que encaje aquí) ===
+${ceoInterview}
+
+${modoIntro}
 
 ${
   esClienteActual
