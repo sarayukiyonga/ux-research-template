@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SegmentFiltersReadBanner } from '@/components/SegmentFiltersReadBanner'
@@ -20,6 +21,20 @@ interface EmpathyMapData {
   necesidadesDeseos: string[]
 }
 
+function useIsNarrowScreen() {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const apply = () => setNarrow(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+  return narrow
+}
+
 // ── Sticky note ────────────────────────────────────────────────────────────────
 
 // Note dimensions
@@ -29,17 +44,71 @@ const GW = NOTE * 2 + GUTTER  // group width for 2-column layout = 128px
 
 function StickyNote({ text, bg, expandDir = 'right' }: { text: string; bg: string; expandDir?: 'right' | 'left' }) {
   const [pinned, setPinned] = useState(false)
+  const isNarrow = useIsNarrowScreen()
+
+  useEffect(() => {
+    if (!isNarrow || !pinned) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isNarrow, pinned])
 
   const expandStyle = expandDir === 'left'
     ? { top: 0, right: 0 }   // expands leftward
     : { top: 0, left: 0 }    // expands rightward (default)
 
+  const desktopPinned = !isNarrow && pinned
+  const inlineExpandedClass = isNarrow
+    ? 'hidden'
+    : pinned
+      ? 'block'
+      : 'hidden group-hover:block'
+
+  const mobileOverlay =
+    typeof document !== 'undefined' &&
+    isNarrow &&
+    pinned &&
+    createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Nota ampliada"
+        className="fixed inset-0 z-500 flex items-center justify-center p-4 sm:p-6 bg-black/50"
+        onClick={() => setPinned(false)}
+      >
+        <div
+          role="document"
+          className="w-full max-w-[min(100vw-2rem,28rem)] max-h-[min(85vh,36rem)] overflow-y-auto rounded-2xl shadow-2xl border border-white/40 px-5 py-5 sm:px-6 sm:py-6 text-[15px] sm:text-base leading-relaxed text-gray-900"
+          style={{ backgroundColor: bg }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="whitespace-pre-wrap wrap-break-word">{text}</p>
+          <button
+            type="button"
+            className="mt-5 w-full rounded-xl bg-white/90 py-3 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200/80 hover:bg-white"
+            onClick={() => setPinned(false)}
+          >
+            Cerrar
+          </button>
+          <p className="mt-2 text-center text-[11px] text-gray-600">Toca fuera de la tarjeta para cerrar</p>
+        </div>
+      </div>,
+      document.body
+    )
+
   return (
     <div
       className="group relative cursor-pointer"
       style={{ width: NOTE, height: NOTE, flexShrink: 0, zIndex: pinned ? 100 : undefined }}
-      onClick={(e) => { e.stopPropagation(); setPinned((p) => !p) }}
+      onClick={(e) => {
+        e.stopPropagation()
+        setPinned((p) => !p)
+      }}
     >
+      {mobileOverlay}
+
       {/* Compact square with small text preview */}
       <div
         className="absolute inset-0 rounded-[3px] shadow-sm overflow-hidden"
@@ -50,22 +119,22 @@ function StickyNote({ text, bg, expandDir = 'right' }: { text: string; bg: strin
         </p>
       </div>
 
-      {/* Expanded card — hover on desktop, pinned on mobile */}
+      {/* Expanded card — hover on desktop; en móvil se usa el portal para no heredar el scale del mapa */}
       <div
-        className={`absolute rounded-[4px] shadow-xl z-50 p-2.5 text-[12px] leading-normal text-gray-800 select-none
-          ${pinned ? 'block' : 'hidden group-hover:block'}`}
+        className={`absolute rounded-[4px] shadow-xl z-50 p-2.5 sm:p-3 leading-normal text-gray-800 select-none ${inlineExpandedClass}`}
         style={{
           ...expandStyle,
           backgroundColor: bg,
-          minWidth: 180,
-          maxWidth: 240,
+          minWidth: desktopPinned ? 220 : 180,
+          maxWidth: desktopPinned ? 320 : 240,
           minHeight: NOTE,
+          fontSize: desktopPinned ? 13 : 12,
           border: '1.5px solid rgba(255,255,255,0.7)',
           boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
         }}
       >
         {text}
-        {pinned && (
+        {pinned && !isNarrow && (
           <span className="block mt-2 text-[9px] text-gray-500 opacity-60">
             Toca para cerrar
           </span>
@@ -264,10 +333,16 @@ function EmpathyMapVisual({ data }: { data: EmpathyMapData }) {
             <NoteGroup notes={data.dolorFrustraciones} bg={COLORS.dolor} cols={4} />
           </div>
 
-          {/* Necesidades / Deseos — right */}
-          <div className="flex-1 flex flex-col gap-2 p-4">
-            <SectionLabel>Necesidades / Deseos</SectionLabel>
-            <NoteGroup notes={data.necesidadesDeseos} bg={COLORS.necesidades} cols={4} />
+          {/* Necesidades / Deseos — right: notas alineadas a la derecha y expansión hacia la izquierda para no salirse del marco */}
+          <div className="flex-1 flex flex-col gap-2 p-4 items-end">
+            <SectionLabel align="right">Necesidades / Deseos</SectionLabel>
+            <NoteGroup
+              notes={data.necesidadesDeseos}
+              bg={COLORS.necesidades}
+              cols={4}
+              expandDir="left"
+              justify="end"
+            />
           </div>
         </div>
       </div>
@@ -287,20 +362,244 @@ const SECTIONS: { key: keyof EmpathyMapData; label: string; color: string; bg: s
   { key: 'necesidadesDeseos', label: 'Necesidades / Deseos', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100' },
 ]
 
-function EmpathyDetailList({ data }: { data: EmpathyMapData }) {
+function DetailEditIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  )
+}
+
+function DetailPlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+function DetailTrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>
+  )
+}
+
+function EmpathyDetailList({
+  data,
+  onPatchNote,
+  onAddNote,
+  onDeleteNote,
+}: {
+  data: EmpathyMapData
+  onPatchNote: (key: keyof EmpathyMapData, index: number, text: string) => void
+  onAddNote: (key: keyof EmpathyMapData, text: string) => void
+  onDeleteNote: (key: keyof EmpathyMapData, index: number) => void
+}) {
+  const [editing, setEditing] = useState<{ key: keyof EmpathyMapData; index: number } | null>(null)
+  const [draft, setDraft] = useState('')
+  const [addingKey, setAddingKey] = useState<keyof EmpathyMapData | null>(null)
+  const [newDraft, setNewDraft] = useState('')
+
+  const cancelAdd = () => {
+    setAddingKey(null)
+    setNewDraft('')
+  }
+
+  const openEdit = (key: keyof EmpathyMapData, index: number, text: string) => {
+    cancelAdd()
+    setEditing({ key, index })
+    setDraft(text)
+  }
+
+  const cancelEdit = () => {
+    setEditing(null)
+    setDraft('')
+  }
+
+  const saveEdit = () => {
+    if (!editing) return
+    onPatchNote(editing.key, editing.index, draft.trim())
+    cancelEdit()
+  }
+
+  const openAdd = (key: keyof EmpathyMapData) => {
+    cancelEdit()
+    setAddingKey(key)
+    setNewDraft('')
+  }
+
+  const submitAdd = (key: keyof EmpathyMapData) => {
+    const t = newDraft.trim()
+    if (!t) return
+    onAddNote(key, t)
+    cancelAdd()
+  }
+
+  const handleDeleteNote = (key: keyof EmpathyMapData, index: number) => {
+    if (editing?.key === key) cancelEdit()
+    onDeleteNote(key, index)
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {SECTIONS.map(({ key, label, color, bg }) => (
         <div key={key} className={`rounded-xl border p-4 space-y-2 ${bg}`}>
-          <p className={`text-xs font-bold uppercase tracking-wide ${color}`}>{label}</p>
-          <ul className="space-y-1">
-            {data[key].map((note, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 bg-current opacity-50" />
-                {note}
-              </li>
-            ))}
+          <div className="flex items-center justify-between gap-2">
+            <p className={`text-xs font-bold uppercase tracking-wide ${color}`}>{label}</p>
+            <button
+              type="button"
+              onClick={() => (addingKey === key ? cancelAdd() : openAdd(key))}
+              className={`shrink-0 rounded-lg p-1.5 ring-1 ring-transparent focus:outline-none focus:ring-2 focus:ring-gray-300 ${
+                addingKey === key
+                  ? 'bg-white text-gray-900 ring-gray-300/80'
+                  : 'text-gray-500 hover:bg-white/80 hover:text-gray-800 hover:ring-gray-200/80'
+              }`}
+              aria-expanded={addingKey === key}
+              aria-label={addingKey === key ? 'Cerrar formulario de nueva nota' : `Añadir nota en ${label}`}
+              title={addingKey === key ? 'Cerrar' : 'Añadir nota'}
+            >
+              <DetailPlusIcon className="h-4 w-4" />
+            </button>
+          </div>
+          <ul className="space-y-2">
+            {data[key].map((note, i) => {
+              const isEditing = editing?.key === key && editing?.index === i
+              return (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span
+                    className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 opacity-50 ${color.replace('text-', 'bg-')}`}
+                  />
+                  {isEditing ? (
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <textarea
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        rows={5}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        aria-label={`Editar nota: ${label}`}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={saveEdit}
+                          className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        El texto coincide con la nota del mapa; al guardar se actualiza el mapa y Sheets.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 leading-relaxed">{note}</span>
+                      <div className="mt-0.5 flex shrink-0 items-start gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(key, i, note)}
+                          className="rounded-lg p-1.5 text-gray-500 ring-1 ring-transparent hover:bg-white/80 hover:text-gray-800 hover:ring-gray-200/80 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                          aria-label={`Editar esta nota (${label})`}
+                          title="Editar texto de la nota"
+                        >
+                          <DetailEditIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteNote(key, i)}
+                          className="rounded-lg p-1.5 text-gray-500 ring-1 ring-transparent hover:bg-red-50 hover:text-red-600 hover:ring-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+                          aria-label={`Eliminar esta nota (${label})`}
+                          title="Eliminar nota"
+                        >
+                          <DetailTrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </li>
+              )
+            })}
           </ul>
+
+          {addingKey === key && (
+            <div className="space-y-2 border-t border-black/5 pt-3">
+              <label className="block">
+                <span className="sr-only">Texto de la nueva nota</span>
+                <textarea
+                  value={newDraft}
+                  onChange={(e) => setNewDraft(e.target.value)}
+                  rows={4}
+                  placeholder="Escribe la nueva nota…"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                  maxLength={4000}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => submitAdd(key)}
+                  disabled={!newDraft.trim()}
+                  className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:pointer-events-none disabled:opacity-40"
+                >
+                  Añadir
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelAdd}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                La nota aparecerá en el mapa y se guardará en Sheets al pulsar Añadir.
+              </p>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -314,6 +613,7 @@ const SEGMENT_META: Record<
   {
     otherHref: string
     otherLabel: string
+    insightsHref: string
     showPain: boolean
     accent: 'rose' | 'orange'
     mapCardTitle: string
@@ -323,6 +623,7 @@ const SEGMENT_META: Record<
   clientes: {
     otherHref: '/empathy/potenciales',
     otherLabel: 'Ver mapa de clientes potenciales →',
+    insightsHref: '/insights/clientes',
     showPain: false,
     accent: 'rose',
     mapCardTitle: 'Mapa de empatía · Clientes actuales',
@@ -332,6 +633,7 @@ const SEGMENT_META: Record<
   potenciales: {
     otherHref: '/empathy/clientes',
     otherLabel: '← Ver mapa de clientes actuales',
+    insightsHref: '/insights/potenciales',
     showPain: true,
     accent: 'orange',
     mapCardTitle: 'Mapa de empatía · Clientes potenciales',
@@ -371,20 +673,59 @@ export function EmpathyMapPage({
       .finally(() => setLoadingSaved(false))
   }, [segment])
 
-  const saveMap = async (mapData: EmpathyMapData) => {
-    setSaving(true)
-    try {
-      const filters = segmentFiltersToApi(readSegmentSurveyFilters(segment))
-      const r = await fetch('/api/empathy-map-saved', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segment, data: mapData, filters }),
-      })
-      const d = await r.json()
-      if (d.savedAt) setSavedAt(d.savedAt)
-    } catch {}
-    setSaving(false)
-  }
+  const saveMap = useCallback(
+    async (mapData: EmpathyMapData) => {
+      setSaving(true)
+      try {
+        const filters = segmentFiltersToApi(readSegmentSurveyFilters(segment))
+        const r = await fetch('/api/empathy-map-saved', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segment, data: mapData, filters }),
+        })
+        const d = await r.json()
+        if (d.savedAt) setSavedAt(d.savedAt)
+      } catch {}
+      setSaving(false)
+    },
+    [segment]
+  )
+
+  const patchNote = useCallback((key: keyof EmpathyMapData, index: number, text: string) => {
+    setData((prev) => {
+      if (!prev) return prev
+      const next: EmpathyMapData = {
+        ...prev,
+        [key]: prev[key].map((n, j) => (j === index ? text : n)),
+      }
+      void saveMap(next)
+      return next
+    })
+  }, [saveMap])
+
+  const addNote = useCallback((key: keyof EmpathyMapData, text: string) => {
+    setData((prev) => {
+      if (!prev) return prev
+      const next: EmpathyMapData = {
+        ...prev,
+        [key]: [...prev[key], text],
+      }
+      void saveMap(next)
+      return next
+    })
+  }, [saveMap])
+
+  const deleteNote = useCallback((key: keyof EmpathyMapData, index: number) => {
+    setData((prev) => {
+      if (!prev) return prev
+      const next: EmpathyMapData = {
+        ...prev,
+        [key]: prev[key].filter((_, j) => j !== index),
+      }
+      void saveMap(next)
+      return next
+    })
+  }, [saveMap])
 
   const generate = async () => {
     setGenerating(true)
@@ -493,6 +834,17 @@ export function EmpathyMapPage({
             ✦ Generar mapa de empatía
           </button>
         </div>
+
+        <div className="border-t border-gray-200 pt-6 mt-2">
+          <Link
+            href={meta.insightsHref}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-amber-800 underline underline-offset-4 hover:text-amber-950"
+          >
+            Ir a Insights
+            <span aria-hidden>→</span>
+          </Link>
+          <p className="text-xs text-gray-500 mt-1.5">Siguiente paso del panel: patrones a partir del mapa guardado.</p>
+        </div>
       </div>
     )
   }
@@ -549,7 +901,23 @@ export function EmpathyMapPage({
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
           Detalle completo
         </p>
-        <EmpathyDetailList data={data} />
+        <EmpathyDetailList
+          data={data}
+          onPatchNote={patchNote}
+          onAddNote={addNote}
+          onDeleteNote={deleteNote}
+        />
+      </div>
+
+      <div className="border-t border-gray-200 pt-6 pb-1">
+        <Link
+          href={meta.insightsHref}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-amber-800 underline underline-offset-4 hover:text-amber-950"
+        >
+          Ir a Insights
+          <span aria-hidden>→</span>
+        </Link>
+        <p className="text-xs text-gray-500 mt-1.5">Siguiente paso del panel: patrones a partir del mapa guardado.</p>
       </div>
     </div>
   )
