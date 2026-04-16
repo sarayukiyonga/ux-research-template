@@ -68,9 +68,9 @@ function FlowParallelogram({
   bgClass: string
 }) {
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 w-[7.25rem]">
-      <div className={`w-full skew-x-[-12deg] rounded-sm border-2 px-2 py-2.5 shadow-sm ${borderClass} ${bgClass}`}>
-        <div className="skew-x-[12deg] text-center text-[10px] font-semibold leading-tight text-gray-900 line-clamp-5">
+    <div className="flex shrink-0 flex-col items-center gap-1.5 w-29">
+      <div className={`w-full -skew-x-12 rounded-sm border-2 px-2 py-2.5 shadow-sm ${borderClass} ${bgClass}`}>
+        <div className="skew-x-12 text-center text-[10px] font-semibold leading-tight text-gray-900 line-clamp-5">
           {children}
         </div>
       </div>
@@ -94,7 +94,7 @@ function FlowchartProcessBox({
   if (tipo === 'entrada' || tipo === 'salida') {
     return (
       <div
-        className={`flex min-h-[3.25rem] min-w-[5.5rem] max-w-[6.75rem] shrink-0 items-center justify-center rounded-full border-2 px-2 py-2 text-center text-[10px] font-bold leading-tight shadow-sm ${
+        className={`flex min-h-13 min-w-22 max-w-27 shrink-0 items-center justify-center rounded-full border-2 px-2 py-2 text-center text-[10px] font-bold leading-tight shadow-sm ${
           tipo === 'entrada'
             ? 'border-emerald-600 bg-emerald-50 text-emerald-950'
             : 'border-slate-500 bg-slate-50 text-slate-800'
@@ -109,7 +109,7 @@ function FlowchartProcessBox({
     return (
       <div className="rounded-md p-[3px] bg-amber-400/90 shadow-sm">
         <div
-          className={`flex min-h-[3.25rem] min-w-[5.5rem] max-w-[6.75rem] items-center justify-center rounded-[4px] border-2 border-amber-800 bg-amber-50 px-2 py-2 text-center text-[10px] font-bold leading-tight text-amber-950`}
+          className={`flex min-h-13 min-w-22 max-w-27 items-center justify-center rounded-[4px] border-2 border-amber-800 bg-amber-50 px-2 py-2 text-center text-[10px] font-bold leading-tight text-amber-950`}
         >
           {title}
         </div>
@@ -119,7 +119,7 @@ function FlowchartProcessBox({
 
   return (
     <div
-      className={`flex min-h-[3.25rem] min-w-[5.5rem] max-w-[6.75rem] shrink-0 items-center justify-center rounded-md border-2 px-2 py-2 text-center text-[10px] font-semibold leading-tight shadow-sm ${accentBorder} ${accentBg} text-gray-900`}
+      className={`flex min-h-13 min-w-22 max-w-27 shrink-0 items-center justify-center rounded-md border-2 px-2 py-2 text-center text-[10px] font-semibold leading-tight shadow-sm ${accentBorder} ${accentBg} text-gray-900`}
     >
       {title}
     </div>
@@ -137,7 +137,7 @@ function FlowArrowConnector({
   const markerId = `arrow-${uid}`
 
   return (
-    <div className="flex w-[5.25rem] shrink-0 flex-col items-center justify-start gap-1 pt-2">
+    <div className="flex w-21 shrink-0 flex-col items-center justify-start gap-1 pt-2">
       <svg width="84" height="22" viewBox="0 0 84 22" className={strokeClass} aria-hidden>
         <defs>
           <marker id={markerId} markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -146,7 +146,7 @@ function FlowArrowConnector({
         </defs>
         <line x1="2" y1="11" x2="76" y2="11" stroke="currentColor" strokeWidth="2" markerEnd={`url(#${markerId})`} />
       </svg>
-      <p className="max-w-[5rem] text-center text-[9px] font-medium leading-tight text-gray-600">{label || '—'}</p>
+      <p className="max-w-20 text-center text-[9px] font-medium leading-tight text-gray-600">{label || '—'}</p>
     </div>
   )
 }
@@ -165,7 +165,7 @@ function FlowDownArrow({ label, strokeClass }: { label: string; strokeClass: str
         </defs>
         <line x1="11" y1="4" x2="11" y2="44" stroke="currentColor" strokeWidth="2" markerEnd={`url(#${markerId})`} />
       </svg>
-      <p className="max-w-[7rem] text-center text-[9px] font-semibold leading-tight text-gray-700">{label || '—'}</p>
+      <p className="max-w-28 text-center text-[9px] font-semibold leading-tight text-gray-700">{label || '—'}</p>
     </div>
   )
 }
@@ -181,14 +181,14 @@ function FlowDiamond({
 }) {
   const border = accent === 'cyan' ? 'border-indigo-600 bg-indigo-50' : 'border-purple-700 bg-purple-50'
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 w-[5.5rem]">
-      <div className="relative flex h-[4.25rem] w-[4.25rem] items-center justify-center">
+    <div className="flex shrink-0 flex-col items-center gap-1.5 w-22">
+      <div className="relative flex h-17 w-17 items-center justify-center">
         <div className={`absolute inset-[5px] rotate-45 rounded-sm border-2 shadow-sm ${border}`} aria-hidden />
-        <span className="relative z-10 max-w-[3.25rem] text-center text-[9px] font-bold leading-tight text-gray-900">
+        <span className="relative z-10 max-w-13 text-center text-[9px] font-bold leading-tight text-gray-900">
           {titulo}
         </span>
       </div>
-      <p className="text-[8px] text-center text-gray-500 leading-snug line-clamp-3 max-w-[6rem]" title={descripcion}>
+      <p className="text-[8px] text-center text-gray-500 leading-snug line-clamp-3 max-w-24" title={descripcion}>
         {descripcion}
       </p>
       <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">Decisión</span>
@@ -212,7 +212,7 @@ function HorizontalLinealSteps({
     <>
       {ordenados.map((p, i) => (
         <div key={`${p.orden}-${i}`} className="flex items-start">
-          <div className="flex w-[6.75rem] shrink-0 flex-col items-center gap-1.5">
+          <div className="flex w-27 shrink-0 flex-col items-center gap-1.5">
             <FlowchartProcessBox title={p.tituloBolita} tipo={p.tipo} accent={accent} />
             <p className="text-[9px] text-center text-gray-500 leading-snug px-0.5 line-clamp-3" title={p.descripcion}>
               {p.descripcion}
@@ -257,7 +257,7 @@ function RenderFlowNodo({
         {nodo.ramas.map((rama, idx) => (
           <div
             key={`${rama.etiqueta}-${idx}`}
-            className="flex min-w-[9rem] max-w-[14rem] flex-1 flex-col items-center rounded-xl border border-gray-100 bg-white/80 px-2 py-3 shadow-sm"
+            className="flex min-w-36 max-w-56 flex-1 flex-col items-center rounded-xl border border-gray-100 bg-white/80 px-2 py-3 shadow-sm"
           >
             <FlowDownArrow label={rama.etiqueta} strokeClass={stroke} />
             <RenderFlowNodo nodo={rama.siguiente} accent={accent} stroke={stroke} />
@@ -471,7 +471,7 @@ function SegmentFlowPanel({
         })}
       </div>
       <div className="flex flex-wrap gap-2 items-end border-t border-gray-100 pt-3">
-        <label className="flex-1 min-w-[12rem] space-y-1">
+        <label className="flex-1 min-w-48 space-y-1">
           <span className="text-[11px] font-medium text-gray-500">Canal adicional (solo este segmento)</span>
           <input
             type="text"

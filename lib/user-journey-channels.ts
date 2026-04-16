@@ -9,7 +9,7 @@ export const JOURNEY_BASE_CANAL_ID = 'journey_base' as const
 export const USER_JOURNEY_CANALES = [
   {
     id: 'web',
-    label: 'web',
+    label: 'Página web',
     descripcionCorta: 'el sitio web',
     focoExperiencia:
       'navegación por páginas, formularios, CTAs, testimonios en pantalla y abandono o cierre de la visita en el navegador',

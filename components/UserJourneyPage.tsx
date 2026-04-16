@@ -251,7 +251,7 @@ function SegmentCanalPanel({
         </div>
       </div>
       <div className="flex flex-wrap gap-2 items-end pt-1 border-t border-gray-100">
-        <label className="flex-1 min-w-[12rem] space-y-1">
+        <label className="flex-1 min-w-48 space-y-1">
           <span className="text-[11px] font-medium text-gray-500">Añadir canal personalizado</span>
           <input
             type="text"
@@ -566,17 +566,13 @@ export function UserJourneyPage() {
     ? getCanalPromptFields(canalActivoId, segState.catalogo)
     : getCanalPromptFields(DEFAULT_USER_JOURNEY_CANAL_ID, defaultJourneyCanalCatalogo())
   const isBaseChannel = canalActivoId === JOURNEY_BASE_CANAL_ID
-  const clavePovLabel = isBaseChannel ? 'POV ↔ recorrido' : canalActivoId === 'web' ? 'POV ↔ web' : 'POV ↔ canal'
+  const clavePovLabel = isBaseChannel ? 'POV ↔ recorrido' : `POV ↔ ${canalPrompt.label}`
   const rolBloqueTitulo = isBaseChannel
     ? 'MOA frente al POV (recorrido global)'
-    : canalActivoId === 'web'
-      ? 'Web MOA y el POV'
-      : `${canalPrompt.label} y el POV`
+    : `${canalPrompt.label} y el POV`
   const clavePovCheckboxLabel = isBaseChannel
     ? 'Momento clave: MOA aporta más al POV en el recorrido'
-    : canalActivoId === 'web'
-      ? 'Esta etapa es el momento clave POV ↔ web'
-      : `Esta etapa es el momento clave POV ↔ ${canalPrompt.label}`
+    : `Esta etapa es el momento clave POV ↔ ${canalPrompt.label}`
 
   useEffect(() => {
     Promise.all([

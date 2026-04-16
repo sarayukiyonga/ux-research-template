@@ -439,7 +439,7 @@ function PersonaCanalesSection({
         ))}
       </div>
       <div className="flex flex-wrap gap-2 items-end">
-        <label className="flex-1 min-w-[10rem] space-y-1">
+        <label className="flex-1 min-w-40 space-y-1">
           <span className="text-[10px] font-medium text-gray-500">Añadir canal (texto libre)</span>
           <input
             type="text"
