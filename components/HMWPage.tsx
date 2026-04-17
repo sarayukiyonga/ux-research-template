@@ -346,7 +346,7 @@ function HMWListBlock({
                   const btnBase =
                     'rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors'
                   return (
-                    <div key={`${qi}-r-${ri}`} className={`rounded-xl border-2 p-2.5 ${boxBorder}`}>
+                    <div key={`${qi}-r-${ri}`} className={`rounded-xl border-2 p-2.5 ${boxBorder}`} data-pdf-avoid-break>
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                           Respuesta {ri + 1}
@@ -400,6 +400,7 @@ function HMWListBlock({
                         ) : null}
                       </div>
                       <AutoTextarea
+                        data-pdf-show
                         className={`w-full min-h-18 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 ${ring}`}
                         rows={2}
                         maxLength={2000}

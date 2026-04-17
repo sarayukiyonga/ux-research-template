@@ -5,6 +5,10 @@ export type { MoaPdfRoute } from '@/lib/moa-pdf-routes'
 
 const SIDE_MM = 10
 const BOTTOM_MM = 10
+const PAGE_W_MM = 210
+const PAGE_H_MM = 297
+const IMG_W_MM = PAGE_W_MM - 2 * SIDE_MM   // 190 mm
+const REST_SLICE_MM = PAGE_H_MM - 2 * BOTTOM_MM // 277 mm
 
 function addCanvasToPdf(
   pdf: jsPDF,
@@ -49,11 +53,77 @@ function addCanvasToPdf(
 }
 
 /**
+ * Inserta divs espaciadores invisibles antes de los elementos marcados con
+ * [data-pdf-avoid-break] que se cortarían entre páginas PDF.
+ * Devuelve los espaciadores para que el llamador los elimine tras el render.
+ *
+ * @param element  Elemento raíz que se va a capturar
+ * @param domPxPerPage  Altura de una página PDF expresada en píxeles DOM
+ */
+function injectPageBreakAvoidance(
+  element: HTMLElement,
+  domPxPerPage: number
+): HTMLElement[] {
+  const spacers: HTMLElement[] = []
+  const containerRect = element.getBoundingClientRect()
+
+  const avoidEls = Array.from(
+    element.querySelectorAll<HTMLElement>('[data-pdf-avoid-break]')
+  )
+
+  for (const el of avoidEls) {
+    // getBoundingClientRect() fuerza un reflow, por lo que los espaciadores
+    // previos ya están incluidos en la posición devuelta.
+    const rect = el.getBoundingClientRect()
+    const elH = rect.height
+
+    // Ignorar elementos más altos que el 90 % de una página (no pueden evitar el corte)
+    if (elH <= 0 || elH > domPxPerPage * 0.9) continue
+
+    const elTop = rect.top - containerRect.top + element.scrollTop
+    const elBottom = elTop + elH
+
+    const topPage = Math.floor(elTop / domPxPerPage)
+    const bottomPage = Math.floor(elBottom / domPxPerPage)
+
+    if (topPage !== bottomPage) {
+      // El elemento cruza un salto de página: calcular el espaciador necesario
+      const spacerHeight = (topPage + 1) * domPxPerPage - elTop
+
+      const spacer = document.createElement('div')
+      spacer.style.cssText = `height:${spacerHeight}px;display:block;background:transparent;pointer-events:none;flex-shrink:0;`
+      spacer.setAttribute('data-pdf-spacer', 'true')
+      el.parentNode?.insertBefore(spacer, el)
+      spacers.push(spacer)
+    }
+  }
+
+  return spacers
+}
+
+/**
  * Oculta inputs, selects, textareas, botones y cualquier elemento marcado con
  * [data-pdf-ignore] en el clon del documento antes de que html2canvas lo renderice.
+ * Excepción: los elementos con [data-pdf-show] se sustituyen por un <div> con el
+ * mismo texto para que su contenido siga siendo visible en el PDF.
  * No modifica el DOM real de la página.
  */
 function hideInteractiveElements(clonedDoc: Document) {
+  // Primero: sustituir los textareas/inputs marcados con data-pdf-show por un div legible
+  clonedDoc
+    .querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
+      'textarea[data-pdf-show], input[data-pdf-show]'
+    )
+    .forEach((el) => {
+      const proxy = clonedDoc.createElement('div')
+      proxy.textContent = el.value ?? ''
+      // Heredar clases visuales del elemento original, excepto las de interactividad
+      proxy.className = el.className
+      proxy.style.cssText = 'white-space: pre-wrap; overflow: visible; height: auto; resize: none;'
+      el.parentNode?.insertBefore(proxy, el)
+    })
+
+  // Después: ocultar todos los controles interactivos (incluidos los data-pdf-show ya sustituidos)
   const selector = [
     'input',
     'textarea',
@@ -73,6 +143,12 @@ export async function exportElementToPdf(element: HTMLElement, fileName: string)
   const html2canvas = (await import('html2canvas-pro')).default
   const { jsPDF } = await import('jspdf')
 
+  // Píxeles DOM equivalentes a una página PDF (misma fórmula que addCanvasToPdf)
+  const domPxPerPage = REST_SLICE_MM * element.scrollWidth / IMG_W_MM
+
+  // Insertar espaciadores para evitar cortes; se eliminan tras el render
+  const spacers = injectPageBreakAvoidance(element, domPxPerPage)
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
@@ -83,6 +159,9 @@ export async function exportElementToPdf(element: HTMLElement, fileName: string)
     windowHeight: Math.max(element.scrollHeight, element.clientHeight),
     onclone: (_clonedDoc, clonedEl) => hideInteractiveElements(clonedEl.ownerDocument),
   })
+
+  // Limpiar espaciadores del DOM real
+  spacers.forEach((s) => s.parentNode?.removeChild(s))
 
   const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
   addCanvasToPdf(pdf, canvas, { startNewPage: false })
@@ -157,6 +236,9 @@ export async function exportRoutesToCombinedPdf(
       const prevY = win?.scrollY ?? 0
       win?.scrollTo(0, 0)
 
+      const domPxPerPage = REST_SLICE_MM * root.scrollWidth / IMG_W_MM
+      const spacers = injectPageBreakAvoidance(root, domPxPerPage)
+
       const canvas = await html2canvas(root, {
         scale,
         useCORS: true,
@@ -167,6 +249,8 @@ export async function exportRoutesToCombinedPdf(
         windowHeight: Math.max(root.scrollHeight, root.clientHeight),
         onclone: (_clonedDoc, clonedEl) => hideInteractiveElements(clonedEl.ownerDocument),
       })
+
+      spacers.forEach((s) => s.parentNode?.removeChild(s))
 
       win?.scrollTo(0, prevY)
 

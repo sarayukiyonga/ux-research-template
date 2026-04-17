@@ -1056,6 +1056,7 @@ function TreeLinealSteps({
               className={`relative flex w-full max-w-2xl flex-col items-center gap-1 rounded-xl transition-all ${
                 draggingIdx === i ? 'opacity-40' : ''
               } ${dragOverIdx === i && draggingIdx !== i ? 'ring-2 ring-teal-400 ring-offset-1' : ''}`}
+              data-pdf-avoid-break
               data-flowref-paso={p.tituloBolita}
               data-retorno-a={p.retornoA ?? ''}
               data-retorno-tipo={p.retornoTipo ?? ''}
@@ -1290,7 +1291,7 @@ function RenderFlowNodo({
           />
         </div>
       ) : (
-        <div className="flex w-full max-w-md flex-col items-center gap-1.5">
+        <div className="flex w-full max-w-md flex-col items-center gap-1.5" data-pdf-avoid-break>
           <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} />
           {onReplace && (
             <div className="flex flex-wrap items-center justify-center gap-1.5">
