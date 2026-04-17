@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo, useId, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, useId, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FlowPaso, FlowNodo, UserFlowLine } from '@/lib/user-flow-tree'
+import type { FlowLineal, FlowDecision } from '@/lib/user-flow-tree'
 import {
   emptyFlowV3,
   getFlowLineForSegmentChannel,
@@ -25,6 +26,8 @@ import {
 } from '@/lib/user-journey-ideas-persist'
 
 export type { FlowPaso, UserFlowLine, UserFlowBundle } from '@/lib/user-flow-tree'
+
+// ─── Validaciones de dependencias ────────────────────────────────────────────
 
 function hasValidPersonasSaved(personas: unknown): boolean {
   if (!personas || typeof personas !== 'object') return false
@@ -62,6 +65,386 @@ function hasValidPovSaved(statements: unknown): boolean {
 const SMARTDRAW_FLOWCHART_URL =
   'https://www.smartdraw.com/flowchart/simbolos-de-diagramas-de-flujo.htm'
 
+// ─── Helpers de mutación del árbol ───────────────────────────────────────────
+
+function renumberPasos(pasos: FlowPaso[]): FlowPaso[] {
+  return pasos.map((p, i) => ({ ...p, orden: i + 1 }))
+}
+
+function deletePasoAt(nodo: FlowLineal, idx: number): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const newPasos = renumberPasos(sorted.filter((_, i) => i !== idx))
+  // Eliminar el conector que llega al paso borrado (clic[idx-1]) o el siguiente si era el primero
+  const clicoIdx = Math.min(idx, nodo.clicsEntrePasos.length - 1)
+  const newClics = nodo.clicsEntrePasos.filter((_, i) => i !== clicoIdx)
+  return { ...nodo, pasos: newPasos, clicsEntrePasos: newClics }
+}
+
+function updatePasoAt(nodo: FlowLineal, idx: number, paso: Omit<FlowPaso, 'orden'>): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const newPasos = sorted.map((p, i) => (i === idx ? { ...paso, orden: i + 1 } : p))
+  return { ...nodo, pasos: newPasos }
+}
+
+function insertPasoAfter(
+  nodo: FlowLineal,
+  afterIdx: number,
+  draft: Omit<FlowPaso, 'orden'>
+): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const insertAt = afterIdx + 1
+  const rawPasos = [
+    ...sorted.slice(0, insertAt),
+    { ...draft, orden: 0 },
+    ...sorted.slice(insertAt),
+  ]
+  const newPasos = renumberPasos(rawPasos)
+  // clic[i] conecta pasos[i] y pasos[i+1]; insertar nuevo clic en posición max(0, insertAt-1)
+  const clicInsertIdx = Math.max(0, insertAt - 1)
+  const newClics = [
+    ...nodo.clicsEntrePasos.slice(0, clicInsertIdx),
+    'Continúa en la web',
+    ...nodo.clicsEntrePasos.slice(clicInsertIdx),
+  ]
+  return { ...nodo, pasos: newPasos, clicsEntrePasos: newClics }
+}
+
+function updateClicoAt(nodo: FlowLineal, idx: number, value: string): FlowLineal {
+  const newClics = nodo.clicsEntrePasos.map((c, i) => (i === idx ? value : c))
+  return { ...nodo, clicsEntrePasos: newClics }
+}
+
+function updateDiamond(
+  nodo: FlowDecision,
+  tituloDiamante: string,
+  descripcion: string
+): FlowDecision {
+  return { ...nodo, tituloDiamante, descripcion }
+}
+
+function updateBranchLabel(nodo: FlowDecision, ramaIdx: number, etiqueta: string): FlowDecision {
+  return {
+    ...nodo,
+    ramas: nodo.ramas.map((r, i) => (i === ramaIdx ? { ...r, etiqueta } : r)),
+  }
+}
+
+// ─── Formularios inline de edición ───────────────────────────────────────────
+
+const TIPO_LABELS: Record<FlowPaso['tipo'], string> = {
+  entrada: 'Entrada / inicio (cápsula ámbar)',
+  navegacion: 'Navegación / proceso (rectángulo teal)',
+  conversion: 'Conversión (rectángulo teal oscuro)',
+  salida: 'Salida / fin (cápsula ámbar)',
+}
+
+function PasoEditForm({
+  initial,
+  onSave,
+  onCancel,
+  isNew = false,
+}: {
+  initial: Omit<FlowPaso, 'orden'>
+  onSave: (p: Omit<FlowPaso, 'orden'>) => void
+  onCancel: () => void
+  isNew?: boolean
+}) {
+  const [titulo, setTitulo] = useState(initial.tituloBolita)
+  const [desc, setDesc] = useState(initial.descripcion)
+  const [tipo, setTipo] = useState<FlowPaso['tipo']>(initial.tipo)
+  const canSave = titulo.trim().length > 0
+
+  const commit = () => {
+    if (canSave) onSave({ tituloBolita: titulo.trim(), descripcion: desc.trim(), tipo })
+  }
+
+  return (
+    <div className="w-full max-w-2xl rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm space-y-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-teal-700">
+        {isNew ? 'Nuevo paso' : 'Editar paso'}
+      </p>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Título (máx. 36 car.)</span>
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value.slice(0, 36))}
+          maxLength={36}
+          autoFocus
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+          placeholder="Nombre del paso"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') onCancel()
+          }}
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Descripción (máx. 200 car.)</span>
+        <textarea
+          value={desc}
+          onChange={(e) => setDesc(e.target.value.slice(0, 200))}
+          maxLength={200}
+          rows={2}
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none"
+          placeholder="Descripción breve del paso"
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Tipo</span>
+        <select
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value as FlowPaso['tipo'])}
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+        >
+          {(Object.entries(TIPO_LABELS) as [FlowPaso['tipo'], string][]).map(([v, label]) => (
+            <option key={v} value={v}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={commit}
+          className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+        >
+          {isNew ? 'Añadir' : 'Guardar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DiamondEditForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: { tituloDiamante: string; descripcion: string }
+  onSave: (tituloDiamante: string, descripcion: string) => void
+  onCancel: () => void
+}) {
+  const [titulo, setTitulo] = useState(initial.tituloDiamante)
+  const [desc, setDesc] = useState(initial.descripcion)
+  const canSave = titulo.trim().length > 0
+
+  return (
+    <div className="w-full max-w-md rounded-xl border border-orange-200 bg-white px-4 py-3 shadow-sm space-y-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-orange-700">
+        Editar decisión
+      </p>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Texto del rombo (máx. 36 car.)</span>
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value.slice(0, 36))}
+          maxLength={36}
+          autoFocus
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          placeholder="Pregunta o condición"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && canSave) onSave(titulo.trim(), desc.trim())
+            if (e.key === 'Escape') onCancel()
+          }}
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Descripción (máx. 240 car.)</span>
+        <textarea
+          value={desc}
+          onChange={(e) => setDesc(e.target.value.slice(0, 240))}
+          maxLength={240}
+          rows={2}
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+        />
+      </label>
+      <div className="flex justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={() => onSave(titulo.trim(), desc.trim())}
+          className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-40"
+        >
+          Guardar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Crea un FlowLineal mínimo con un paso de navegación para usar como rama de una nueva decisión. */
+function makeMinimalLineal(label: string): FlowLineal {
+  return {
+    tipo: 'lineal',
+    pasos: [{ orden: 1, tituloBolita: label || 'Paso', descripcion: '', tipo: 'navegacion' }],
+    clicsEntrePasos: [],
+    despues: null,
+  }
+}
+
+/** Formulario para crear un nuevo nodo de decisión con 2 ramas iniciales. */
+function NewDecisionForm({
+  onSave,
+  onCancel,
+}: {
+  onSave: (nodo: FlowDecision) => void
+  onCancel: () => void
+}) {
+  const [titulo, setTitulo] = useState('')
+  const [desc, setDesc] = useState('')
+  const [rama1, setRama1] = useState('Sí')
+  const [rama2, setRama2] = useState('No')
+
+  const commit = () => {
+    const decision: FlowDecision = {
+      tipo: 'decision',
+      tituloDiamante: titulo.trim() || '¿Condición?',
+      descripcion: desc.trim(),
+      ramas: [
+        { etiqueta: rama1.trim() || 'Sí', siguiente: makeMinimalLineal(rama1.trim() || 'Rama 1') },
+        { etiqueta: rama2.trim() || 'No', siguiente: makeMinimalLineal(rama2.trim() || 'Rama 2') },
+      ],
+    }
+    onSave(decision)
+  }
+
+  return (
+    <div className="w-full max-w-md rounded-xl border border-orange-200 bg-white px-4 py-3 shadow-sm space-y-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-orange-700">Nueva decisión</p>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Texto del rombo (máx. 36 car.)</span>
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value.slice(0, 36))}
+          maxLength={36}
+          autoFocus
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          placeholder="¿Condición?"
+          onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-[11px] font-medium text-gray-500">Descripción (máx. 240 car.)</span>
+        <textarea
+          value={desc}
+          onChange={(e) => setDesc(e.target.value.slice(0, 240))}
+          maxLength={240}
+          rows={2}
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium text-gray-500">Etiqueta rama 1</span>
+          <input
+            value={rama1}
+            onChange={(e) => setRama1(e.target.value.slice(0, 80))}
+            maxLength={80}
+            className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            placeholder="Sí"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[11px] font-medium text-gray-500">Etiqueta rama 2</span>
+          <input
+            value={rama2}
+            onChange={(e) => setRama2(e.target.value.slice(0, 80))}
+            maxLength={80}
+            className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            placeholder="No"
+          />
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={commit}
+          className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+        >
+          Añadir decisión
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Input inline que edita la etiqueta de un conector o rama al pulsar sobre el texto. */
+function InlineLabelEditor({
+  value,
+  onSave,
+  maxLength = 100,
+  className = '',
+}: {
+  value: string
+  onSave: (v: string) => void
+  maxLength?: number
+  className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(value)
+      setTimeout(() => { ref.current?.select() }, 0)
+    }
+  }, [editing, value])
+
+  if (!editing) {
+    return (
+      <span
+        className={`cursor-pointer rounded px-1 hover:bg-gray-100 transition-colors ${className}`}
+        title="Clic para editar etiqueta"
+        onClick={() => setEditing(true)}
+      >
+        {value || <span className="italic text-gray-400">—</span>}
+      </span>
+    )
+  }
+
+  return (
+    <input
+      ref={ref}
+      value={draft}
+      autoFocus
+      onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
+      maxLength={maxLength}
+      onBlur={() => { onSave(draft.trim() || value); setEditing(false) }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { onSave(draft.trim() || value); setEditing(false) }
+        if (e.key === 'Escape') setEditing(false)
+      }}
+      className={`rounded border border-gray-300 px-1.5 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 ${className}`}
+    />
+  )
+}
+
+// ─── Componentes de presentación ─────────────────────────────────────────────
+
 /** Paralelogramo: entrada/salida de datos (canal / contexto), estilo pastel neutro. */
 function FlowParallelogram({ children }: { children: ReactNode }) {
   const plain =
@@ -86,9 +469,7 @@ function FlowchartProcessBox({
 }: {
   title: string
   tipo: FlowPaso['tipo']
-  /** Título + descripción para tooltip al truncar. */
   fullTooltip?: string
-  /** Rama secundaria (p. ej. «No»): rectángulos estilo pastel rosa como en diagramas de excepción. */
   pathVariant?: 'default' | 'alternate'
 }) {
   const tip = (fullTooltip?.trim() || title).slice(0, 2000)
@@ -118,7 +499,10 @@ function FlowchartProcessBox({
 
   if (tipo === 'conversion') {
     return (
-      <div title={tip} className={`flex min-h-14 min-w-44 max-w-2xl items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${pastelTealConv}`}>
+      <div
+        title={tip}
+        className={`flex min-h-14 min-w-44 max-w-2xl items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${pastelTealConv}`}
+      >
         <span className="line-clamp-3">{title}</span>
       </div>
     )
@@ -135,39 +519,75 @@ function FlowchartProcessBox({
 }
 
 /**
- * Conector entre nodos: tramo vertical simple, o en **L** saliendo del rombo (baja, gira hacia el carril de la rama, baja).
+ * Conector entre nodos. Acepta callbacks opcionales para editar etiqueta e insertar paso.
  */
 function FlowDownArrow({
   label,
   fromDiamond,
   branchIndex = 0,
   branchCount = 1,
+  onEditLabel,
+  onAdd,
 }: {
   label: string
-  /** Si true, dibuja codo en L hacia el interior del diagrama (solo entre ramas del rombo). */
   fromDiamond?: boolean
   branchIndex?: number
   branchCount?: number
+  /** Si se pasa, la etiqueta se convierte en editable al hacer clic. */
+  onEditLabel?: (newLabel: string) => void
+  /** Si se pasa, aparece un botón "+" para insertar paso antes del conector. */
+  onAdd?: () => void
 }) {
   const markerId = useId().replace(/:/g, '')
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [draftLabel, setDraftLabel] = useState(label)
+  const labelRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingLabel) {
+      setDraftLabel(label)
+      setTimeout(() => { labelRef.current?.select() }, 0)
+    }
+  }, [editingLabel, label])
+
   const tip = label ? label.slice(0, 2000) : undefined
 
-  const labelBlock =
-    label != null && label !== '' ? (
-      <p className="w-full max-w-2xl px-1 text-center text-[12px] font-medium leading-snug text-gray-500 line-clamp-3">
-        {label}
-      </p>
-    ) : (
-      <p className="text-[9px] text-gray-400">—</p>
-    )
+  const commitLabel = () => {
+    onEditLabel?.(draftLabel.trim() || label)
+    setEditingLabel(false)
+  }
+
+  const labelBlock = editingLabel ? (
+    <input
+      ref={labelRef}
+      value={draftLabel}
+      autoFocus
+      onChange={(e) => setDraftLabel(e.target.value.slice(0, 100))}
+      maxLength={100}
+      onBlur={commitLabel}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commitLabel()
+        if (e.key === 'Escape') setEditingLabel(false)
+      }}
+      className="w-full max-w-2xl rounded border border-gray-300 px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+    />
+  ) : label != null && label !== '' ? (
+    <p
+      className={`w-full max-w-2xl px-1 text-center text-[12px] font-medium leading-snug text-gray-500 line-clamp-3 ${onEditLabel ? 'cursor-pointer hover:text-teal-600' : ''}`}
+      title={onEditLabel ? 'Clic para editar etiqueta' : tip}
+      onClick={onEditLabel ? () => setEditingLabel(true) : undefined}
+    >
+      {label}
+    </p>
+  ) : (
+    <p className="text-[9px] text-gray-400">—</p>
+  )
 
   const useElbow = Boolean(fromDiamond && branchCount >= 2)
   const y0 = 6
   const yElbow = 18
   const yArrow = 74
 
-  // Tramo horizontal: de borde a borde (xEntry → xFar), sin flecha.
-  // Tramo vertical: del centro (x=50) en yElbow hasta yArrow, con flecha.
   let elbowPathD: string | null = null
   let straightPathD: string
 
@@ -175,15 +595,15 @@ function FlowDownArrow({
     straightPathD = `M 100 ${y0} L 100 ${yArrow}`
   } else if (branchCount === 2) {
     const xEntry = branchIndex === 0 ? 200 : 0
-    elbowPathD    = `M ${xEntry} ${y0} L ${xEntry} ${yElbow} L 100 ${yElbow}`
+    elbowPathD = `M ${xEntry} ${y0} L ${xEntry} ${yElbow} L 100 ${yElbow}`
     straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
   } else {
     const last = branchCount - 1
     if (branchIndex === 0) {
-      elbowPathD    = `M 200 ${y0} L 200 ${yElbow} L 100 ${yElbow}`
+      elbowPathD = `M 200 ${y0} L 200 ${yElbow} L 100 ${yElbow}`
       straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
     } else if (branchIndex === last) {
-      elbowPathD    = `M 0 ${y0} L 0 ${yElbow} L 100 ${yElbow}`
+      elbowPathD = `M 0 ${y0} L 0 ${yElbow} L 100 ${yElbow}`
       straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
     } else {
       straightPathD = `M 100 ${y0} L 100 ${yArrow}`
@@ -201,7 +621,7 @@ function FlowDownArrow({
   return (
     <div
       className="flex w-full max-w-2xl shrink-0 flex-col items-center gap-0.5 py-1 text-gray-400"
-      title={tip}
+      title={onEditLabel ? undefined : tip}
     >
       <svg
         viewBox="0 0 200 82"
@@ -226,6 +646,16 @@ function FlowDownArrow({
         <path d={straightPathD} {...sharedStroke} markerEnd={`url(#${markerId})`} />
       </svg>
       {labelBlock}
+      {onAdd && !editingLabel && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mt-0.5 inline-flex items-center gap-0.5 rounded-full border border-teal-200 bg-white px-2.5 py-0.5 text-[10px] text-teal-500 hover:border-teal-400 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+          title="Insertar paso aquí"
+        >
+          + insertar paso
+        </button>
+      )}
     </div>
   )
 }
@@ -233,7 +663,10 @@ function FlowDownArrow({
 function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: string }) {
   const romboTip = [titulo.trim(), descripcion.trim()].filter(Boolean).join('\n\n').slice(0, 2000)
   return (
-    <div className="flex w-full max-w-md shrink-0 flex-col items-center gap-1.5 cursor-default" title={romboTip}>
+    <div
+      className="flex w-full max-w-md shrink-0 flex-col items-center gap-1.5 cursor-default"
+      title={romboTip}
+    >
       <div className="relative flex h-20 w-20 items-center justify-center sm:h-21 sm:w-21">
         <div
           className="absolute inset-[6px] rotate-45 rounded-md border border-orange-300/95 bg-orange-100/85 shadow-sm"
@@ -243,48 +676,185 @@ function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: str
           {titulo}
         </span>
       </div>
-      <p className="max-w-xs text-center text-[12px] leading-snug text-gray-500 line-clamp-3" title={descripcion}>
+      <p
+        className="max-w-xs text-center text-[12px] leading-snug text-gray-500 line-clamp-3"
+        title={descripcion}
+      >
         {descripcion}
       </p>
     </div>
   )
 }
 
-/** Tramo lineal en columna (árbol vertical de arriba abajo). */
+// ─── Tramo lineal editable ────────────────────────────────────────────────────
+
+/**
+ * Renderiza y edita un tramo lineal de pasos.
+ * Cuando se pasa `onReplace`, activa controles de editar / borrar / insertar.
+ */
 function TreeLinealSteps({
-  pasos,
-  clics,
+  nodo,
   pathVariant = 'default',
+  onReplace,
 }: {
-  pasos: FlowPaso[]
-  clics: string[]
+  nodo: FlowLineal
   pathVariant?: 'default' | 'alternate'
+  onReplace?: (n: FlowLineal) => void
 }) {
-  const ordenados = [...pasos].sort((a, b) => a.orden - b.orden)
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [addingAfterIdx, setAddingAfterIdx] = useState<number | null>(null)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+
+  const canEdit = Boolean(onReplace)
+  const ordenados = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+
+  const commitEdit = (i: number, draft: Omit<FlowPaso, 'orden'>) => {
+    onReplace?.(updatePasoAt(nodo, i, draft))
+    setEditingIdx(null)
+  }
+
+  const commitDelete = (i: number) => {
+    onReplace?.(deletePasoAt(nodo, i))
+  }
+
+  const commitAdd = (afterIdx: number, draft: Omit<FlowPaso, 'orden'>) => {
+    onReplace?.(insertPasoAfter(nodo, afterIdx, draft))
+    setAddingAfterIdx(null)
+  }
+
+  const commitClic = (i: number, value: string) => {
+    onReplace?.(updateClicoAt(nodo, i, value))
+  }
+
   return (
     <div className="flex w-full max-w-2xl flex-col items-center gap-1">
+      {/* Botón insertar ANTES del primer paso */}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => setAddingAfterIdx(-1)}
+          className="mb-0.5 inline-flex items-center gap-1 rounded-full border border-dashed border-teal-300 px-3 py-0.5 text-[10px] text-teal-600 hover:bg-teal-50 transition-colors"
+        >
+          + insertar paso al inicio
+        </button>
+      )}
+      {addingAfterIdx === -1 && (
+        <div className="w-full py-1">
+          <PasoEditForm
+            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+            onSave={(p) => commitAdd(-1, p)}
+            onCancel={() => setAddingAfterIdx(null)}
+            isNew
+          />
+        </div>
+      )}
+
       {ordenados.map((p, i) => (
         <div key={`${p.orden}-${i}`} className="flex w-full flex-col items-center">
-          {i > 0 && <FlowDownArrow label={clics[i - 1] ?? '—'} />}
-          <div className="flex w-full max-w-2xl shrink-0 flex-col items-center gap-1">
-            <FlowchartProcessBox
-              title={p.tituloBolita}
-              tipo={p.tipo}
-              pathVariant={pathVariant}
-              fullTooltip={`${p.tituloBolita}\n\n${p.descripcion}`}
+          {/* Conector entre pasos */}
+          {i > 0 && (
+            <FlowDownArrow
+              label={nodo.clicsEntrePasos[i - 1] ?? '—'}
+              onEditLabel={canEdit ? (v) => commitClic(i - 1, v) : undefined}
+              onAdd={canEdit ? () => setAddingAfterIdx(i - 1) : undefined}
             />
-            <p
-              className="w-full max-w-2xl text-center text-[12px] leading-snug text-gray-500 line-clamp-4"
-              title={p.descripcion}
+          )}
+
+          {/* Formulario insertar entre pasos */}
+          {addingAfterIdx === i - 1 && i > 0 && (
+            <div className="w-full py-1">
+              <PasoEditForm
+                initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+                onSave={(p) => commitAdd(i - 1, p)}
+                onCancel={() => setAddingAfterIdx(null)}
+                isNew
+              />
+            </div>
+          )}
+
+          {/* Paso: formulario de edición o visualización */}
+          {editingIdx === i ? (
+            <div className="w-full py-1">
+              <PasoEditForm
+                initial={{ tituloBolita: p.tituloBolita, descripcion: p.descripcion, tipo: p.tipo }}
+                onSave={(draft) => commitEdit(i, draft)}
+                onCancel={() => setEditingIdx(null)}
+              />
+            </div>
+          ) : (
+            <div
+              className="relative flex w-full max-w-2xl flex-col items-center gap-1"
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
             >
-              {p.descripcion}
-            </p>
-          </div>
+              <FlowchartProcessBox
+                title={p.tituloBolita}
+                tipo={p.tipo}
+                pathVariant={pathVariant}
+                fullTooltip={`${p.tituloBolita}\n\n${p.descripcion}`}
+              />
+              <p
+                className="w-full max-w-2xl text-center text-[12px] leading-snug text-gray-500 line-clamp-4"
+                title={p.descripcion}
+              >
+                {p.descripcion}
+              </p>
+              {canEdit && (
+                <div
+                  className="flex gap-1 transition-opacity"
+                  style={{ opacity: hoveredIdx === i ? 1 : 0, pointerEvents: hoveredIdx === i ? 'auto' : 'none' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setEditingIdx(i)}
+                    className="flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-500 shadow-sm hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                    title="Editar paso"
+                  >
+                    ✏ editar
+                  </button>
+                  {ordenados.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => commitDelete(i)}
+                      className="flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-500 shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Eliminar paso"
+                    >
+                      ✕ borrar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
+
+      {/* Formulario insertar al final */}
+      {addingAfterIdx === ordenados.length - 1 && (
+        <div className="w-full py-1">
+          <PasoEditForm
+            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+            onSave={(p) => commitAdd(ordenados.length - 1, p)}
+            onCancel={() => setAddingAfterIdx(null)}
+            isNew
+          />
+        </div>
+      )}
+
+      {canEdit && addingAfterIdx !== ordenados.length - 1 && (
+        <button
+          type="button"
+          onClick={() => setAddingAfterIdx(ordenados.length - 1)}
+          className="mt-1 inline-flex items-center gap-1 rounded-full border border-dashed border-teal-300 px-3 py-0.5 text-[10px] text-teal-600 hover:bg-teal-50 transition-colors"
+        >
+          + insertar paso al final
+        </button>
+      )}
     </div>
   )
 }
+
+// ─── Nodo recursivo editable ──────────────────────────────────────────────────
 
 function branchPathVariant(
   ramas: { etiqueta: string }[],
@@ -299,39 +869,174 @@ function branchPathVariant(
 function RenderFlowNodo({
   nodo,
   pathVariant = 'default',
+  onReplace,
 }: {
   nodo: FlowNodo
   pathVariant?: 'default' | 'alternate'
+  /** Si se pasa, habilita todos los controles de edición. */
+  onReplace?: (n: FlowNodo) => void
 }) {
+  const [editingDiamond, setEditingDiamond] = useState(false)
+  const [editingBranchIdx, setEditingBranchIdx] = useState<number | null>(null)
+  const [confirmingDeleteDecision, setConfirmingDeleteDecision] = useState(false)
+  const [addingDecision, setAddingDecision] = useState(false)
+
   if (nodo.tipo === 'lineal') {
     return (
       <div className="flex w-full flex-col items-center gap-2">
-        <TreeLinealSteps pasos={nodo.pasos} clics={nodo.clicsEntrePasos} pathVariant={pathVariant} />
+        <TreeLinealSteps
+          nodo={nodo}
+          pathVariant={pathVariant}
+          onReplace={
+            onReplace
+              ? (newLineal: FlowLineal) => onReplace(newLineal)
+              : undefined
+          }
+        />
         {nodo.despues != null && (
           <div className="mt-3 flex w-full flex-col items-center pt-2">
             <FlowDownArrow label="Continúa el flujo" />
-            <RenderFlowNodo nodo={nodo.despues} pathVariant={pathVariant} />
+            <RenderFlowNodo
+              nodo={nodo.despues}
+              pathVariant={pathVariant}
+              onReplace={
+                onReplace
+                  ? (newDespues) => onReplace({ ...nodo, despues: newDespues })
+                  : undefined
+              }
+            />
+          </div>
+        )}
+        {/* Añadir decisión al final del tramo (solo cuando no hay despues) */}
+        {onReplace && nodo.despues === null && (
+          <div className="mt-2 flex w-full flex-col items-center">
+            {addingDecision ? (
+              <NewDecisionForm
+                onSave={(decision) => {
+                  onReplace({ ...nodo, despues: decision })
+                  setAddingDecision(false)
+                }}
+                onCancel={() => setAddingDecision(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingDecision(true)}
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-orange-300 px-3 py-0.5 text-[10px] text-orange-500 hover:bg-orange-50 transition-colors"
+              >
+                + añadir nodo de decisión
+              </button>
+            )}
           </div>
         )}
       </div>
     )
   }
 
+  // Nodo de decisión (rombo)
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4">
-      <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} />
+      {editingDiamond ? (
+        <div className="w-full max-w-md">
+          <DiamondEditForm
+            initial={{ tituloDiamante: nodo.tituloDiamante, descripcion: nodo.descripcion }}
+            onSave={(t, d) => {
+              onReplace?.(updateDiamond(nodo, t, d))
+              setEditingDiamond(false)
+            }}
+            onCancel={() => setEditingDiamond(false)}
+          />
+        </div>
+      ) : (
+        <div className="flex w-full max-w-md flex-col items-center gap-1.5">
+          <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} />
+          {onReplace && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => { setEditingDiamond(true); setConfirmingDeleteDecision(false) }}
+                className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-400 shadow-sm hover:bg-orange-50 hover:text-orange-700 transition-colors"
+              >
+                ✏ editar decisión
+              </button>
+              {!confirmingDeleteDecision ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDeleteDecision(true)}
+                  className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-400 shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                >
+                  ✕ borrar decisión
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[10px]">
+                  <span className="text-red-700">Se conserva la 1.ª rama.</span>
+                  <button
+                    type="button"
+                    onClick={() => { onReplace(nodo.ramas[0].siguiente); setConfirmingDeleteDecision(false) }}
+                    className="font-semibold text-red-700 underline underline-offset-2 hover:text-red-900"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDeleteDecision(false)}
+                    className="text-gray-500 underline underline-offset-2 hover:text-gray-700"
+                  >
+                    Cancelar
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex w-full flex-col items-stretch justify-center gap-8 pt-1 lg:flex-row lg:items-start">
         {nodo.ramas.map((rama, idx) => {
           const childVariant = branchPathVariant(nodo.ramas, idx, pathVariant)
           return (
-            <div key={`${rama.etiqueta}-${idx}`} className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 lg:max-w-none">
-              <FlowDownArrow
-                label={rama.etiqueta}
-                fromDiamond
-                branchIndex={idx}
-                branchCount={nodo.ramas.length}
+            <div
+              key={`${rama.etiqueta}-${idx}`}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 lg:max-w-none"
+            >
+              {editingBranchIdx === idx ? (
+                <div className="flex w-full items-center gap-2 py-1">
+                  <InlineLabelEditor
+                    value={rama.etiqueta}
+                    maxLength={80}
+                    onSave={(v) => {
+                      onReplace?.(updateBranchLabel(nodo, idx, v))
+                      setEditingBranchIdx(null)
+                    }}
+                    className="flex-1 text-center"
+                  />
+                </div>
+              ) : (
+                <FlowDownArrow
+                  label={rama.etiqueta}
+                  fromDiamond
+                  branchIndex={idx}
+                  branchCount={nodo.ramas.length}
+                  onEditLabel={
+                    onReplace ? (v) => onReplace?.(updateBranchLabel(nodo, idx, v)) : undefined
+                  }
+                />
+              )}
+              <RenderFlowNodo
+                nodo={rama.siguiente}
+                pathVariant={childVariant}
+                onReplace={
+                  onReplace
+                    ? (newNodo) =>
+                        onReplace({
+                          ...nodo,
+                          ramas: nodo.ramas.map((r, i) =>
+                            i === idx ? { ...r, siguiente: newNodo } : r
+                          ),
+                        })
+                    : undefined
+                }
               />
-              <RenderFlowNodo nodo={rama.siguiente} pathVariant={childVariant} />
             </div>
           )
         })}
@@ -339,6 +1044,8 @@ function RenderFlowNodo({
     </div>
   )
 }
+
+// ─── Leyenda ─────────────────────────────────────────────────────────────────
 
 function FlowchartLegend() {
   return (
@@ -377,9 +1084,17 @@ function FlowchartLegend() {
         </span>
       </div>
       <p className="mt-2 text-[12px] text-gray-500">
-        Lectura <strong>de arriba abajo</strong>. Textos largos se resumen en la caja; el <strong>texto completo</strong>{' '}
-        aparece al pasar el cursor. Convención de símbolos (
-        <a href={SMARTDRAW_FLOWCHART_URL} className="text-teal-700 underline underline-offset-2" target="_blank" rel="noreferrer">
+        Lectura <strong>de arriba abajo</strong>. Pasa el cursor sobre cualquier{' '}
+        <strong>paso</strong> para ver los botones de edición (✏) y borrado (✕). Haz clic en las{' '}
+        <strong>etiquetas de flecha</strong> para editarlas. Los botones{' '}
+        <strong>+ insertar paso</strong> aparecen al pasar el cursor por las flechas. Convención de
+        símbolos (
+        <a
+          href={SMARTDRAW_FLOWCHART_URL}
+          className="text-teal-700 underline underline-offset-2"
+          target="_blank"
+          rel="noreferrer"
+        >
           referencia SmartDraw
         </a>
         ).
@@ -388,16 +1103,20 @@ function FlowchartLegend() {
   )
 }
 
+// ─── Sección del diagrama ─────────────────────────────────────────────────────
+
 function UserFlowchartSection({
   flow,
   segmentLabel,
   canalSubtitle,
   accent: _accent,
+  onUpdateFlow,
 }: {
   flow: UserFlowLine
   segmentLabel: string
   canalSubtitle?: string
   accent: 'cyan' | 'orange'
+  onUpdateFlow?: (newFlow: UserFlowLine) => void
 }) {
   const { raiz } = flow
 
@@ -407,7 +1126,9 @@ function UserFlowchartSection({
         <h2 className="text-lg font-bold text-gray-900">
           {segmentLabel}
           {canalSubtitle ? (
-            <span className="block text-sm font-normal text-gray-500 mt-0.5">Canal: {canalSubtitle}</span>
+            <span className="block text-sm font-normal text-gray-500 mt-0.5">
+              Canal: {canalSubtitle}
+            </span>
           ) : null}
         </h2>
         <p className="text-sm text-gray-500" title={flow.arquetipo}>
@@ -419,7 +1140,9 @@ function UserFlowchartSection({
         className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 text-sm text-gray-800"
         title={flow.objetivoConversion}
       >
-        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800/75 mb-0.5">Objetivo de conversión</p>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800/75 mb-0.5">
+          Objetivo de conversión
+        </p>
         <p className="leading-snug">{flow.objetivoConversion}</p>
       </div>
 
@@ -431,13 +1154,24 @@ function UserFlowchartSection({
 
           <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
 
-          <RenderFlowNodo nodo={raiz} />
+          <RenderFlowNodo
+            nodo={raiz}
+            onReplace={
+              onUpdateFlow
+                ? (newRaiz) => onUpdateFlow({ ...flow, raiz: newRaiz })
+                : undefined
+            }
+          />
         </div>
       </div>
-      <p className="text-[11px] text-gray-400 sm:hidden">Desplaza si hace falta para ver ramas anchas del diagrama →</p>
+      <p className="text-[11px] text-gray-400 sm:hidden">
+        Desplaza si hace falta para ver ramas anchas del diagrama →
+      </p>
     </section>
   )
 }
+
+// ─── Panel de segmento / canal ────────────────────────────────────────────────
 
 function SegmentFlowPanel({
   flow,
@@ -469,8 +1203,8 @@ function SegmentFlowPanel({
       <div>
         <h2 className="text-sm font-bold text-gray-900">Segmento y canal del diagrama</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Un diagrama por <strong>tipo de cliente</strong> y <strong>canal</strong>. Los canales se sincronizan con el
-          User Journey; puedes añadir más solo en este segmento.
+          Un diagrama por <strong>tipo de cliente</strong> y <strong>canal</strong>. Los canales se
+          sincronizan con el User Journey; puedes añadir más solo en este segmento.
         </p>
       </div>
       <div className="flex flex-wrap gap-2" role="tablist">
@@ -519,7 +1253,9 @@ function SegmentFlowPanel({
       </div>
       <div className="flex flex-wrap gap-2 items-end border-t border-gray-100 pt-3">
         <label className="flex-1 min-w-48 space-y-1">
-          <span className="text-[11px] font-medium text-gray-500">Canal adicional (solo este segmento)</span>
+          <span className="text-[11px] font-medium text-gray-500">
+            Canal adicional (solo este segmento)
+          </span>
           <input
             type="text"
             value={nuevoCanalLabel}
@@ -542,6 +1278,8 @@ function SegmentFlowPanel({
     </section>
   )
 }
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export function UserFlowPage() {
   const [flow, setFlow] = useState<UserFlowV3Persist | null>(null)
@@ -586,7 +1324,10 @@ export function UserFlowPage() {
             ),
           },
         }
-        if (filt.segmentoActivo === 'clienteActual' || filt.segmentoActivo === 'clientePotencial') {
+        if (
+          filt.segmentoActivo === 'clienteActual' ||
+          filt.segmentoActivo === 'clientePotencial'
+        ) {
           setSegmento(filt.segmentoActivo)
         }
         setFlow(next)
@@ -594,10 +1335,17 @@ export function UserFlowPage() {
         setDepsOk({
           persona: hasValidPersonasSaved(personaSaved?.saved?.personas),
           pov: hasValidPovSaved(povSaved?.saved?.statements),
-          journey: savedJourneyCellHasFlowBundle(journeySaved?.saved?.journey, journeySaved?.saved?.filters),
+          journey: savedJourneyCellHasFlowBundle(
+            journeySaved?.saved?.journey,
+            journeySaved?.saved?.filters
+          ),
         })
         const rawIdeas = ideasSaved?.saved?.ideas
-        setIdeasPersist(rawIdeas ? normalizeUserJourneyIdeasPersist(rawIdeas) : normalizeUserJourneyIdeasPersist(null))
+        setIdeasPersist(
+          rawIdeas
+            ? normalizeUserJourneyIdeasPersist(rawIdeas)
+            : normalizeUserJourneyIdeasPersist(null)
+        )
       })
       .finally(() => setLoadingSaved(false))
   }, [])
@@ -623,6 +1371,21 @@ export function UserFlowPage() {
       if (d.savedAt) setSavedAt(d.savedAt)
     } catch {}
     setSaving(false)
+  }
+
+  /** Actualiza el diagrama activo y guarda automáticamente. */
+  const handleUpdateActiveLine = async (newLine: UserFlowLine) => {
+    if (!flow) return
+    const activeCanalId = flow[segmento].canalActivoId
+    const next: UserFlowV3Persist = {
+      ...flow,
+      [segmento]: {
+        ...flow[segmento],
+        diagramas: { ...flow[segmento].diagramas, [activeCanalId]: newLine },
+      },
+    }
+    setFlow(next)
+    await saveFlow(next)
   }
 
   const handleSelectSegment = async (s: typeof segmento) => {
@@ -708,8 +1471,14 @@ export function UserFlowPage() {
         return
       }
       const cps = d.canalPorSegmento as { clienteActual?: string; clientePotencial?: string }
-      const ca = typeof cps?.clienteActual === 'string' ? cps.clienteActual : flow.clienteActual.canalActivoId
-      const cp = typeof cps?.clientePotencial === 'string' ? cps.clientePotencial : flow.clientePotencial.canalActivoId
+      const ca =
+        typeof cps?.clienteActual === 'string'
+          ? cps.clienteActual
+          : flow.clienteActual.canalActivoId
+      const cp =
+        typeof cps?.clientePotencial === 'string'
+          ? cps.clientePotencial
+          : flow.clientePotencial.canalActivoId
       let next = flow
       next = mergeGeneratedFlow(next, 'clienteActual', ca, d.clienteActual as UserFlowLine)
       next = mergeGeneratedFlow(next, 'clientePotencial', cp, d.clientePotencial as UserFlowLine)
@@ -749,11 +1518,21 @@ export function UserFlowPage() {
         setGenError(typeof d.error === 'string' ? d.error : 'Error al generar.')
         return
       }
-      if (d.version !== 3 || d.segmento !== segmento || !d.flow || typeof d.canalId !== 'string') {
+      if (
+        d.version !== 3 ||
+        d.segmento !== segmento ||
+        !d.flow ||
+        typeof d.canalId !== 'string'
+      ) {
         setGenError('Respuesta incompleta del servidor.')
         return
       }
-      const next = mergeGeneratedFlow(flow, segmento, d.canalId as string, d.flow as UserFlowLine)
+      const next = mergeGeneratedFlow(
+        flow,
+        segmento,
+        d.canalId as string,
+        d.flow as UserFlowLine
+      )
       setFlow(next)
       await saveFlow(next)
     } catch (e) {
@@ -766,11 +1545,19 @@ export function UserFlowPage() {
   const prereqBase = depsOk.persona && depsOk.pov && depsOk.journey
   const ideaCountActual = useMemo(() => {
     if (!flow || !ideasPersist) return 0
-    return getIdeasForSegmentChannel(ideasPersist, 'clienteActual', flow.clienteActual.canalActivoId).length
+    return getIdeasForSegmentChannel(
+      ideasPersist,
+      'clienteActual',
+      flow.clienteActual.canalActivoId
+    ).length
   }, [flow, ideasPersist])
   const ideaCountPotencial = useMemo(() => {
     if (!flow || !ideasPersist) return 0
-    return getIdeasForSegmentChannel(ideasPersist, 'clientePotencial', flow.clientePotencial.canalActivoId).length
+    return getIdeasForSegmentChannel(
+      ideasPersist,
+      'clientePotencial',
+      flow.clientePotencial.canalActivoId
+    ).length
   }, [flow, ideasPersist])
   const prereqOne =
     prereqBase && (segmento === 'clienteActual' ? ideaCountActual > 0 : ideaCountPotencial > 0)
@@ -823,15 +1610,19 @@ export function UserFlowPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
         <p>
-          El <strong>User Flow</strong> se muestra como diagrama <strong>vertical</strong> con estilo <strong>pastel</strong>{' '}
-          (cápsulas amarillas inicio/fin, rectángulos teal, rombo melocotón, paralelogramo gris para datos; la segunda
-          rama de una decisión binaria va en tono rosa). Se genera a partir de las{' '}
+          El <strong>User Flow</strong> se muestra como diagrama <strong>vertical</strong> con
+          estilo <strong>pastel</strong> (cápsulas amarillas inicio/fin, rectángulos teal, rombo
+          melocotón, paralelogramo gris para datos; la segunda rama de una decisión binaria va en
+          tono rosa). Se genera a partir de las{' '}
           <strong>ideas de funcionalidades y contenido</strong> guardadas en{' '}
-          <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
+          <Link
+            href="/user-journey"
+            className="font-semibold text-cyan-800 underline underline-offset-2"
+          >
             User Journey
           </Link>{' '}
-          para el mismo <strong>segmento</strong> y <strong>canal</strong>. El mapa de journey, la persona y el POV
-          afinan el resultado.
+          para el mismo <strong>segmento</strong> y <strong>canal</strong>. El mapa de journey, la
+          persona y el POV afinan el resultado.
         </p>
         <p className="text-xs text-gray-500">
           Símbolos habituales:{' '}
@@ -847,13 +1638,20 @@ export function UserFlowPage() {
         </p>
       </div>
 
-      {(!depsOk.persona || !depsOk.pov || !depsOk.journey || ideaCountActual === 0 || ideaCountPotencial === 0) && (
+      {(!depsOk.persona ||
+        !depsOk.pov ||
+        !depsOk.journey ||
+        ideaCountActual === 0 ||
+        ideaCountPotencial === 0) && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
           <p className="font-medium">Faltan datos guardados</p>
           <ul className="text-xs list-disc pl-4 space-y-1">
             {!depsOk.journey && (
               <li>
-                <Link href="/user-journey" className="font-semibold underline underline-offset-2">
+                <Link
+                  href="/user-journey"
+                  className="font-semibold underline underline-offset-2"
+                >
                   User Journey Map
                 </Link>{' '}
                 guardado con mapas para los canales activos por segmento.
@@ -861,14 +1659,14 @@ export function UserFlowPage() {
             )}
             {depsOk.journey && ideaCountActual === 0 && (
               <li>
-                <strong>Ideas</strong> en User Journey (cliente actual, canal activo aquí): al menos una en «
-                Funcionalidades y contenido por canal».
+                <strong>Ideas</strong> en User Journey (cliente actual, canal activo aquí): al
+                menos una en «Funcionalidades y contenido por canal».
               </li>
             )}
             {depsOk.journey && ideaCountPotencial === 0 && (
               <li>
-                <strong>Ideas</strong> en User Journey (cliente potencial, canal activo aquí): al menos una en la misma
-                sección.
+                <strong>Ideas</strong> en User Journey (cliente potencial, canal activo aquí): al
+                menos una en la misma sección.
               </li>
             )}
             {!depsOk.persona && <li>User Persona (ambos segmentos).</li>}
@@ -880,15 +1678,24 @@ export function UserFlowPage() {
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
         <p>
           Prioridad:{' '}
-          <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
+          <Link
+            href="/user-journey"
+            className="font-semibold text-cyan-800 underline underline-offset-2"
+          >
             ideas funcionalidad/contenido
           </Link>
           {' · apoyo: mapa '}
-          <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
+          <Link
+            href="/user-journey"
+            className="font-semibold text-cyan-800 underline underline-offset-2"
+          >
             Journey
           </Link>
           {' · '}
-          <Link href="/user-persona" className="font-semibold text-cyan-700 underline underline-offset-2">
+          <Link
+            href="/user-persona"
+            className="font-semibold text-cyan-700 underline underline-offset-2"
+          >
             Persona
           </Link>
           {' + '}
@@ -948,8 +1755,8 @@ export function UserFlowPage() {
           <div className="space-y-1">
             <p className="font-semibold text-gray-800">User Flow (diagrama de flujo)</p>
             <p className="text-sm text-gray-500 max-w-lg mx-auto leading-relaxed">
-              Genera diagramas para los canales activos de cada segmento (o solo el segmento y canal seleccionados).
-              Cada canal puede tener su propio diagrama guardado en Sheets.
+              Genera diagramas para los canales activos de cada segmento (o solo el segmento y
+              canal seleccionados). Cada canal puede tener su propio diagrama guardado en Sheets.
             </p>
           </div>
           <button
@@ -973,8 +1780,8 @@ export function UserFlowPage() {
                 en el canal <strong>{canalLabel}</strong>
               </>
             ) : null}
-            . Genera el mapa en User Journey, añade <strong>ideas</strong> de funcionalidad/contenido para ese canal, y
-            pulsa generar aquí.
+            . Genera el mapa en User Journey, añade <strong>ideas</strong> de
+            funcionalidad/contenido para ese canal, y pulsa generar aquí.
           </p>
           <button
             type="button"
@@ -986,12 +1793,14 @@ export function UserFlowPage() {
           </button>
         </div>
       ) : null}
+
       {activeLine ? (
         <UserFlowchartSection
           flow={activeLine}
           segmentLabel={segmentLabel}
           canalSubtitle={canalLabel}
           accent={accent}
+          onUpdateFlow={(newLine) => void handleUpdateActiveLine(newLine)}
         />
       ) : null}
     </div>
