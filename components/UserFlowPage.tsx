@@ -27,6 +27,26 @@ import {
 
 export type { FlowPaso, UserFlowLine, UserFlowBundle } from '@/lib/user-flow-tree'
 
+// ─── Iconos SVG (mismos que UserJourneyPage / EmpathyMapPage) ─────────────────
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  )
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
 // ─── Validaciones de dependencias ────────────────────────────────────────────
 
 function hasValidPersonasSaved(personas: unknown): boolean {
@@ -807,19 +827,21 @@ function TreeLinealSteps({
                   <button
                     type="button"
                     onClick={() => setEditingIdx(i)}
-                    className="flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-500 shadow-sm hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                    className="rounded-lg p-1.5 text-teal-700 hover:bg-teal-50 ring-1 ring-transparent hover:ring-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-300 transition-colors"
                     title="Editar paso"
+                    aria-label="Editar paso"
                   >
-                    ✏ editar
+                    <PencilIcon className="h-3.5 w-3.5" />
                   </button>
                   {ordenados.length > 1 && (
                     <button
                       type="button"
                       onClick={() => commitDelete(i)}
-                      className="flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-500 shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 ring-1 ring-transparent hover:ring-red-200 focus:outline-none focus:ring-2 focus:ring-red-300 transition-colors"
                       title="Eliminar paso"
+                      aria-label="Eliminar paso"
                     >
-                      ✕ borrar
+                      <XIcon className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
@@ -955,17 +977,21 @@ function RenderFlowNodo({
               <button
                 type="button"
                 onClick={() => { setEditingDiamond(true); setConfirmingDeleteDecision(false) }}
-                className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-400 shadow-sm hover:bg-orange-50 hover:text-orange-700 transition-colors"
+                className="rounded-lg p-1.5 text-orange-700 hover:bg-orange-50 ring-1 ring-transparent hover:ring-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-colors"
+                title="Editar decisión"
+                aria-label="Editar decisión"
               >
-                ✏ editar decisión
+                <PencilIcon className="h-3.5 w-3.5" />
               </button>
               {!confirmingDeleteDecision ? (
                 <button
                   type="button"
                   onClick={() => setConfirmingDeleteDecision(true)}
-                  className="inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-400 shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                  className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 ring-1 ring-transparent hover:ring-red-200 focus:outline-none focus:ring-2 focus:ring-red-300 transition-colors"
+                  title="Borrar decisión"
+                  aria-label="Borrar decisión"
                 >
-                  ✕ borrar decisión
+                  <XIcon className="h-3.5 w-3.5" />
                 </button>
               ) : (
                 <span className="inline-flex items-center gap-1.5 rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[10px]">
