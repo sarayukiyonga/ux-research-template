@@ -169,6 +169,38 @@ function reorderPasos(nodo: FlowLineal, fromIdx: number, toIdx: number): FlowLin
   return { ...nodo, pasos: renumberPasos(sorted) }
 }
 
+/**
+ * Divide un tramo lineal en afterIdx e inserta una decisión como `despues`.
+ * - pasos[0..afterIdx] → quedan en el lineal resultante
+ * - pasos[afterIdx+1..n] → pasan como primera rama de la decisión
+ */
+function splitLinealAtDecision(
+  nodo: FlowLineal,
+  afterIdx: number,
+  decision: FlowDecision
+): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const prePasos = renumberPasos(sorted.slice(0, afterIdx + 1))
+  const postPasos = sorted.slice(afterIdx + 1)
+  const preClics = nodo.clicsEntrePasos.slice(0, afterIdx)
+  const postClics = nodo.clicsEntrePasos.slice(afterIdx + 1)
+
+  const continuation: FlowNodo =
+    postPasos.length > 0
+      ? { tipo: 'lineal', pasos: renumberPasos(postPasos), clicsEntrePasos: postClics, despues: nodo.despues }
+      : nodo.despues ?? makeMinimalLineal('Continúa')
+
+  const decisionFinal: FlowDecision = {
+    ...decision,
+    ramas: [
+      { ...decision.ramas[0], siguiente: continuation },
+      decision.ramas[1],
+    ],
+  }
+
+  return { tipo: 'lineal', pasos: prePasos, clicsEntrePasos: preClics, despues: decisionFinal }
+}
+
 function clearRetornoAt(nodo: FlowLineal, idx: number): FlowLineal {
   const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
   const newPasos = sorted.map((p, i) =>
@@ -613,10 +645,12 @@ function FlowchartProcessBox({
   pathVariant?: 'default' | 'alternate'
 }) {
   const tip = (fullTooltip?.trim() || title).slice(0, 2000)
-  const pastelTeal =
+  // Navegación/proceso → azul (distinguible de conversión que es verde/teal)
+  const pastelBlue =
     pathVariant === 'alternate'
       ? 'border border-rose-300 bg-rose-50 text-gray-800'
-      : 'border border-teal-300/90 bg-teal-50/95 text-gray-800'
+      : 'border border-blue-300/90 bg-blue-50/95 text-gray-800'
+  // Conversión → teal/verde
   const pastelTealConv =
     pathVariant === 'alternate'
       ? 'border border-rose-400 bg-rose-100/70 text-gray-800'
@@ -651,7 +685,7 @@ function FlowchartProcessBox({
   return (
     <div
       title={tip}
-      className={`flex min-h-14 min-w-44 max-w-2xl shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-medium leading-snug shadow-sm ${pastelTeal}`}
+      className={`flex min-h-14 min-w-44 max-w-2xl shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-medium leading-snug shadow-sm ${pastelBlue}`}
     >
       <span className="line-clamp-3">{title}</span>
     </div>
@@ -837,13 +871,17 @@ function TreeLinealSteps({
   nodo,
   pathVariant = 'default',
   onReplace,
+  onAddDecisionBefore,
 }: {
   nodo: FlowLineal
   pathVariant?: 'default' | 'alternate'
   onReplace?: (n: FlowLineal) => void
+  /** Llamado cuando el usuario quiere insertar una decisión ANTES de todos los pasos. */
+  onAddDecisionBefore?: (d: FlowDecision) => void
 }) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [addingAfterIdx, setAddingAfterIdx] = useState<number | null>(null)
+  const [addingDecisionAfterIdx, setAddingDecisionAfterIdx] = useState<number | null>(null)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
@@ -871,6 +909,20 @@ function TreeLinealSteps({
 
   const commitDeleteRetorno = (i: number) => {
     onReplace?.(clearRetornoAt(nodo, i))
+  }
+
+  const commitAddDecision = (afterIdx: number, decision: FlowDecision) => {
+    if (afterIdx === -1) {
+      onAddDecisionBefore?.(decision)
+    } else {
+      onReplace?.(splitLinealAtDecision(nodo, afterIdx, decision))
+    }
+    setAddingDecisionAfterIdx(null)
+  }
+
+  const openDecisionForm = (afterIdx: number) => {
+    setAddingDecisionAfterIdx(afterIdx)
+    setAddingAfterIdx(null)  // cierra cualquier form de paso abierto
   }
 
   const handleDragStart = (e: React.DragEvent, i: number) => {
@@ -901,15 +953,26 @@ function TreeLinealSteps({
 
   return (
     <div className="flex w-full max-w-2xl flex-col items-center gap-1">
-      {/* Botón insertar ANTES del primer paso */}
+      {/* Botones insertar / añadir decisión ANTES del primer paso */}
       {canEdit && (
-        <button
-          type="button"
-          onClick={() => setAddingAfterIdx(-1)}
-          className="mb-0.5 inline-flex items-center gap-1 rounded-full border border-dashed border-teal-300 px-3 py-0.5 text-[10px] text-teal-600 hover:bg-teal-50 transition-colors"
-        >
-          + insertar paso al inicio
-        </button>
+        <div className="mb-0.5 flex flex-wrap items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { setAddingAfterIdx(-1); setAddingDecisionAfterIdx(null) }}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-teal-300 px-3 py-0.5 text-[10px] text-teal-600 hover:bg-teal-50 transition-colors"
+          >
+            + insertar paso al inicio
+          </button>
+          {onAddDecisionBefore && (
+            <button
+              type="button"
+              onClick={() => openDecisionForm(-1)}
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-orange-300 px-3 py-0.5 text-[10px] text-orange-500 hover:bg-orange-50 transition-colors"
+            >
+              + añadir decisión al inicio
+            </button>
+          )}
+        </div>
       )}
       {addingAfterIdx === -1 && (
         <div className="w-full py-1">
@@ -921,6 +984,14 @@ function TreeLinealSteps({
           />
         </div>
       )}
+      {addingDecisionAfterIdx === -1 && (
+        <div className="w-full py-1">
+          <NewDecisionForm
+            onSave={(d) => commitAddDecision(-1, d)}
+            onCancel={() => setAddingDecisionAfterIdx(null)}
+          />
+        </div>
+      )}
 
       {ordenados.map((p, i) => (
         <div key={`${p.orden}-${i}`} className="flex w-full flex-col items-center">
@@ -929,11 +1000,21 @@ function TreeLinealSteps({
             <FlowDownArrow
               label={nodo.clicsEntrePasos[i - 1] ?? '—'}
               onEditLabel={canEdit ? (v) => commitClic(i - 1, v) : undefined}
-              onAdd={canEdit ? () => setAddingAfterIdx(i - 1) : undefined}
+              onAdd={canEdit ? () => { setAddingAfterIdx(i - 1); setAddingDecisionAfterIdx(null) } : undefined}
             />
           )}
+          {/* Botón añadir decisión entre pasos (se muestra debajo del conector) */}
+          {canEdit && i > 0 && addingDecisionAfterIdx !== i - 1 && addingAfterIdx !== i - 1 && (
+            <button
+              type="button"
+              onClick={() => openDecisionForm(i - 1)}
+              className="mb-0.5 inline-flex items-center gap-1 rounded-full border border-dashed border-orange-300 px-3 py-0.5 text-[10px] text-orange-500 hover:bg-orange-50 transition-colors"
+            >
+              + añadir decisión aquí
+            </button>
+          )}
 
-          {/* Formulario insertar entre pasos */}
+          {/* Formulario insertar paso entre pasos */}
           {addingAfterIdx === i - 1 && i > 0 && (
             <div className="w-full py-1">
               <PasoEditForm
@@ -941,6 +1022,15 @@ function TreeLinealSteps({
                 onSave={(p) => commitAdd(i - 1, p)}
                 onCancel={() => setAddingAfterIdx(null)}
                 isNew
+              />
+            </div>
+          )}
+          {/* Formulario insertar decisión entre pasos */}
+          {addingDecisionAfterIdx === i - 1 && i > 0 && (
+            <div className="w-full py-1">
+              <NewDecisionForm
+                onSave={(d) => commitAddDecision(i - 1, d)}
+                onCancel={() => setAddingDecisionAfterIdx(null)}
               />
             </div>
           )}
@@ -1097,13 +1187,13 @@ function TreeLinealSteps({
 // ─── Nodo recursivo editable ──────────────────────────────────────────────────
 
 function branchPathVariant(
-  ramas: { etiqueta: string }[],
+  _ramas: { etiqueta: string }[],
   idx: number,
-  parentVariant: 'default' | 'alternate'
+  _parentVariant: 'default' | 'alternate'
 ): 'default' | 'alternate' {
-  if (parentVariant === 'alternate') return 'alternate'
-  if (ramas.length === 2 && idx === 1) return 'alternate'
-  return 'default'
+  // La primera rama (índice 0 = Sí / afirmativa) es siempre teal.
+  // Las ramas siguientes (No, otras) son siempre rose/alternate.
+  return idx === 0 ? 'default' : 'alternate'
 }
 
 function RenderFlowNodo({
@@ -1130,6 +1220,18 @@ function RenderFlowNodo({
           onReplace={
             onReplace
               ? (newLineal: FlowLineal) => onReplace(newLineal)
+              : undefined
+          }
+          onAddDecisionBefore={
+            onReplace
+              ? (decision: FlowDecision) =>
+                  onReplace({
+                    ...decision,
+                    ramas: [
+                      { ...decision.ramas[0], siguiente: nodo },
+                      decision.ramas[1],
+                    ],
+                  })
               : undefined
           }
         />
@@ -1301,7 +1403,7 @@ function FlowchartLegend() {
           Inicio / fin (cápsula)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-5 w-10 shrink-0 rounded-md border border-teal-300 bg-teal-50" />
+          <span className="inline-block h-5 w-10 shrink-0 rounded-md border border-blue-300 bg-blue-50" />
           Proceso (rectángulo)
         </span>
         <span className="inline-flex items-center gap-1.5">
@@ -1374,6 +1476,21 @@ function UserFlowchartSection({
   const { raiz } = flow
   const innerRef = useRef<HTMLDivElement>(null)
   const [arrows, setArrows] = useState<RetornoArrow[]>([])
+  const [editingDeDonde, setEditingDeDonde] = useState(false)
+  const [draftDeDonde, setDraftDeDonde] = useState(flow.deDondeEntra)
+  const [hoveredDeDonde, setHoveredDeDonde] = useState(false)
+  const canEdit = Boolean(onUpdateFlow)
+
+  const commitDeDonde = () => {
+    onUpdateFlow?.({ ...flow, deDondeEntra: draftDeDonde.trim() })
+    setEditingDeDonde(false)
+  }
+
+  const deleteDeDonde = () => {
+    onUpdateFlow?.({ ...flow, deDondeEntra: '' })
+    setDraftDeDonde('')
+    setEditingDeDonde(false)
+  }
 
   const allTargets = useMemo(() => collectTargets(raiz), [raiz])
 
@@ -1448,9 +1565,88 @@ function UserFlowchartSection({
             ref={innerRef}
             className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-1 py-2 sm:px-2"
           >
-            <FlowParallelogram>{flow.deDondeEntra}</FlowParallelogram>
+            {/* Paralelograma de origen — editable/borrable */}
+            {editingDeDonde ? (
+              <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                  Origen del flujo
+                </p>
+                <textarea
+                  autoFocus
+                  value={draftDeDonde}
+                  onChange={(e) => setDraftDeDonde(e.target.value.slice(0, 260))}
+                  maxLength={260}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 resize-none"
+                  placeholder="¿De dónde llega el usuario? (ej. Google Ads, email, directo…)"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitDeDonde() }
+                    if (e.key === 'Escape') setEditingDeDonde(false)
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDeDonde(false)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={commitDeDonde}
+                    className="rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            ) : flow.deDondeEntra ? (
+              <div
+                className="relative flex w-full max-w-2xl flex-col items-center gap-1"
+                onMouseEnter={() => setHoveredDeDonde(true)}
+                onMouseLeave={() => setHoveredDeDonde(false)}
+              >
+                <FlowParallelogram>{flow.deDondeEntra}</FlowParallelogram>
+                {canEdit && (
+                  <div
+                    className="flex gap-1 transition-opacity"
+                    style={{ opacity: hoveredDeDonde ? 1 : 0, pointerEvents: hoveredDeDonde ? 'auto' : 'none' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => { setDraftDeDonde(flow.deDondeEntra); setEditingDeDonde(true) }}
+                      className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-50 ring-1 ring-transparent hover:ring-slate-200 transition-colors"
+                      title="Editar origen"
+                      aria-label="Editar origen"
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deleteDeDonde}
+                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 ring-1 ring-transparent hover:ring-red-200 transition-colors"
+                      title="Eliminar origen"
+                      aria-label="Eliminar origen"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : canEdit ? (
+              <button
+                type="button"
+                onClick={() => { setDraftDeDonde(''); setEditingDeDonde(true) }}
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-3 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                + añadir origen del flujo
+              </button>
+            ) : null}
 
-            <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
+            {flow.deDondeEntra && (
+              <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
+            )}
 
             <RenderFlowNodo
               nodo={raiz}
