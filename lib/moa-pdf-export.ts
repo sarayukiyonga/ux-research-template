@@ -48,8 +48,29 @@ function addCanvasToPdf(
   }
 }
 
+/**
+ * Oculta inputs, selects, textareas, botones y cualquier elemento marcado con
+ * [data-pdf-ignore] en el clon del documento antes de que html2canvas lo renderice.
+ * No modifica el DOM real de la página.
+ */
+function hideInteractiveElements(clonedDoc: Document) {
+  const selector = [
+    'input',
+    'textarea',
+    'select',
+    'button',
+    '[role="button"]',
+    '[data-pdf-ignore]',
+  ].join(',')
+
+  clonedDoc.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+    el.style.setProperty('display', 'none', 'important')
+  })
+}
+
 export async function exportElementToPdf(element: HTMLElement, fileName: string) {
-  const html2canvas = (await import('html2canvas')).default
+  // html2canvas-pro es un fork con soporte para oklch/oklab/lab/lch usados por Tailwind v4
+  const html2canvas = (await import('html2canvas-pro')).default
   const { jsPDF } = await import('jspdf')
 
   const canvas = await html2canvas(element, {
@@ -60,6 +81,7 @@ export async function exportElementToPdf(element: HTMLElement, fileName: string)
     scrollY: -window.scrollY,
     windowWidth: document.documentElement.scrollWidth,
     windowHeight: Math.max(element.scrollHeight, element.clientHeight),
+    onclone: (_clonedDoc, clonedEl) => hideInteractiveElements(clonedEl.ownerDocument),
   })
 
   const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' })
@@ -81,7 +103,8 @@ export async function exportRoutesToCombinedPdf(
   fileName: string,
   options?: { settleMs?: number; scale?: number }
 ) {
-  const html2canvas = (await import('html2canvas')).default
+  // html2canvas-pro es un fork con soporte para oklch/oklab/lab/lch usados por Tailwind v4
+  const html2canvas = (await import('html2canvas-pro')).default
   const { jsPDF } = await import('jspdf')
 
   const settleMs = options?.settleMs ?? 2200
@@ -142,6 +165,7 @@ export async function exportRoutesToCombinedPdf(
         scrollY: 0,
         windowWidth: doc.documentElement.scrollWidth,
         windowHeight: Math.max(root.scrollHeight, root.clientHeight),
+        onclone: (_clonedDoc, clonedEl) => hideInteractiveElements(clonedEl.ownerDocument),
       })
 
       win?.scrollTo(0, prevY)
