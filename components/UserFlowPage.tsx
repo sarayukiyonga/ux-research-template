@@ -205,7 +205,7 @@ function FlowDownArrow({
     >
       <svg
         viewBox="0 0 200 82"
-        className="h-[5.25rem] w-full text-gray-400"
+        className="h-21 w-full text-gray-400"
         preserveAspectRatio="xMidYMin meet"
         aria-hidden
       >
@@ -234,12 +234,12 @@ function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: str
   const romboTip = [titulo.trim(), descripcion.trim()].filter(Boolean).join('\n\n').slice(0, 2000)
   return (
     <div className="flex w-full max-w-md shrink-0 flex-col items-center gap-1.5 cursor-default" title={romboTip}>
-      <div className="relative flex h-20 w-20 items-center justify-center sm:h-[5.25rem] sm:w-[5.25rem]">
+      <div className="relative flex h-20 w-20 items-center justify-center sm:h-21 sm:w-21">
         <div
           className="absolute inset-[6px] rotate-45 rounded-md border border-orange-300/95 bg-orange-100/85 shadow-sm"
           aria-hidden
         />
-        <span className="relative z-10 max-w-[4.5rem] text-center text-[10px] font-semibold leading-tight text-gray-800 line-clamp-3">
+        <span className="relative z-10 max-w-18 text-center text-[10px] font-semibold leading-tight text-gray-800 line-clamp-3">
           {titulo}
         </span>
       </div>
