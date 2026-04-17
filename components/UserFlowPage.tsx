@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, useId, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FlowPaso, FlowNodo, UserFlowLine } from '@/lib/user-flow-tree'
@@ -62,24 +62,18 @@ function hasValidPovSaved(statements: unknown): boolean {
 const SMARTDRAW_FLOWCHART_URL =
   'https://www.smartdraw.com/flowchart/simbolos-de-diagramas-de-flujo.htm'
 
-/** Paralelogramo: entrada/salida de datos (canal por el que entra el usuario). */
-function FlowParallelogram({
-  children,
-  borderClass,
-  bgClass,
-}: {
-  children: ReactNode
-  borderClass: string
-  bgClass: string
-}) {
+/** Paralelogramo: entrada/salida de datos (canal / contexto), estilo pastel neutro. */
+function FlowParallelogram({ children }: { children: ReactNode }) {
+  const plain =
+    typeof children === 'string' || typeof children === 'number' ? String(children) : undefined
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 w-29">
-      <div className={`w-full -skew-x-12 rounded-sm border-2 px-2 py-2.5 shadow-sm ${borderClass} ${bgClass}`}>
-        <div className="skew-x-12 text-center text-[10px] font-semibold leading-tight text-gray-900 line-clamp-5">
+    <div className="flex w-full max-w-2xl shrink-0 flex-col items-center gap-1" title={plain}>
+      <div className="w-fit -skew-x-10 rounded-lg border border-slate-300/90 bg-slate-100/90 px-4 py-2.5 shadow-sm">
+        <div className="skew-x-10 text-center text-[11px] font-medium leading-snug text-gray-800 line-clamp-6">
           {children}
         </div>
       </div>
-      <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">Entrada / salida</span>
+      <span className="text-[8px] font-medium text-gray-500">Entrada-salida de datos</span>
     </div>
   )
 }
@@ -87,107 +81,171 @@ function FlowParallelogram({
 function FlowchartProcessBox({
   title,
   tipo,
-  accent,
+  fullTooltip,
+  pathVariant = 'default',
 }: {
   title: string
   tipo: FlowPaso['tipo']
-  accent: 'cyan' | 'orange'
+  /** Título + descripción para tooltip al truncar. */
+  fullTooltip?: string
+  /** Rama secundaria (p. ej. «No»): rectángulos estilo pastel rosa como en diagramas de excepción. */
+  pathVariant?: 'default' | 'alternate'
 }) {
-  const accentBorder = accent === 'cyan' ? 'border-cyan-600' : 'border-orange-600'
-  const accentBg = accent === 'cyan' ? 'bg-cyan-50' : 'bg-orange-50'
+  const tip = (fullTooltip?.trim() || title).slice(0, 2000)
+  const pastelTeal =
+    pathVariant === 'alternate'
+      ? 'border border-rose-300 bg-rose-50 text-gray-800'
+      : 'border border-teal-300/90 bg-teal-50/95 text-gray-800'
+  const pastelTealConv =
+    pathVariant === 'alternate'
+      ? 'border border-rose-400 bg-rose-100/70 text-gray-800'
+      : 'border border-teal-400/90 bg-teal-100/80 text-gray-800'
 
   if (tipo === 'entrada' || tipo === 'salida') {
     return (
       <div
-        className={`flex min-h-13 min-w-22 max-w-27 shrink-0 items-center justify-center rounded-full border-2 px-2 py-2 text-center text-[10px] font-bold leading-tight shadow-sm ${
+        title={tip}
+        className={`flex min-h-14 min-w-44 max-w-2xl shrink-0 items-center justify-center rounded-full border px-4 py-2.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${
           tipo === 'entrada'
-            ? 'border-emerald-600 bg-emerald-50 text-emerald-950'
-            : 'border-slate-500 bg-slate-50 text-slate-800'
+            ? 'border-amber-300/95 bg-amber-50 text-gray-800'
+            : 'border-amber-400/90 bg-amber-100/80 text-gray-800'
         }`}
       >
-        {title}
+        <span className="line-clamp-3">{title}</span>
       </div>
     )
   }
 
   if (tipo === 'conversion') {
     return (
-      <div className="rounded-md p-[3px] bg-amber-400/90 shadow-sm">
-        <div
-          className={`flex min-h-13 min-w-22 max-w-27 items-center justify-center rounded-[4px] border-2 border-amber-800 bg-amber-50 px-2 py-2 text-center text-[10px] font-bold leading-tight text-amber-950`}
-        >
-          {title}
-        </div>
+      <div title={tip} className={`flex min-h-14 min-w-44 max-w-2xl items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${pastelTealConv}`}>
+        <span className="line-clamp-3">{title}</span>
       </div>
     )
   }
 
   return (
     <div
-      className={`flex min-h-13 min-w-22 max-w-27 shrink-0 items-center justify-center rounded-md border-2 px-2 py-2 text-center text-[10px] font-semibold leading-tight shadow-sm ${accentBorder} ${accentBg} text-gray-900`}
+      title={tip}
+      className={`flex min-h-14 min-w-44 max-w-2xl shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-center text-[11px] font-medium leading-snug shadow-sm ${pastelTeal}`}
     >
-      {title}
+      <span className="line-clamp-3">{title}</span>
     </div>
   )
 }
 
 /**
- * Conector vertical entre nodos (sin marker SVG: evita recortes y fallos de pintado).
- * Línea + triángulo relleno; el texto va debajo para no solapar la punta.
+ * Conector entre nodos: tramo vertical simple, o en **L** saliendo del rombo (baja, gira hacia el carril de la rama, baja).
  */
-function FlowDownArrow({ label, strokeClass }: { label: string; strokeClass: string }) {
+function FlowDownArrow({
+  label,
+  fromDiamond,
+  branchIndex = 0,
+  branchCount = 1,
+}: {
+  label: string
+  /** Si true, dibuja codo en L hacia el interior del diagrama (solo entre ramas del rombo). */
+  fromDiamond?: boolean
+  branchIndex?: number
+  branchCount?: number
+}) {
+  const markerId = useId().replace(/:/g, '')
+  const tip = label ? label.slice(0, 2000) : undefined
+
+  const labelBlock =
+    label != null && label !== '' ? (
+      <p className="w-full max-w-2xl px-1 text-center text-[9px] font-medium leading-snug text-gray-500 line-clamp-3">
+        {label}
+      </p>
+    ) : (
+      <p className="text-[9px] text-gray-400">—</p>
+    )
+
+  const useElbow = Boolean(fromDiamond && branchCount >= 2)
+  const y0 = 6
+  const yElbow = 18
+  const yArrow = 74
+
+  // Tramo horizontal: de borde a borde (xEntry → xFar), sin flecha.
+  // Tramo vertical: del centro (x=50) en yElbow hasta yArrow, con flecha.
+  let elbowPathD: string | null = null
+  let straightPathD: string
+
+  if (!useElbow) {
+    straightPathD = `M 100 ${y0} L 100 ${yArrow}`
+  } else if (branchCount === 2) {
+    const xEntry = branchIndex === 0 ? 200 : 0
+    elbowPathD    = `M ${xEntry} ${y0} L ${xEntry} ${yElbow} L 100 ${yElbow}`
+    straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
+  } else {
+    const last = branchCount - 1
+    if (branchIndex === 0) {
+      elbowPathD    = `M 200 ${y0} L 200 ${yElbow} L 100 ${yElbow}`
+      straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
+    } else if (branchIndex === last) {
+      elbowPathD    = `M 0 ${y0} L 0 ${yElbow} L 100 ${yElbow}`
+      straightPathD = `M 100 ${yElbow} L 100 ${yArrow}`
+    } else {
+      straightPathD = `M 100 ${y0} L 100 ${yArrow}`
+    }
+  }
+
+  const sharedStroke = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.35,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  }
+
   return (
-    <div className="flex flex-col items-center gap-1.5 py-2 shrink-0 w-full max-w-[min(100%,18rem)]">
+    <div
+      className="flex w-full max-w-2xl shrink-0 flex-col items-center gap-0.5 py-1 text-gray-400"
+      title={tip}
+    >
       <svg
-        width="48"
-        height="56"
-        viewBox="0 0 48 56"
-        className={strokeClass}
-        style={{ overflow: 'visible' }}
+        viewBox="0 0 200 82"
+        className="h-[5.25rem] w-full text-gray-400"
+        preserveAspectRatio="xMidYMin meet"
         aria-hidden
       >
-        <line
-          x1="24"
-          y1="4"
-          x2="24"
-          y2="38"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-        <polygon points="24,52 16,40 32,40" fill="currentColor" />
+        <defs>
+          <marker
+            id={markerId}
+            markerWidth="7"
+            markerHeight="7"
+            refX="3.5"
+            refY="3.5"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path d="M0,0 L7,3.5 L0,7 Z" fill="currentColor" />
+          </marker>
+        </defs>
+        {elbowPathD && <path d={elbowPathD} {...sharedStroke} />}
+        <path d={straightPathD} {...sharedStroke} markerEnd={`url(#${markerId})`} />
       </svg>
-      {label ? (
-        <p className="w-full px-1 text-center text-[9px] font-semibold leading-snug text-gray-700">{label}</p>
-      ) : (
-        <p className="text-[9px] text-gray-400">—</p>
-      )}
+      {labelBlock}
     </div>
   )
 }
 
-function FlowDiamond({
-  titulo,
-  descripcion,
-  accent,
-}: {
-  titulo: string
-  descripcion: string
-  accent: 'cyan' | 'orange'
-}) {
-  const border = accent === 'cyan' ? 'border-indigo-600 bg-indigo-50' : 'border-purple-700 bg-purple-50'
+function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: string }) {
+  const romboTip = [titulo.trim(), descripcion.trim()].filter(Boolean).join('\n\n').slice(0, 2000)
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 w-22">
-      <div className="relative flex h-17 w-17 items-center justify-center">
-        <div className={`absolute inset-[5px] rotate-45 rounded-sm border-2 shadow-sm ${border}`} aria-hidden />
-        <span className="relative z-10 max-w-13 text-center text-[9px] font-bold leading-tight text-gray-900">
+    <div className="flex w-full max-w-md shrink-0 flex-col items-center gap-1.5 cursor-default" title={romboTip}>
+      <div className="relative flex h-20 w-20 items-center justify-center sm:h-[5.25rem] sm:w-[5.25rem]">
+        <div
+          className="absolute inset-[6px] rotate-45 rounded-md border border-orange-300/95 bg-orange-100/85 shadow-sm"
+          aria-hidden
+        />
+        <span className="relative z-10 max-w-[4.5rem] text-center text-[10px] font-semibold leading-tight text-gray-800 line-clamp-3">
           {titulo}
         </span>
       </div>
-      <p className="text-[8px] text-center text-gray-500 leading-snug line-clamp-3 max-w-24" title={descripcion}>
+      <p className="max-w-xs text-center text-[9px] leading-snug text-gray-500 line-clamp-3" title={descripcion}>
         {descripcion}
       </p>
-      <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">Decisión</span>
     </div>
   )
 }
@@ -196,23 +254,29 @@ function FlowDiamond({
 function TreeLinealSteps({
   pasos,
   clics,
-  accent,
-  stroke,
+  pathVariant = 'default',
 }: {
   pasos: FlowPaso[]
   clics: string[]
-  accent: 'cyan' | 'orange'
-  stroke: string
+  pathVariant?: 'default' | 'alternate'
 }) {
   const ordenados = [...pasos].sort((a, b) => a.orden - b.orden)
   return (
-    <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+    <div className="flex w-full max-w-2xl flex-col items-center gap-1">
       {ordenados.map((p, i) => (
-        <div key={`${p.orden}-${i}`} className="flex flex-col items-center w-full">
-          {i > 0 && <FlowDownArrow label={clics[i - 1] ?? '—'} strokeClass={stroke} />}
-          <div className="flex w-27 shrink-0 flex-col items-center gap-1.5">
-            <FlowchartProcessBox title={p.tituloBolita} tipo={p.tipo} accent={accent} />
-            <p className="text-[9px] text-center text-gray-500 leading-snug px-0.5 line-clamp-4" title={p.descripcion}>
+        <div key={`${p.orden}-${i}`} className="flex w-full flex-col items-center">
+          {i > 0 && <FlowDownArrow label={clics[i - 1] ?? '—'} />}
+          <div className="flex w-full max-w-2xl shrink-0 flex-col items-center gap-1">
+            <FlowchartProcessBox
+              title={p.tituloBolita}
+              tipo={p.tipo}
+              pathVariant={pathVariant}
+              fullTooltip={`${p.tituloBolita}\n\n${p.descripcion}`}
+            />
+            <p
+              className="w-full max-w-2xl text-center text-[9px] leading-snug text-gray-500 line-clamp-4"
+              title={p.descripcion}
+            >
               {p.descripcion}
             </p>
           </div>
@@ -222,23 +286,31 @@ function TreeLinealSteps({
   )
 }
 
+function branchPathVariant(
+  ramas: { etiqueta: string }[],
+  idx: number,
+  parentVariant: 'default' | 'alternate'
+): 'default' | 'alternate' {
+  if (parentVariant === 'alternate') return 'alternate'
+  if (ramas.length === 2 && idx === 1) return 'alternate'
+  return 'default'
+}
+
 function RenderFlowNodo({
   nodo,
-  accent,
-  stroke,
+  pathVariant = 'default',
 }: {
   nodo: FlowNodo
-  accent: 'cyan' | 'orange'
-  stroke: string
+  pathVariant?: 'default' | 'alternate'
 }) {
   if (nodo.tipo === 'lineal') {
     return (
-      <div className="flex flex-col items-center gap-2 w-full">
-        <TreeLinealSteps pasos={nodo.pasos} clics={nodo.clicsEntrePasos} accent={accent} stroke={stroke} />
+      <div className="flex w-full flex-col items-center gap-2">
+        <TreeLinealSteps pasos={nodo.pasos} clics={nodo.clicsEntrePasos} pathVariant={pathVariant} />
         {nodo.despues != null && (
-          <div className="flex w-full flex-col items-center border-t border-dashed border-gray-200 pt-3 mt-2">
-            <FlowDownArrow label="Continúa el flujo" strokeClass={stroke} />
-            <RenderFlowNodo nodo={nodo.despues} accent={accent} stroke={stroke} />
+          <div className="mt-3 flex w-full flex-col items-center pt-2">
+            <FlowDownArrow label="Continúa el flujo" />
+            <RenderFlowNodo nodo={nodo.despues} pathVariant={pathVariant} />
           </div>
         )}
       </div>
@@ -246,62 +318,68 @@ function RenderFlowNodo({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-4xl mx-auto">
-      <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} accent={accent} />
-      <div className="flex w-full flex-col sm:flex-row items-stretch sm:items-start justify-center gap-8 sm:gap-10 pt-1">
-        {nodo.ramas.map((rama, idx) => (
-          <div
-            key={`${rama.etiqueta}-${idx}`}
-            className="flex min-w-0 sm:min-w-36 max-w-sm flex-1 flex-col items-center rounded-xl border border-gray-100 bg-white/80 px-3 py-3 shadow-sm"
-          >
-            <FlowDownArrow label={rama.etiqueta} strokeClass={stroke} />
-            <RenderFlowNodo nodo={rama.siguiente} accent={accent} stroke={stroke} />
-          </div>
-        ))}
+    <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4">
+      <FlowDiamond titulo={nodo.tituloDiamante} descripcion={nodo.descripcion} />
+      <div className="flex w-full flex-col items-stretch justify-center gap-8 pt-1 lg:flex-row lg:items-start">
+        {nodo.ramas.map((rama, idx) => {
+          const childVariant = branchPathVariant(nodo.ramas, idx, pathVariant)
+          return (
+            <div key={`${rama.etiqueta}-${idx}`} className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 lg:max-w-none">
+              <FlowDownArrow
+                label={rama.etiqueta}
+                fromDiamond
+                branchIndex={idx}
+                branchCount={nodo.ramas.length}
+              />
+              <RenderFlowNodo nodo={rama.siguiente} pathVariant={childVariant} />
+            </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function FlowchartLegend({ accent }: { accent: 'cyan' | 'orange' }) {
-  const proc = accent === 'cyan' ? 'border-cyan-600 bg-cyan-50' : 'border-orange-600 bg-orange-50'
+function FlowchartLegend() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5 text-[10px] text-gray-600">
-      <p className="font-semibold text-gray-700 mb-2">Leyenda (diagrama de flujo)</p>
+    <div className="rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2.5 text-[10px] text-gray-600">
+      <p className="mb-2 font-semibold text-gray-700">Leyenda (estilo pastel, vertical)</p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-5 w-9 rounded-full border-2 border-emerald-600 bg-emerald-50 shrink-0" />
-          Inicio / fin (óvalo)
+          <span className="inline-block h-5 w-9 shrink-0 rounded-full border border-amber-300 bg-amber-50" />
+          Inicio / fin (cápsula)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className={`inline-block h-5 w-10 rounded-sm border-2 shrink-0 ${proc}`} />
+          <span className="inline-block h-5 w-10 shrink-0 rounded-md border border-teal-300 bg-teal-50" />
           Proceso (rectángulo)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="relative inline-block h-4 w-4 shrink-0 rotate-45 border-2 border-indigo-600 bg-indigo-50"
+            className="relative inline-block h-4 w-4 shrink-0 rotate-45 border border-orange-300 bg-orange-100/90"
             aria-hidden
           />
           Decisión (rombo)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="inline-block h-5 w-10 -skew-x-12 border-2 border-violet-400 bg-violet-50 shrink-0 rounded-sm"
+            className="inline-block h-5 w-10 shrink-0 -skew-x-10 rounded-md border border-slate-300 bg-slate-100"
             aria-hidden
           />
-          Entrada-salida datos (paralelogramo)
+          Entrada-salida de datos (paralelogramo)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-flex h-5 items-center rounded p-px bg-amber-400">
-            <span className="inline-block h-full w-9 rounded-[2px] border-2 border-amber-900 bg-amber-50" />
-          </span>
-          Conversión (proceso destacado)
+          <span className="inline-block h-5 w-10 shrink-0 rounded-md border border-teal-400 bg-teal-100/80" />
+          Conversión
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-5 w-10 shrink-0 rounded-md border border-rose-300 bg-rose-50" />
+          Rama alternativa (2.ª opción)
         </span>
       </div>
       <p className="mt-2 text-[9px] text-gray-500">
-        El diagrama se lee <strong>de arriba abajo</strong> (árbol): tramos lineales en columna y ramas bajo cada
-        decisión. Convención de símbolos (
-        <a href={SMARTDRAW_FLOWCHART_URL} className="underline underline-offset-2 text-cyan-700" target="_blank" rel="noreferrer">
+        Lectura <strong>de arriba abajo</strong>. Textos largos se resumen en la caja; el <strong>texto completo</strong>{' '}
+        aparece al pasar el cursor. Convención de símbolos (
+        <a href={SMARTDRAW_FLOWCHART_URL} className="text-teal-700 underline underline-offset-2" target="_blank" rel="noreferrer">
           referencia SmartDraw
         </a>
         ).
@@ -314,16 +392,13 @@ function UserFlowchartSection({
   flow,
   segmentLabel,
   canalSubtitle,
-  accent,
+  accent: _accent,
 }: {
   flow: UserFlowLine
   segmentLabel: string
   canalSubtitle?: string
   accent: 'cyan' | 'orange'
 }) {
-  const stroke = accent === 'cyan' ? 'text-cyan-700' : 'text-orange-700'
-  const paraBorder = accent === 'cyan' ? 'border-violet-500' : 'border-violet-600'
-  const paraBg = 'bg-violet-50/90'
   const { raiz } = flow
 
   return (
@@ -335,28 +410,28 @@ function UserFlowchartSection({
             <span className="block text-sm font-normal text-gray-500 mt-0.5">Canal: {canalSubtitle}</span>
           ) : null}
         </h2>
-        <p className="text-sm text-gray-500">{flow.arquetipo}</p>
+        <p className="text-sm text-gray-500" title={flow.arquetipo}>
+          {flow.arquetipo}
+        </p>
       </div>
 
-      <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-sm text-amber-950">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800/80 mb-0.5">Objetivo de conversión</p>
+      <div
+        className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 text-sm text-gray-800"
+        title={flow.objetivoConversion}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800/75 mb-0.5">Objetivo de conversión</p>
         <p className="leading-snug">{flow.objetivoConversion}</p>
       </div>
 
-      <FlowchartLegend accent={accent} />
+      <FlowchartLegend />
 
       <div className="overflow-x-auto pb-2 pt-1">
-        <div className="flex flex-col items-center gap-4 max-w-3xl mx-auto px-2 pt-1">
-          <FlowParallelogram borderClass={paraBorder} bgClass={paraBg}>
-            {flow.deDondeEntra}
-          </FlowParallelogram>
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-1 py-2 sm:px-2">
+          <FlowParallelogram>{flow.deDondeEntra}</FlowParallelogram>
 
-          <FlowDownArrow
-            label="Llega a la primera pantalla del flujo (carga / enlace)"
-            strokeClass={stroke}
-          />
+          <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
 
-          <RenderFlowNodo nodo={raiz} accent={accent} stroke={stroke} />
+          <RenderFlowNodo nodo={raiz} />
         </div>
       </div>
       <p className="text-[11px] text-gray-400 sm:hidden">Desplaza si hace falta para ver ramas anchas del diagrama →</p>
@@ -748,8 +823,10 @@ export function UserFlowPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 space-y-2">
         <p>
-          El <strong>User Flow</strong> es un diagrama en <strong>árbol vertical</strong> (óvalos, rectángulos, rombos,
-          paralelogramos) generado a partir de las <strong>ideas de funcionalidades y contenido</strong> guardadas en{' '}
+          El <strong>User Flow</strong> se muestra como diagrama <strong>vertical</strong> con estilo <strong>pastel</strong>{' '}
+          (cápsulas amarillas inicio/fin, rectángulos teal, rombo melocotón, paralelogramo gris para datos; la segunda
+          rama de una decisión binaria va en tono rosa). Se genera a partir de las{' '}
+          <strong>ideas de funcionalidades y contenido</strong> guardadas en{' '}
           <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
             User Journey
           </Link>{' '}
