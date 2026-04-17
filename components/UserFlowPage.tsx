@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useId, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, useId, useRef, useCallback, useLayoutEffect, createContext, useContext, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FlowPaso, FlowNodo, UserFlowLine } from '@/lib/user-flow-tree'
@@ -43,6 +43,19 @@ function XIcon({ className }: { className?: string }) {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function DragHandleIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <circle cx="9"  cy="5"  r="1.5" />
+      <circle cx="15" cy="5"  r="1.5" />
+      <circle cx="9"  cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9"  cy="19" r="1.5" />
+      <circle cx="15" cy="19" r="1.5" />
     </svg>
   )
 }
@@ -149,6 +162,44 @@ function updateBranchLabel(nodo: FlowDecision, ramaIdx: number, etiqueta: string
   }
 }
 
+function reorderPasos(nodo: FlowLineal, fromIdx: number, toIdx: number): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const [moved] = sorted.splice(fromIdx, 1)
+  sorted.splice(toIdx, 0, moved)
+  return { ...nodo, pasos: renumberPasos(sorted) }
+}
+
+function clearRetornoAt(nodo: FlowLineal, idx: number): FlowLineal {
+  const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
+  const newPasos = sorted.map((p, i) =>
+    i === idx
+      ? (({ retornoA: _a, retornoTipo: _t, retornoLabel: _l, ...rest }) => rest)(p)
+      : p
+  )
+  return { ...nodo, pasos: newPasos }
+}
+
+// ─── Contexto de targets de retorno ──────────────────────────────────────────
+
+interface FlowTarget {
+  tipo: 'paso' | 'decision'
+  titulo: string
+}
+
+const FlowTargetsContext = createContext<FlowTarget[]>([])
+
+function collectTargets(nodo: FlowNodo): FlowTarget[] {
+  const out: FlowTarget[] = []
+  if (nodo.tipo === 'lineal') {
+    for (const p of nodo.pasos) out.push({ tipo: 'paso', titulo: p.tituloBolita })
+    if (nodo.despues) out.push(...collectTargets(nodo.despues))
+  } else {
+    out.push({ tipo: 'decision', titulo: nodo.tituloDiamante })
+    for (const r of nodo.ramas) out.push(...collectTargets(r.siguiente))
+  }
+  return out
+}
+
 // ─── Formularios inline de edición ───────────────────────────────────────────
 
 const TIPO_LABELS: Record<FlowPaso['tipo'], string> = {
@@ -169,14 +220,25 @@ function PasoEditForm({
   onCancel: () => void
   isNew?: boolean
 }) {
+  const targets = useContext(FlowTargetsContext)
   const [titulo, setTitulo] = useState(initial.tituloBolita)
   const [desc, setDesc] = useState(initial.descripcion)
   const [tipo, setTipo] = useState<FlowPaso['tipo']>(initial.tipo)
+  const [retornoTipo, setRetornoTipo] = useState<'paso' | 'decision' | ''>(initial.retornoTipo ?? '')
+  const [retornoA, setRetornoA] = useState(initial.retornoA ?? '')
+  const [retornoLabel, setRetornoLabel] = useState(initial.retornoLabel ?? '')
   const canSave = titulo.trim().length > 0
 
   const commit = () => {
-    if (canSave) onSave({ tituloBolita: titulo.trim(), descripcion: desc.trim(), tipo })
+    if (!canSave) return
+    const retorno =
+      retornoTipo && retornoA
+        ? { retornoTipo: retornoTipo as 'paso' | 'decision', retornoA, retornoLabel: retornoLabel.trim() }
+        : { retornoTipo: undefined, retornoA: undefined, retornoLabel: undefined }
+    onSave({ tituloBolita: titulo.trim(), descripcion: desc.trim(), tipo, ...retorno })
   }
+
+  const filteredTargets = targets.filter((t) => t.tipo === retornoTipo)
 
   return (
     <div className="w-full max-w-2xl rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm space-y-3">
@@ -223,6 +285,64 @@ function PasoEditForm({
           ))}
         </select>
       </label>
+
+      {/* Sección de retorno — sólo visible cuando hay targets en el árbol */}
+      {targets.length > 0 && !isNew && (
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">
+            Flecha de retorno (opcional)
+          </p>
+          <div className="flex gap-2">
+            <label className="flex-1 space-y-1">
+              <span className="text-[11px] font-medium text-gray-500">Tipo de destino</span>
+              <select
+                value={retornoTipo}
+                onChange={(e) => {
+                  setRetornoTipo(e.target.value as 'paso' | 'decision' | '')
+                  setRetornoA('')
+                }}
+                className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+              >
+                <option value="">Sin retorno</option>
+                <option value="paso">Paso anterior</option>
+                <option value="decision">Toma de decisión</option>
+              </select>
+            </label>
+            {retornoTipo && (
+              <label className="flex-1 space-y-1">
+                <span className="text-[11px] font-medium text-gray-500">Elemento destino</span>
+                <select
+                  value={retornoA}
+                  onChange={(e) => setRetornoA(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                >
+                  <option value="">Seleccionar...</option>
+                  {filteredTargets.map((t) => (
+                    <option key={t.titulo} value={t.titulo}>
+                      {t.titulo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {retornoTipo && retornoA && (
+            <label className="block space-y-1">
+              <span className="text-[11px] font-medium text-gray-500">
+                Etiqueta de la flecha (ej. "Si falla", "Reintentar")
+              </span>
+              <input
+                value={retornoLabel}
+                onChange={(e) => setRetornoLabel(e.target.value.slice(0, 80))}
+                maxLength={80}
+                className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                placeholder="Reintentar, Si falla..."
+              />
+            </label>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-end gap-2 pt-1">
         <button
           type="button"
@@ -686,6 +806,7 @@ function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: str
     <div
       className="flex w-full max-w-md shrink-0 flex-col items-center gap-1.5 cursor-default"
       title={romboTip}
+      data-flowref-decision={titulo}
     >
       <div className="relative flex h-20 w-20 items-center justify-center sm:h-21 sm:w-21">
         <div
@@ -724,6 +845,8 @@ function TreeLinealSteps({
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [addingAfterIdx, setAddingAfterIdx] = useState<number | null>(null)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   const canEdit = Boolean(onReplace)
   const ordenados = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
@@ -744,6 +867,36 @@ function TreeLinealSteps({
 
   const commitClic = (i: number, value: string) => {
     onReplace?.(updateClicoAt(nodo, i, value))
+  }
+
+  const commitDeleteRetorno = (i: number) => {
+    onReplace?.(clearRetornoAt(nodo, i))
+  }
+
+  const handleDragStart = (e: React.DragEvent, i: number) => {
+    setDraggingIdx(i)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(i))
+  }
+
+  const handleDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverIdx !== i) setDragOverIdx(i)
+  }
+
+  const handleDrop = (e: React.DragEvent, toIdx: number) => {
+    e.preventDefault()
+    if (draggingIdx !== null && draggingIdx !== toIdx) {
+      onReplace?.(reorderPasos(nodo, draggingIdx, toIdx))
+    }
+    setDraggingIdx(null)
+    setDragOverIdx(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingIdx(null)
+    setDragOverIdx(null)
   }
 
   return (
@@ -796,17 +949,45 @@ function TreeLinealSteps({
           {editingIdx === i ? (
             <div className="w-full py-1">
               <PasoEditForm
-                initial={{ tituloBolita: p.tituloBolita, descripcion: p.descripcion, tipo: p.tipo }}
+                initial={{
+                  tituloBolita: p.tituloBolita,
+                  descripcion: p.descripcion,
+                  tipo: p.tipo,
+                  retornoTipo: p.retornoTipo,
+                  retornoA: p.retornoA,
+                  retornoLabel: p.retornoLabel,
+                }}
                 onSave={(draft) => commitEdit(i, draft)}
                 onCancel={() => setEditingIdx(null)}
               />
             </div>
           ) : (
             <div
-              className="relative flex w-full max-w-2xl flex-col items-center gap-1"
+              className={`relative flex w-full max-w-2xl flex-col items-center gap-1 rounded-xl transition-all ${
+                draggingIdx === i ? 'opacity-40' : ''
+              } ${dragOverIdx === i && draggingIdx !== i ? 'ring-2 ring-teal-400 ring-offset-1' : ''}`}
+              data-flowref-paso={p.tituloBolita}
+              data-retorno-a={p.retornoA ?? ''}
+              data-retorno-tipo={p.retornoTipo ?? ''}
+              data-retorno-label={p.retornoLabel ?? ''}
+              draggable={canEdit}
+              onDragStart={canEdit ? (e) => handleDragStart(e, i) : undefined}
+              onDragOver={canEdit ? (e) => handleDragOver(e, i) : undefined}
+              onDrop={canEdit ? (e) => handleDrop(e, i) : undefined}
+              onDragEnd={canEdit ? handleDragEnd : undefined}
               onMouseEnter={() => setHoveredIdx(i)}
               onMouseLeave={() => setHoveredIdx(null)}
             >
+              {/* Handle de arrastre */}
+              {canEdit && (
+                <div
+                  className="absolute -left-6 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing transition-opacity"
+                  style={{ opacity: hoveredIdx === i ? 0.6 : 0 }}
+                >
+                  <DragHandleIcon className="h-4 w-4 text-gray-400" />
+                </div>
+              )}
+
               <FlowchartProcessBox
                 title={p.tituloBolita}
                 tipo={p.tipo}
@@ -819,6 +1000,43 @@ function TreeLinealSteps({
               >
                 {p.descripcion}
               </p>
+
+              {/* Badge de retorno configurado */}
+              {p.retornoA && p.retornoTipo && (
+                <div className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] text-amber-800">
+                  <span aria-hidden>↩</span>
+                  {p.retornoLabel && (
+                    <span className="font-semibold">{p.retornoLabel}</span>
+                  )}
+                  <span className="text-amber-600">
+                    → {p.retornoTipo === 'decision' ? '◇ ' : ''}{p.retornoA}
+                  </span>
+                  {canEdit && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setEditingIdx(i)}
+                        className="ml-0.5 rounded p-0.5 text-amber-700 hover:bg-amber-100 transition-colors"
+                        title="Editar retorno"
+                        aria-label="Editar retorno"
+                      >
+                        <PencilIcon className="h-2.5 w-2.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => commitDeleteRetorno(i)}
+                        className="rounded p-0.5 text-amber-700 hover:bg-amber-100 transition-colors"
+                        title="Eliminar retorno"
+                        aria-label="Eliminar retorno"
+                      >
+                        <XIcon className="h-2.5 w-2.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Botones editar / borrar paso */}
               {canEdit && (
                 <div
                   className="flex gap-1 transition-opacity"
@@ -1131,6 +1349,15 @@ function FlowchartLegend() {
 
 // ─── Sección del diagrama ─────────────────────────────────────────────────────
 
+interface RetornoArrow {
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  label: string
+  idx: number
+}
+
 function UserFlowchartSection({
   flow,
   segmentLabel,
@@ -1145,6 +1372,47 @@ function UserFlowchartSection({
   onUpdateFlow?: (newFlow: UserFlowLine) => void
 }) {
   const { raiz } = flow
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [arrows, setArrows] = useState<RetornoArrow[]>([])
+
+  const allTargets = useMemo(() => collectTargets(raiz), [raiz])
+
+  const recalcArrows = useCallback(() => {
+    const container = innerRef.current
+    if (!container) return
+    const cr = container.getBoundingClientRect()
+    const newArrows: RetornoArrow[] = []
+    const sourceEls = container.querySelectorAll<HTMLElement>('[data-retorno-a]')
+    let idx = 0
+    sourceEls.forEach((el) => {
+      const retornoA = el.getAttribute('data-retorno-a')
+      const retornoTipo = el.getAttribute('data-retorno-tipo') as 'paso' | 'decision' | ''
+      const retornoLabel = el.getAttribute('data-retorno-label') ?? ''
+      if (!retornoA || !retornoTipo) return
+      const attr = retornoTipo === 'paso' ? 'data-flowref-paso' : 'data-flowref-decision'
+      // escape para el selector CSS
+      const escaped = retornoA.replace(/["\\]/g, '\\$&')
+      const targetEl = container.querySelector<HTMLElement>(`[${attr}="${escaped}"]`)
+      if (!targetEl) return
+      const sr = el.getBoundingClientRect()
+      const tr = targetEl.getBoundingClientRect()
+      newArrows.push({
+        fromX: sr.right - cr.left,
+        fromY: sr.top + sr.height / 2 - cr.top,
+        toX: tr.right - cr.left,
+        toY: tr.top + tr.height / 2 - cr.top,
+        label: retornoLabel,
+        idx: idx++,
+      })
+    })
+    setArrows(newArrows)
+  }, [])
+
+  useLayoutEffect(() => {
+    recalcArrows()
+  }, [flow, recalcArrows])
+
+  const svgMarkerId = useId().replace(/:/g, '')
 
   return (
     <section className="space-y-4">
@@ -1175,20 +1443,91 @@ function UserFlowchartSection({
       <FlowchartLegend />
 
       <div className="overflow-x-auto pb-2 pt-1">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-1 py-2 sm:px-2">
-          <FlowParallelogram>{flow.deDondeEntra}</FlowParallelogram>
+        <FlowTargetsContext.Provider value={allTargets}>
+          <div
+            ref={innerRef}
+            className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-1 py-2 sm:px-2"
+          >
+            <FlowParallelogram>{flow.deDondeEntra}</FlowParallelogram>
 
-          <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
+            <FlowDownArrow label="Llega a la primera pantalla del flujo (carga / enlace)" />
 
-          <RenderFlowNodo
-            nodo={raiz}
-            onReplace={
-              onUpdateFlow
-                ? (newRaiz) => onUpdateFlow({ ...flow, raiz: newRaiz })
-                : undefined
-            }
-          />
-        </div>
+            <RenderFlowNodo
+              nodo={raiz}
+              onReplace={
+                onUpdateFlow
+                  ? (newRaiz) => onUpdateFlow({ ...flow, raiz: newRaiz })
+                  : undefined
+              }
+            />
+
+            {/* SVG overlay para las flechas de retorno */}
+            {arrows.length > 0 && (
+              <svg
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'visible',
+                  pointerEvents: 'none',
+                }}
+                aria-hidden
+              >
+                <defs>
+                  <marker
+                    id={`${svgMarkerId}-ret`}
+                    markerWidth="7"
+                    markerHeight="7"
+                    refX="6"
+                    refY="3.5"
+                    orient="auto"
+                    markerUnits="strokeWidth"
+                  >
+                    <path d="M0,0 L7,3.5 L0,7 Z" fill="#d97706" />
+                  </marker>
+                </defs>
+                {arrows.map((a) => {
+                  const offset = 32 + a.idx * 14
+                  const x1 = a.fromX
+                  const y1 = a.fromY
+                  const x2 = a.fromX + offset
+                  const x3 = a.toX + offset
+                  const y2 = a.toY
+                  const x4 = a.toX
+                  const pathD = `M ${x1} ${y1} L ${x2} ${y1} L ${x3} ${y2} L ${x4} ${y2}`
+                  const midX = (x2 + x3) / 2
+                  const midY = (y1 + y2) / 2
+                  return (
+                    <g key={a.idx}>
+                      <path
+                        d={pathD}
+                        stroke="#d97706"
+                        strokeWidth="1.5"
+                        strokeDasharray="5,3"
+                        fill="none"
+                        markerEnd={`url(#${svgMarkerId}-ret)`}
+                      />
+                      {a.label && (
+                        <text
+                          x={midX + 4}
+                          y={midY - 4}
+                          fontSize="10"
+                          fill="#92400e"
+                          fontFamily="inherit"
+                          fontWeight="500"
+                        >
+                          {a.label}
+                        </text>
+                      )}
+                    </g>
+                  )
+                })}
+              </svg>
+            )}
+          </div>
+        </FlowTargetsContext.Provider>
       </div>
       <p className="text-[11px] text-gray-400 sm:hidden">
         Desplaza si hace falta para ver ramas anchas del diagrama →

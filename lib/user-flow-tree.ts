@@ -12,6 +12,12 @@ export const pasoSchema = z.object({
   tituloBolita: z.string().max(36),
   descripcion: z.string().max(200),
   tipo: z.enum(['entrada', 'navegacion', 'conversion', 'salida']),
+  /** Tipo del elemento objetivo al que retrocede: paso o decisión */
+  retornoTipo: z.enum(['paso', 'decision']).optional(),
+  /** tituloBolita (si tipo=paso) o tituloDiamante (si tipo=decision) del destino */
+  retornoA: z.string().max(36).optional(),
+  /** Etiqueta de la flecha de vuelta (ej. "Reintentar", "Si falla") */
+  retornoLabel: z.string().max(80).optional(),
 })
 
 export type FlowPaso = z.infer<typeof pasoSchema>
