@@ -73,7 +73,7 @@ function FlowParallelogram({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
-      <span className="text-[8px] font-medium text-gray-500">Entrada-salida de datos</span>
+      <span className="text-[12px] font-medium text-gray-500">Entrada-salida de datos</span>
     </div>
   )
 }
@@ -154,7 +154,7 @@ function FlowDownArrow({
 
   const labelBlock =
     label != null && label !== '' ? (
-      <p className="w-full max-w-2xl px-1 text-center text-[9px] font-medium leading-snug text-gray-500 line-clamp-3">
+      <p className="w-full max-w-2xl px-1 text-center text-[12px] font-medium leading-snug text-gray-500 line-clamp-3">
         {label}
       </p>
     ) : (
@@ -243,7 +243,7 @@ function FlowDiamond({ titulo, descripcion }: { titulo: string; descripcion: str
           {titulo}
         </span>
       </div>
-      <p className="max-w-xs text-center text-[9px] leading-snug text-gray-500 line-clamp-3" title={descripcion}>
+      <p className="max-w-xs text-center text-[12px] leading-snug text-gray-500 line-clamp-3" title={descripcion}>
         {descripcion}
       </p>
     </div>
@@ -274,7 +274,7 @@ function TreeLinealSteps({
               fullTooltip={`${p.tituloBolita}\n\n${p.descripcion}`}
             />
             <p
-              className="w-full max-w-2xl text-center text-[9px] leading-snug text-gray-500 line-clamp-4"
+              className="w-full max-w-2xl text-center text-[12px] leading-snug text-gray-500 line-clamp-4"
               title={p.descripcion}
             >
               {p.descripcion}
@@ -342,7 +342,7 @@ function RenderFlowNodo({
 
 function FlowchartLegend() {
   return (
-    <div className="rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2.5 text-[10px] text-gray-600">
+    <div className="rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2.5 text-[14px] text-gray-600">
       <p className="mb-2 font-semibold text-gray-700">Leyenda (estilo pastel, vertical)</p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="inline-flex items-center gap-1.5">
@@ -376,7 +376,7 @@ function FlowchartLegend() {
           Rama alternativa (2.ª opción)
         </span>
       </div>
-      <p className="mt-2 text-[9px] text-gray-500">
+      <p className="mt-2 text-[12px] text-gray-500">
         Lectura <strong>de arriba abajo</strong>. Textos largos se resumen en la caja; el <strong>texto completo</strong>{' '}
         aparece al pasar el cursor. Convención de símbolos (
         <a href={SMARTDRAW_FLOWCHART_URL} className="text-teal-700 underline underline-offset-2" target="_blank" rel="noreferrer">
