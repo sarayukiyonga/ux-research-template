@@ -8,6 +8,9 @@ export interface JourneyEtapa {
   titulo: string
   descripcion: string
   puntosDeDolor: string[]
+  /** Canales de marketing activos en esta etapa (boca a boca, Instagram, web, WhatsApp…). */
+  canalesDeMarketing: string
+  /** Qué debe hacer MOA/la web en esta etapa respecto al POV y al HMW. */
   rolWebFrenteAlPov: string
 }
 
@@ -32,6 +35,7 @@ function isEtapa(x: unknown): x is JourneyEtapa {
     typeof o.descripcion === 'string' &&
     Array.isArray(o.puntosDeDolor) &&
     typeof o.rolWebFrenteAlPov === 'string'
+    // canalesDeMarketing es opcional para compatibilidad con datos guardados anteriores
   )
 }
 

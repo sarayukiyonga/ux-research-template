@@ -7,6 +7,7 @@ import {
   parseUserJourneySavedFilters,
   resolveCanalForSegment,
   toJourneyV3,
+  USER_JOURNEY_PERSIST_V3,
   type FlowJourneyPair,
   type UserJourneyV3Persist,
 } from '@/lib/user-journey-persist'
@@ -30,7 +31,7 @@ export type FetchSavedUserJourneyResult =
       savedAt: string
       v3: UserJourneyV3Persist
       pair: FlowJourneyPair
-      /** Celda C2 de user-journey (JSON de filtros guardados), si existe. */
+      /** Filtros guardados (JSON string), si existen. */
       journeyFiltersRaw: string | null
     }
   | {
@@ -39,32 +40,102 @@ export type FetchSavedUserJourneyResult =
       detalle?: string
     }
 
+type RowData = string[]
+
+/** Reconstructs a UserJourneyV3Persist from multi-row Sheets data. */
+function buildV3FromMultiRows(
+  metaRow: RowData,
+  journeyRows: RowData[]
+): { v3: UserJourneyV3Persist; filtersRaw: string | null; savedAt: string } | null {
+  let meta: Record<string, unknown>
+  try {
+    meta = JSON.parse(metaRow[4] ?? '') as Record<string, unknown>
+  } catch {
+    return null
+  }
+
+  const caInfo = meta.clienteActual as Record<string, unknown> | undefined
+  const cpInfo = meta.clientePotencial as Record<string, unknown> | undefined
+  if (!caInfo || !cpInfo) return null
+
+  const v3: UserJourneyV3Persist = {
+    version: USER_JOURNEY_PERSIST_V3,
+    clienteActual: {
+      catalogo: (caInfo.catalogo as UserJourneyV3Persist['clienteActual']['catalogo']) ?? [],
+      canalActivoId: (caInfo.canalActivoId as string) ?? 'web',
+      mapas: {},
+    },
+    clientePotencial: {
+      catalogo: (cpInfo.catalogo as UserJourneyV3Persist['clientePotencial']['catalogo']) ?? [],
+      canalActivoId: (cpInfo.canalActivoId as string) ?? 'web',
+      mapas: {},
+    },
+  }
+
+  for (const row of journeyRows) {
+    if (row[0] !== 'journey') continue
+    const seg = row[2] as 'clienteActual' | 'clientePotencial'
+    const canalId = row[3]
+    if ((seg === 'clienteActual' || seg === 'clientePotencial') && canalId && row[4]) {
+      try {
+        v3[seg].mapas[canalId] = JSON.parse(row[4]) as JourneyForPersona
+      } catch { /* skip malformed */ }
+    }
+  }
+
+  const filtersRaw =
+    meta.filters != null && JSON.stringify(meta.filters).trim() !== '{}'
+      ? JSON.stringify(meta.filters)
+      : meta.filters != null
+        ? JSON.stringify(meta.filters)
+        : null
+  return { v3, filtersRaw, savedAt: metaRow[1] ?? '' }
+}
+
 export async function fetchSavedUserJourneyFromSheets(): Promise<FetchSavedUserJourneyResult> {
   const sheets = google.sheets({ version: 'v4', auth: getAuthReadonly() })
 
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: CEO_SHEET_ID })
-  const exists = meta.data.sheets?.some((s) => s.properties?.title === SHEET_NAME)
+  const sheetsMeta = await sheets.spreadsheets.get({ spreadsheetId: CEO_SHEET_ID })
+  const exists = sheetsMeta.data.sheets?.some((s) => s.properties?.title === SHEET_NAME)
   if (!exists) return { ok: false, code: 'no_sheet' }
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CEO_SHEET_ID,
-    range: `${SHEET_NAME}!A2:C2`,
+    range: `${SHEET_NAME}!A2:E`,
   })
 
-  const row = res.data.values?.[0]
-  if (!row?.[1]?.trim()) return { ok: false, code: 'empty' }
+  const rows = (res.data.values ?? []) as RowData[]
+  if (!rows.length) return { ok: false, code: 'empty' }
 
   let parsed: unknown
-  try {
-    parsed = JSON.parse(row[1] as string)
-  } catch {
-    return { ok: false, code: 'invalid_json' }
+  let filtersRaw: string | null | undefined
+  let savedAt = ''
+
+  if (rows[0][0] === 'meta') {
+    // New multi-row format
+    const metaRow = rows[0]
+    const journeyRows = rows.slice(1)
+    const result = buildV3FromMultiRows(metaRow, journeyRows)
+    if (!result) return { ok: false, code: 'invalid_json' }
+    parsed = result.v3
+    filtersRaw = result.filtersRaw
+    savedAt = result.savedAt
+  } else {
+    // Old single-blob format: A=savedAt, B=v3JSON, C=filtersJSON
+    const row = rows[0]
+    if (!row?.[1]?.trim()) return { ok: false, code: 'empty' }
+    try {
+      parsed = JSON.parse(row[1] as string)
+    } catch {
+      return { ok: false, code: 'invalid_json' }
+    }
+    filtersRaw = row[2] as string | undefined
+    savedAt = (row[0] as string) ?? ''
   }
 
   const cell = parsePersistedJourneyCell(parsed)
   if (!cell) return { ok: false, code: 'invalid_shape' }
 
-  const filtersRaw = row[2]
   const v3 = toJourneyV3(cell)
   const pair = getJourneyPairForUserFlow(cell, filtersRaw)
   if (!pair) {
@@ -80,13 +151,17 @@ export async function fetchSavedUserJourneyFromSheets(): Promise<FetchSavedUserJ
     return { ok: false, code: 'no_journey_for_channel', detalle }
   }
 
-  const journeyFiltersRaw = row[2] != null && String(row[2]).trim() ? String(row[2]) : null
-  return { ok: true, v3, pair, savedAt: (row[0] as string) ?? '', journeyFiltersRaw }
+  const journeyFiltersRaw =
+    filtersRaw != null && String(filtersRaw).trim() ? String(filtersRaw) : null
+  return { ok: true, v3, pair, savedAt, journeyFiltersRaw }
 }
 
 export function journeySegmentToPlainText(j: JourneyForPersona, titulo: string): string {
   const etapas = j.etapas
-    .map((e) => `${e.orden}. ${e.titulo}: ${e.descripcion} | Web↔POV: ${e.rolWebFrenteAlPov}`)
+    .map((e) => {
+      const canales = e.canalesDeMarketing ? ` | Canales: ${e.canalesDeMarketing}` : ''
+      return `${e.orden}. ${e.titulo}: ${e.descripcion}${canales} | Web↔POV: ${e.rolWebFrenteAlPov}`
+    })
     .join('\n')
   return `### ${titulo}\n${j.etiquetaPersona}\nSíntesis: ${j.sintesis}\nEtapas:\n${etapas}`
 }
@@ -101,7 +176,7 @@ export function journeySegmentToFlowGrounding(
     .sort((a, b) => a.orden - b.orden)
     .map(
       (e) =>
-        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}\n    Rol de MOA (${canalEtiqueta}) frente al POV: ${e.rolWebFrenteAlPov}`
+        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales de marketing: ${e.canalesDeMarketing}` : ''}\n    Rol de MOA (${canalEtiqueta}) frente al POV: ${e.rolWebFrenteAlPov}`
     )
     .join('\n')
   return `### ${titulo} — ${j.etiquetaPersona}

@@ -401,7 +401,7 @@ function JourneyMapSection({
                 <h3 className="font-semibold text-gray-900 text-sm leading-snug">{e.titulo}</h3>
                 <p className="text-xs text-gray-600 leading-relaxed">{e.descripcion}</p>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 mb-1.5">Puntos de dolor</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 mb-1.5">Punto de dolor</p>
                   <ul className="space-y-1">
                     {e.puntosDeDolor.map((d, i) => (
                       <li
@@ -413,8 +413,14 @@ function JourneyMapSection({
                     ))}
                   </ul>
                 </div>
+                {(e.canalesDeMarketing || '') && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs leading-relaxed">
+                    <p className="font-semibold text-[10px] uppercase tracking-wide text-violet-600 mb-1">Canales de marketing</p>
+                    <p className="text-violet-900">{e.canalesDeMarketing}</p>
+                  </div>
+                )}
                 <div className={`rounded-xl border px-3 py-2.5 text-xs leading-relaxed ${webBox}`}>
-                  <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80 mb-1">{rolBloqueTitulo}</p>
+                  <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80 mb-1">Oportunidad web</p>
                   <p>{e.rolWebFrenteAlPov}</p>
                 </div>
               </div>
@@ -432,8 +438,9 @@ function JourneyMapSection({
 type EditEtapaDraft = {
   titulo: string
   descripcion: string
-  rolWeb: string
   doloresText: string
+  canalesMarketing: string
+  rolWeb: string
   esClave: boolean
 }
 
@@ -503,13 +510,24 @@ function EtapaEditModal({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium text-gray-500">Puntos de dolor (uno por línea)</span>
+            <span className="text-[11px] font-medium text-gray-500">Punto de dolor (uno por línea)</span>
             <AutoTextarea
               value={draft.doloresText}
               onChange={(e) => onChange({ ...draft, doloresText: e.target.value })}
               rows={4}
               maxLength={2000}
               className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 ${ring}`}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-gray-500">Canales de marketing</span>
+            <AutoTextarea
+              value={draft.canalesMarketing}
+              onChange={(e) => onChange({ ...draft, canalesMarketing: e.target.value })}
+              rows={2}
+              maxLength={260}
+              placeholder="Ej: Boca a boca / Instagram / WhatsApp"
+              className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 ${ring}`}
             />
           </label>
           <label className="block space-y-1">
@@ -551,6 +569,7 @@ export function UserJourneyPage() {
   const [nuevoCanalLabel, setNuevoCanalLabel] = useState('')
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [loadingSaved, setLoadingSaved] = useState(true)
@@ -616,6 +635,7 @@ export function UserJourneyPage() {
 
   const savePersist = async (data: UserJourneyV3Persist, segForFilter: UserJourneySegmento = segmento) => {
     setSaving(true)
+    setSaveError(null)
     try {
       const r = await fetch('/api/user-journey-saved', {
         method: 'POST',
@@ -626,8 +646,55 @@ export function UserJourneyPage() {
         }),
       })
       const d = await r.json()
+      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'Error al guardar en Sheets')
       if (d.savedAt) setSavedAt(d.savedAt)
-    } catch {}
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Error al guardar en Sheets')
+    }
+    setSaving(false)
+  }
+
+  /**
+   * Guarda solo el journey del canal activo (POST incremental).
+   * Preserva el resto de canales ya guardados en Sheets.
+   */
+  const saveCanalPersist = async (
+    data: UserJourneyV3Persist,
+    seg: UserJourneySegmento,
+    canalId: string
+  ) => {
+    const journey = data[seg].mapas[canalId]
+    if (!journey) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const r = await fetch('/api/user-journey-saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'canal',
+          segmento: seg,
+          canalId,
+          journey,
+          meta: {
+            clienteActual: {
+              canalActivoId: data.clienteActual.canalActivoId,
+              catalogo: data.clienteActual.catalogo,
+            },
+            clientePotencial: {
+              canalActivoId: data.clientePotencial.canalActivoId,
+              catalogo: data.clientePotencial.catalogo,
+            },
+            filters: buildFilters(data, seg),
+          },
+        }),
+      })
+      const d = await r.json()
+      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'Error al guardar en Sheets')
+      if (d.savedAt) setSavedAt(d.savedAt)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Error al guardar en Sheets')
+    }
     setSaving(false)
   }
 
@@ -707,7 +774,7 @@ export function UserJourneyPage() {
       },
     }
     setPersist(next)
-    await savePersist(next)
+    await saveCanalPersist(next, segmento, cid)
   }
 
   const regenerateSintesis = async () => {
@@ -744,8 +811,9 @@ export function UserJourneyPage() {
     setEditDraft({
       titulo: e.titulo,
       descripcion: e.descripcion,
-      rolWeb: e.rolWebFrenteAlPov,
       doloresText: e.puntosDeDolor.join('\n'),
+      canalesMarketing: e.canalesDeMarketing ?? '',
+      rolWeb: e.rolWebFrenteAlPov,
       esClave: e.orden === journey.etapaOrdenPovResuelto,
     })
     setEditOpen(true)
@@ -770,8 +838,9 @@ export function UserJourneyPage() {
             ...e,
             titulo: editDraft.titulo.trim().slice(0, 72) || e.titulo,
             descripcion: editDraft.descripcion.trim().slice(0, 420),
-            rolWebFrenteAlPov: editDraft.rolWeb.trim().slice(0, 260),
             puntosDeDolor: finalDolores.map((t) => t.slice(0, 140)).slice(0, 5),
+            canalesDeMarketing: editDraft.canalesMarketing.trim().slice(0, 260),
+            rolWebFrenteAlPov: editDraft.rolWeb.trim().slice(0, 260),
           }
         : e
     )
@@ -823,7 +892,7 @@ export function UserJourneyPage() {
         },
       }
       setPersist(next)
-      await savePersist(next)
+      await saveCanalPersist(next, segmento, seg.canalActivoId)
     } catch {
       setGenError('No se pudo generar el mapa. Inténtalo de nuevo.')
     } finally {
@@ -1003,6 +1072,8 @@ export function UserJourneyPage() {
                 <span className="inline-block h-3 w-3 border border-gray-300 border-t-teal-500 rounded-full animate-spin" />
                 Guardando…
               </span>
+            ) : saveError ? (
+              <span className="text-red-500" title={saveError}>⚠ Error al guardar en Sheets</span>
             ) : savedAt ? (
               <span className="text-green-600">✓ Sheets · {savedAt}</span>
             ) : null}

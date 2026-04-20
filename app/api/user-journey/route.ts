@@ -50,6 +50,14 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .describe(
         'Dolores concretos en este paso (fricción, miedo, confusión…). Deben reflejar tensiones alineadas con el HMW, no inventadas al margen del HMW.'
       ),
+    canalesDeMarketing: z
+      .string()
+      .max(260)
+      .describe(
+        journeyBaseMode
+          ? 'Canales de marketing y contacto relevantes en esta etapa del recorrido (boca a boca, Instagram, web, WhatsApp, email…). Enumera los principales separados por " / ".'
+          : `Canales de marketing y contacto relevantes en esta etapa para ${canal.descripcionCorta} (boca a boca, Instagram, web, WhatsApp, email…). Enumera los principales separados por " / ".`
+      ),
     rolWebFrenteAlPov: z
       .string()
       .max(260)
