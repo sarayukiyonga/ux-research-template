@@ -464,7 +464,7 @@ function DiamondEditForm({
 function makeMinimalLineal(label: string): FlowLineal {
   return {
     tipo: 'lineal',
-    pasos: [{ orden: 1, tituloBolita: label || 'Paso', descripcion: '', tipo: 'navegacion' }],
+    pasos: [{ orden: 1, tituloBolita: label || 'Paso', descripcion: '', tipo: 'navegacion', retornoTipo: null, retornoA: null, retornoLabel: null }],
     clicsEntrePasos: [],
     despues: null,
   }
@@ -977,7 +977,7 @@ function TreeLinealSteps({
       {addingAfterIdx === -1 && (
         <div className="w-full py-1">
           <PasoEditForm
-            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion', retornoTipo: null, retornoA: null, retornoLabel: null }}
             onSave={(p) => commitAdd(-1, p)}
             onCancel={() => setAddingAfterIdx(null)}
             isNew
@@ -1018,7 +1018,7 @@ function TreeLinealSteps({
           {addingAfterIdx === i - 1 && i > 0 && (
             <div className="w-full py-1">
               <PasoEditForm
-                initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+                initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion', retornoTipo: null, retornoA: null, retornoLabel: null }}
                 onSave={(p) => commitAdd(i - 1, p)}
                 onCancel={() => setAddingAfterIdx(null)}
                 isNew
@@ -1164,7 +1164,7 @@ function TreeLinealSteps({
       {addingAfterIdx === ordenados.length - 1 && (
         <div className="w-full py-1">
           <PasoEditForm
-            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion' }}
+            initial={{ tituloBolita: '', descripcion: '', tipo: 'navegacion', retornoTipo: null, retornoA: null, retornoLabel: null }}
             onSave={(p) => commitAdd(ordenados.length - 1, p)}
             onCancel={() => setAddingAfterIdx(null)}
             isNew
