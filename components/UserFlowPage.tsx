@@ -1690,13 +1690,10 @@ function UserFlowchartSection({
                   const x1 = a.fromX
                   const y1 = a.fromY
                   const x2 = a.fromX + offset
-                  const x4 = a.toX
+                  const x3 = a.toX + offset
                   const y2 = a.toY
-                  // Llegar al destino con un segmento vertical final (↑)
-                  // así markerEnd con orient="auto" apunta hacia arriba,
-                  // dejando claro visualmente que es una flecha de retroceso.
-                  const approach = 18
-                  const pathD = `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2 + approach} L ${x4} ${y2 + approach} L ${x4} ${y2}`
+                  const x4 = a.toX
+                  const pathD = `M ${x1} ${y1} L ${x2} ${y1} L ${x3} ${y2} L ${x4} ${y2}`
                   const midY = (y1 + y2) / 2
                   return (
                     <g key={a.idx}>
