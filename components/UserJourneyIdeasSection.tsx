@@ -42,6 +42,13 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [genLoading, setGenLoading] = useState(false)
+  const [genAllLoading, setGenAllLoading] = useState(false)
+  const [genAllProgress, setGenAllProgress] = useState<{
+    current: number
+    total: number
+    segmento: UserJourneySegmento
+    canalLabel: string
+  } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftTexto, setDraftTexto] = useState('')
   const [draftTipo, setDraftTipo] = useState<JourneyIdeaTipo>('funcionalidad')
@@ -164,6 +171,70 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
     }
   }
 
+  const handleGenerateAll = async () => {
+    // Collect all (segmento, canalId) pairs that have a journey map
+    const pairs: Array<{
+      segmento: UserJourneySegmento
+      canalId: string
+      journey: JourneyForPersona
+      canalLabel: string
+    }> = []
+    for (const s of ['clienteActual', 'clientePotencial'] as const) {
+      for (const canal of persist[s].catalogo) {
+        const j = persist[s].mapas[canal.id]
+        if (j) {
+          pairs.push({
+            segmento: s,
+            canalId: canal.id,
+            journey: j,
+            canalLabel: getCanalPromptFields(canal.id, persist[s].catalogo).label,
+          })
+        }
+      }
+    }
+    if (!pairs.length) {
+      window.alert('No hay mapas de User Journey generados aún. Genera los mapas primero.')
+      return
+    }
+
+    setGenAllLoading(true)
+    let currentIdeas = ideas
+
+    for (let i = 0; i < pairs.length; i++) {
+      const { segmento: s, canalId, journey: j, canalLabel: cl } = pairs[i]
+      setGenAllProgress({ current: i + 1, total: pairs.length, segmento: s, canalLabel: cl })
+      try {
+        const res = await fetch('/api/user-journey-ideas-ia', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ journey: j, canalEtiqueta: cl }),
+        })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok || !Array.isArray(d.ideas) || d.ideas.length === 0) continue
+        const nuevas: JourneyIdeaItem[] = (
+          d.ideas as Array<{ etapaOrden: number; tipo: JourneyIdeaTipo; texto: string }>
+        ).map((item) => ({
+          id: newJourneyIdeaId(),
+          etapaOrden: item.etapaOrden,
+          tipo: item.tipo === 'contenido' ? 'contenido' : 'funcionalidad',
+          texto: String(item.texto).trim().slice(0, 400),
+        }))
+        const existing = currentIdeas[s][canalId] ?? []
+        currentIdeas = {
+          ...currentIdeas,
+          [s]: { ...currentIdeas[s], [canalId]: [...existing, ...nuevas] },
+        }
+        setIdeas(currentIdeas)
+        await saveAll(currentIdeas)
+      } catch {
+        // Continúa con el siguiente canal si falla uno
+      }
+    }
+
+    setGenAllProgress(null)
+    setGenAllLoading(false)
+  }
+
   const handleClearCanal = () => {
     if (!window.confirm(`¿Borrar todas las ideas guardadas para «${canalLabel}» en este segmento?`)) return
     updateIdeasForChannel(() => [])
@@ -245,7 +316,8 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
           <select
             value={ideasCanalId}
             onChange={(e) => setIdeasCanalId(normalizeCanalInCatalog(e.target.value, seg.catalogo))}
-            className={`mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white ${ring} focus:outline-none focus:ring-2`}
+            disabled={genAllLoading}
+            className={`mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white ${ring} focus:outline-none focus:ring-2 disabled:opacity-60`}
           >
             {seg.catalogo.map((c) => (
               <option key={c.id} value={c.id}>
@@ -257,13 +329,21 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={genLoading || !journey}
+            disabled={genLoading || genAllLoading || !journey}
             onClick={() => void handleGenerate()}
             className={`rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-45 ${
               accent === 'teal' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-orange-600 hover:bg-orange-700'
             }`}
           >
             {genLoading ? 'Generando con IA…' : 'Generar ideas con IA'}
+          </button>
+          <button
+            type="button"
+            disabled={genLoading || genAllLoading}
+            onClick={() => void handleGenerateAll()}
+            className="rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45"
+          >
+            ✦ Generar todos los canales
           </button>
           <button
             type="button"
@@ -274,7 +354,7 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
               setDraftTexto('')
               setManualOpen(true)
             }}
-            disabled={!journey}
+            disabled={!journey || genAllLoading}
             className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-45"
           >
             Añadir idea manual
@@ -282,13 +362,28 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
           <button
             type="button"
             onClick={() => handleClearCanal()}
-            disabled={items.length === 0}
+            disabled={items.length === 0 || genAllLoading}
             className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-40"
           >
             Vaciar este canal
           </button>
         </div>
       </div>
+
+      {genAllLoading && genAllProgress && (
+        <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 flex items-center gap-3">
+          <span className="inline-block h-4 w-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-indigo-900">
+              Generando ideas para todos los canales ({genAllProgress.current}/{genAllProgress.total})
+            </p>
+            <p className="text-xs text-indigo-700 mt-0.5">
+              {genAllProgress.segmento === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'}{' '}
+              · {genAllProgress.canalLabel}
+            </p>
+          </div>
+        </div>
+      )}
 
       {!journey && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
