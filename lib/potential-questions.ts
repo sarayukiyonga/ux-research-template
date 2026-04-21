@@ -1,4 +1,5 @@
-export const POTENTIAL_SHEET_ID = '17TiRexoLK-jEWhgJ3sgO2KiK5BbqikoaZfUlqXabAJU'
+export const POTENTIAL_SHEET_ID =
+  process.env.POTENTIAL_SURVEY_SHEET_ID ?? '17TiRexoLK-jEWhgJ3sgO2KiK5BbqikoaZfUlqXabAJU'
 export const POTENTIAL_SHEET_RANGE = 'A:Q'
 
 // Q1 uses three columns: Men (1), Women (2), Non-binary (3)

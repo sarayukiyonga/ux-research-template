@@ -89,5 +89,6 @@ export const QUESTIONS: Question[] = [
   },
 ]
 
-export const SHEET_ID = '1qAc11BPmA0JkV8Hp2C2fcC7N3LndhPVDOpAfFOXHiWM'
+export const SHEET_ID =
+  process.env.SURVEY_SHEET_ID ?? '1qAc11BPmA0JkV8Hp2C2fcC7N3LndhPVDOpAfFOXHiWM'
 export const SHEET_RANGE = 'A:P' // hasta col P (índice 15), ignoramos email en Q
