@@ -205,7 +205,7 @@ function clearRetornoAt(nodo: FlowLineal, idx: number): FlowLineal {
   const sorted = [...nodo.pasos].sort((a, b) => a.orden - b.orden)
   const newPasos = sorted.map((p, i) =>
     i === idx
-      ? (({ retornoA: _a, retornoTipo: _t, retornoLabel: _l, ...rest }) => rest)(p)
+      ? { ...p, retornoTipo: null, retornoA: null, retornoLabel: null }
       : p
   )
   return { ...nodo, pasos: newPasos }
@@ -266,7 +266,7 @@ function PasoEditForm({
     const retorno =
       retornoTipo && retornoA
         ? { retornoTipo: retornoTipo as 'paso' | 'decision', retornoA, retornoLabel: retornoLabel.trim() }
-        : { retornoTipo: undefined, retornoA: undefined, retornoLabel: undefined }
+        : { retornoTipo: null, retornoA: null, retornoLabel: null }
     onSave({ tituloBolita: titulo.trim(), descripcion: desc.trim(), tipo, ...retorno })
   }
 
