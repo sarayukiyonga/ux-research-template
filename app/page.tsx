@@ -96,13 +96,43 @@ const sections = [
     color: 'teal',
   },
   {
+    href: '/mvp',
+    emoji: '🎯',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'Priorizar los accionables (MVP)',
+    description:
+      'Matriz de valor (usuario vs. negocio) generada con IA a partir de las respuestas HMW «mejor», encuestas y entrevista CEO. Funcionalidades arrastrables.',
+    color: 'violet',
+  },
+  {
+    href: '/moscow',
+    emoji: '📋',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'Must · Should · Could · Won\'t',
+    description:
+      'Clasificación MoSCoW de las funcionalidades del MVP: qué es imprescindible, importante, deseable o descartado para el lanzamiento.',
+    color: 'violet',
+  },
+  {
+    href: '/mapa-sitio',
+    emoji: '🗺️',
+    tag: 'Design Thinking',
+    tagPulse: false,
+    title: 'Mapa del Sitio',
+    description:
+      'Arquitectura de información generada a partir del MoSCoW: árbol jerárquico de secciones y páginas de la nueva web de MOA.',
+    color: 'teal',
+  },
+  {
     href: '/user-flow',
     emoji: '🔀',
     tag: 'Design Thinking',
     tagPulse: false,
     title: 'User Flow (flujo de usuario)',
     description:
-      'Diagrama de flujo basado en el User Journey guardado (ramas, CTAs hasta conversión).',
+      'Diagrama de flujo basado en el mapa del sitio y el User Journey: pantallas reales, clics y ramas hasta conversión.',
     color: 'cyan',
   },
   {

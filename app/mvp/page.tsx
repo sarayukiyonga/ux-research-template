@@ -1,0 +1,56 @@
+import { MVPPage } from '@/components/MVPPage'
+import Link from 'next/link'
+
+export default function MVPRoute() {
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-5xl px-4 py-10">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-6"
+        >
+          ← Volver al dashboard
+        </Link>
+
+        {/* Header */}
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 mb-3">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+            Design Thinking
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+            Priorizar los accionables
+          </h1>
+          <p className="mt-1 text-gray-500 text-sm">
+            MOA · Matriz de valor para definir el MVP — Eje X: valor para el negocio · Eje Y: valor para el usuario
+          </p>
+        </div>
+
+        {/* Info */}
+        <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-5 py-4 mb-8 space-y-2 text-sm text-violet-950 leading-relaxed">
+          <p>
+            La IA genera funcionalidades basándose en las respuestas HMW marcadas como{' '}
+            <strong>«mejor»</strong>, los resultados de encuestas y la entrevista a la CEO.
+            Cada nota se posiciona según su{' '}
+            <span className="font-semibold">valor para el usuario</span> (eje vertical) y{' '}
+            <span className="font-semibold">valor para el negocio</span> (eje horizontal).
+          </p>
+          <p className="text-violet-800/80 text-xs">
+            Las funcionalidades en el cuadrante <strong>superior derecho</strong>{' '}
+            (naranja) son las candidatas principales al MVP.
+            Arrastra las notas para ajustar la priorización manualmente.
+          </p>
+        </div>
+
+        <MVPPage />
+
+        <p className="mt-10 text-center text-xs text-gray-400">
+          Siguiente paso:{' '}
+          <Link href="/moscow" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            Must · Should · Could · Won&apos;t →
+          </Link>
+        </p>
+      </div>
+    </main>
+  )
+}

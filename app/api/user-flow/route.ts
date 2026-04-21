@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
+import { google } from 'googleapis'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 import { fetchSavedPovFromSheets, type POVStatement } from '@/lib/fetch-saved-pov'
 import {
@@ -23,6 +24,32 @@ import {
 import { userFlowLineSchema, normalizeUserFlowLine } from '@/lib/user-flow-tree'
 import { getCanalPromptFields } from '@/lib/user-journey-channels'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CEO_SHEET_ID } from '@/lib/ceo-questions'
+import { normalizeSitemapPersist, sitemapToPromptBlock } from '@/lib/sitemap-moa-types'
+
+function getSitemapAuth() {
+  return new google.auth.JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  })
+}
+
+async function loadSitemapBlock(): Promise<string> {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth: getSitemapAuth() })
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: CEO_SHEET_ID,
+      range: 'sitemap_moa!A2:B2',
+    })
+    const row = res.data.values?.[0]
+    if (!row || !row[1]) return ''
+    const persist = normalizeSitemapPersist(JSON.parse(row[1]))
+    return sitemapToPromptBlock(persist.root)
+  } catch {
+    return ''
+  }
+}
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -80,6 +107,7 @@ async function generateOneFlow(opts: {
   journeyBlock: string
   personaBlock: string
   povBlock: string
+  moscowBlock: string
   segmentLabel: string
   canalEtiqueta: string
 }) {
@@ -89,8 +117,8 @@ async function generateOneFlow(opts: {
     schema: z.object({ flow: userFlowLineSchema }),
     system: `${systemBase}
 
-Segmento: **${opts.segmentLabel}**. Las ideas listadas son la prioridad; el journey y persona/POV son apoyo.`,
-    prompt: `=== IDEAS DE FUNCIONALIDADES Y CONTENIDO (PRIORIDAD 1 — canal ${opts.canalEtiqueta}) ===
+Segmento: **${opts.segmentLabel}**. El mapa del sitio define las paginas reales que existen: usa sus nombres exactos como titulos de los pasos (rectangulos). Las ideas del canal son el contexto de interaccion. El journey y persona/POV dan coherencia al recorrido.`,
+    prompt: `${opts.moscowBlock ? opts.moscowBlock + '\n\n' : ''}=== IDEAS DE FUNCIONALIDADES Y CONTENIDO (canal ${opts.canalEtiqueta}) ===
 ${opts.ideasBlock}
 
 === USER JOURNEY MAP — contexto de etapas, dolores y POV ===
@@ -103,7 +131,7 @@ ${opts.personaBlock}
 ${opts.povBlock}
 
 ===
-Devuelve el objeto "flow" con **raiz** como árbol vertical fiel a las ideas; usa el journey para no contradecir etapas y dolores.`,
+Devuelve el objeto "flow" con **raiz** como arbol vertical. Usa los nombres de pagina del mapa del sitio como titulos de los pasos. Las paginas [MUST] del mapa deben aparecer en el flujo. Usa el journey para no contradecir etapas y dolores.`,
   })
   return normalizeUserFlowLine(object.flow)
 }
@@ -138,12 +166,16 @@ export async function POST(req: Request) {
       /* sin cuerpo: generar ambos */
     }
 
-    const personas = await fetchSavedUserPersonas()
+    const [personas, pov, moscowBlock] = await Promise.all([
+      fetchSavedUserPersonas(),
+      fetchSavedPovFromSheets(),
+      loadSitemapBlock(),
+    ])
+
     if (!personas.ok) {
       return NextResponse.json({ error: ERR_PERSONA }, { status: 400 })
     }
 
-    const pov = await fetchSavedPovFromSheets()
     if (!pov.ok) {
       return NextResponse.json({ error: ERR_POV }, { status: 400 })
     }
@@ -208,6 +240,7 @@ export async function POST(req: Request) {
         journeyBlock: journeyActual,
         personaBlock: textoPersonaActual,
         povBlock: povActual,
+        moscowBlock,
         segmentLabel: 'cliente actual',
         canalEtiqueta: canalMeta.label,
       })
@@ -260,6 +293,7 @@ export async function POST(req: Request) {
         journeyBlock: journeyPotencial,
         personaBlock: textoPersonaPotencial,
         povBlock: povPotencial,
+        moscowBlock,
         segmentLabel: 'cliente potencial',
         canalEtiqueta: canalMeta.label,
       })
@@ -334,6 +368,7 @@ export async function POST(req: Request) {
         journeyBlock: journeyActual,
         personaBlock: textoPersonaActual,
         povBlock: povActual,
+        moscowBlock,
         segmentLabel: 'cliente actual',
         canalEtiqueta: canalMetaA.label,
       })
@@ -355,6 +390,7 @@ export async function POST(req: Request) {
         journeyBlock: journeyPotencial,
         personaBlock: textoPersonaPotencial,
         povBlock: povPotencial,
+        moscowBlock,
         segmentLabel: 'cliente potencial',
         canalEtiqueta: canalMetaP.label,
       })

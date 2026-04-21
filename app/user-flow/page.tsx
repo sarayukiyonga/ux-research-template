@@ -34,15 +34,15 @@ export default function UserFlowRoute() {
 
           <div className="rounded-2xl border border-cyan-200 bg-cyan-50/60 px-5 py-4 mb-8 space-y-2 text-sm text-cyan-950 leading-relaxed">
             <p>
-              El flujo se construye a partir del <strong>User Journey Map</strong> guardado: las <strong>etapas en orden</strong>,
-              los <strong>dolores</strong> y el rol de la <strong>web frente al POV</strong> se traducen a rectángulos (pantallas)
-              y flechas (clics). Puede haber <strong>ramas</strong> (rombo) donde el journey sugiera bifurcación. El{' '}
-              <strong>objetivo de conversión</strong> del diagrama debe alinearse con la etapa en que el journey indica que el
-              POV se resuelve en la web.
+              El flujo combina las <strong>funcionalidades Must del MoSCoW</strong> con el{' '}
+              <strong>User Journey Map</strong>: las etapas, dolores y el rol de la web frente al POV
+              se traducen en pantallas (rectángulos) y clics (flechas). Las decisiones (rombos) aparecen
+              donde las funcionalidades Must o los dolores del journey sugieren bifurcación.
             </p>
             <p className="text-xs text-cyan-900/85">
-              Hace falta el <strong>User Journey Map guardado</strong> (obligatorio), más <strong>User Persona</strong> y{' '}
-              <strong>POV</strong>. La IA no inventa un recorrido distinto al del journey. Referencia de símbolos:{' '}
+              Requiere: <strong>MoSCoW guardado</strong> (Must) + <strong>User Journey Map</strong> +{' '}
+              <strong>User Persona</strong> + <strong>POV</strong>. Si no hay MoSCoW guardado, el flujo
+              se basa solo en el journey. Referencia de símbolos:{' '}
               <a
                 href="https://www.smartdraw.com/flowchart/simbolos-de-diagramas-de-flujo.htm"
                 className="font-semibold underline underline-offset-2"
@@ -54,8 +54,11 @@ export default function UserFlowRoute() {
               .
             </p>
             <p className="text-xs flex flex-wrap gap-x-4 gap-y-1 pt-1">
+              <Link href="/mapa-sitio" className="font-semibold text-cyan-800 underline underline-offset-2">
+                ← Mapa del Sitio
+              </Link>
               <Link href="/user-journey" className="font-semibold text-cyan-800 underline underline-offset-2">
-                User Journey Map (base) →
+                User Journey Map →
               </Link>
               <Link href="/user-persona" className="font-semibold text-cyan-800 underline underline-offset-2">
                 User Persona →
