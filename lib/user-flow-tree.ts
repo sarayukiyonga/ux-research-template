@@ -83,9 +83,28 @@ function alignClics(pasos: { orden: number }[], clics: string[]): string[] {
   return out
 }
 
+/**
+ * Elimina retornoA de un paso si apunta a un paso con orden >= el propio
+ * (retorno hacia adelante o al mismo paso, ambos inválidos).
+ */
+function sanitizeRetornos(pasos: FlowPaso[]): FlowPaso[] {
+  const sorted = [...pasos].sort((a, b) => a.orden - b.orden)
+  return sorted.map((p) => {
+    if (!p.retornoA || !p.retornoTipo) return p
+    // Solo es válido si el paso destino existe y tiene orden MENOR que el actual
+    if (p.retornoTipo === 'paso') {
+      const target = sorted.find((t) => t.tituloBolita === p.retornoA)
+      if (!target || target.orden >= p.orden) {
+        return { ...p, retornoTipo: null, retornoA: null, retornoLabel: null }
+      }
+    }
+    return p
+  })
+}
+
 export function normalizeFlowNode(n: FlowNodo): FlowNodo {
   if (n.tipo === 'lineal') {
-    const pasos = [...n.pasos].sort((a, b) => a.orden - b.orden)
+    const pasos = sanitizeRetornos([...n.pasos].sort((a, b) => a.orden - b.orden))
     return {
       tipo: 'lineal',
       pasos,
