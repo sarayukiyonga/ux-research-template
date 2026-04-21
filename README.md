@@ -1,6 +1,6 @@
 # UX Research Template — IA para proyectos web de servicios
 
-Plantilla Next.js para realizar investigación UX completa (encuestas, entrevistas CEO, user personas, empathy maps, HMW, POV, user journey, MoSCoW, MVP y mapa del sitio) con generación de análisis mediante IA (OpenAI GPT-4o).
+Plantilla Next.js para realizar investigación UX completa (encuestas, entrevistas CEO, user personas, empathy maps, HMW, POV, MoSCoW, MVP, mapa del sitio, user journey y user flow) con generación de análisis mediante IA (OpenAI GPT-4o).
 
 Diseñada para proyectos web de **negocios de servicios presenciales**: centros de salud, entrenadores personales, clínicas, estudios, consultorios, etc.
 
@@ -18,11 +18,11 @@ Diseñada para proyectos web de **negocios de servicios presenciales**: centros 
 | User Persona | `/user-persona` | Perfiles de cliente actual y potencial |
 | Point of View | `/pov` | Declaraciones POV (Design Thinking) |
 | How Might We | `/hmw` | Preguntas HMW generadas por IA |
-| User Journey | `/user-journey` | Mapa de viaje por canal (web, Instagram, etc.) |
-| User Flow | `/user-flow` | Flujos de usuario con IA |
 | MoSCoW | `/moscow` | Priorización de funcionalidades |
 | MVP | `/mvp` | Matriz de valor usuario vs. negocio |
 | Mapa del sitio | `/mapa-sitio` | Arquitectura de la web generada con IA |
+| User Journey | `/user-journey` | Mapa de viaje por canal (web, Instagram, etc.) |
+| User Flow | `/user-flow` | Flujos de usuario con IA (usa journey + mapa guardados) |
 | Principios de diseño | `/design` | Principios visuales y de comunicación |
 
 ---
@@ -134,11 +134,11 @@ El orden natural de los módulos sigue el proceso de Design Thinking:
 6. /user-persona → Perfiles de usuario
 7. /pov          → Point of View
 8. /hmw          → How Might We
-9. /user-journey → Viaje del usuario
-10. /user-flow   → Flujos de usuario
-11. /moscow      → Priorización MoSCoW
-12. /mvp         → Matriz de valor MVP
-13. /mapa-sitio  → Arquitectura web
+9. /moscow       → Priorización MoSCoW (la IA del mapa del sitio puede usarlo)
+10. /mvp         → Matriz de valor MVP
+11. /mapa-sitio → Arquitectura web (conviente tenerla guardada antes del user flow)
+12. /user-journey → Viaje del usuario (obligatorio guardar antes del user flow)
+13. /user-flow   → Flujos de usuario (requiere journey + ideas en Sheets; usa el mapa)
 14. /design      → Principios de diseño
 ```
 
