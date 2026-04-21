@@ -1708,12 +1708,13 @@ function UserFlowchartSection({
                       />
                       {a.label && (
                         <text
-                          x={midX + 4}
+                          x={x2 - 6}
                           y={midY - 4}
                           fontSize="10"
                           fill="#92400e"
                           fontFamily="inherit"
                           fontWeight="500"
+                          textAnchor="end"
                         >
                           {a.label}
                         </text>
