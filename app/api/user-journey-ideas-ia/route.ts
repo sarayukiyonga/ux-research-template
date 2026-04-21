@@ -3,6 +3,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
 
   const ordenes = j.etapas.map((e) => e.orden)
   const bloque = journeyToPromptBlock(j, canalEtiqueta)
+  const ceoInterview = await fetchCeoInterviewPlaintext()
 
   const ideaSchema = z.object({
     etapaOrden: z
@@ -97,13 +100,21 @@ export async function POST(req: Request) {
       system:
         'Eres estratega de producto y contenidos para MOA (Patri, salud y fitness, Martorell). ' +
         'Generas ideas realistas para el canal de comunicación indicado (no inventes funciones imposibles para ese medio). ' +
+        'Al inicio del mensaje de usuario viene la **encuesta / entrevista a la ' +
+        CLIENT.ownerRole +
+        '**: úsala como **fuente de verdad** para modelo de servicio, límites, tono y viabilidad; **no contradigas** lo explícito ni propongas ofertas o canales que la encuesta descarte. ' +
+        'Las etapas del mapa definen **dónde** aplicar cada idea. ' +
         'Responde solo con el JSON del esquema. Español.' +
         MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
-      prompt: `A partir del User Journey Map siguiente, genera ideas de **funcionalidades** (qué debe poder hacer el sistema, la web, la app, el flujo en WhatsApp, etc.) y de **contenidos** (textos, piezas, ritmo de comunicación) para el canal **${canalEtiqueta}**.
+      prompt: `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) — modelo de servicio ===
+${ceoInterview}
+
+A partir del User Journey Map siguiente, genera ideas de **funcionalidades** (qué debe poder hacer el sistema, la web, la app, el flujo en WhatsApp, etc.) y de **contenidos** (textos, piezas, ritmo de comunicación) para el canal **${canalEtiqueta}**.
 
 Reglas:
 - Cada idea debe asociarse a **etapaOrden** existente en el mapa (usa solo estos órdenes: ${ordenes.join(', ')}).
 - En cada etapa, piensa qué necesita la persona según descripción, dolores y rol MOA↔POV; propón ideas que **reduzcan fricción** o **refuercen confianza** hacia el POV.
+- Las ideas deben ser **coherentes** con la encuesta CEO de arriba (promesas, formato presencial/digital, recursos).
 - Alterna razonablemente funcionalidad y contenido según encaje (no hace falta 50/50 estricto).
 - Sé específico a MOA/Patri; evita ideas genéricas de manual de marketing.
 

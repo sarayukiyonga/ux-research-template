@@ -2175,16 +2175,21 @@ export function UserFlowPage() {
           El <strong>User Flow</strong> se muestra como diagrama <strong>vertical</strong> con
           estilo <strong>pastel</strong> (cápsulas amarillas inicio/fin, rectángulos teal, rombo
           melocotón, paralelogramo gris para datos; la segunda rama de una decisión binaria va en
-          tono rosa). Se genera a partir de las{' '}
-          <strong>ideas de funcionalidades y contenido</strong> guardadas en{' '}
+          tono rosa). Se genera en coherencia con el{' '}
           <Link
             href="/user-journey"
             className="font-semibold text-cyan-800 underline underline-offset-2"
           >
-            User Journey
+            User Journey Map
           </Link>{' '}
-          para el mismo <strong>segmento</strong> y <strong>canal</strong>. El mapa de journey, la
-          persona y el POV afinan el resultado.
+          del mismo <strong>segmento</strong> y <strong>canal</strong>, usando las{' '}
+          <strong>ideas de funcionalidades y contenido</strong> como base del diagrama, la{' '}
+          <Link href="/mvp" className="font-semibold text-cyan-800 underline underline-offset-2">
+            matriz MVP
+          </Link>{' '}
+          del mismo canal para priorizar pasos críticos, y la persona y el POV para tono y
+          bifurcaciones. Si el canal es <strong>Página web</strong>, la IA usa además el{' '}
+          <strong>mapa del sitio</strong> guardado (nombres de pantalla alineados al sitemap).
         </p>
         <p className="text-xs text-gray-500">
           Símbolos habituales:{' '}
@@ -2239,21 +2244,18 @@ export function UserFlowPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
         <p>
-          Prioridad:{' '}
-          <Link
-            href="/user-journey"
-            className="font-semibold text-cyan-800 underline underline-offset-2"
-          >
-            ideas funcionalidad/contenido
-          </Link>
-          {' · apoyo: mapa '}
+          Fuentes:{' '}
           <Link
             href="/user-journey"
             className="font-semibold text-cyan-800 underline underline-offset-2"
           >
             Journey
           </Link>
-          {' · '}
+          {' → ideas FUNC/CONT · '}
+          <Link href="/mvp" className="font-semibold text-cyan-800 underline underline-offset-2">
+            MVP
+          </Link>
+          {' (mismo canal) · '}
           <Link
             href="/user-persona"
             className="font-semibold text-cyan-700 underline underline-offset-2"
@@ -2264,6 +2266,7 @@ export function UserFlowPage() {
           <Link href="/pov" className="font-semibold text-cyan-700 underline underline-offset-2">
             POV
           </Link>
+          {' · mapa web solo canal Página web'}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-400">

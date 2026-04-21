@@ -4,12 +4,26 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import { loadHmwIaContextOrFail, hmwIaContextToMarkdown } from '@/lib/hmw-ia-context'
-import type { HMWQuestionsPayload, HMWItem } from '@/lib/hmw-payload'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { fetchSavedInsights, insightsToPlainText } from '@/lib/fetch-saved-insights'
+import {
+  MOSCOW_CATEGORIAS,
+  getScopePersist,
+  normalizeMoSCoWStoredJson,
+  MOSCOW_SCOPE_ALL,
+  type MoSCoWCategoria,
+  type MoSCoWPersist,
+} from '@/lib/moscow-types'
+import { fetchSavedUserJourneyFromSheets } from '@/lib/fetch-saved-user-journey'
+import { mergeJourneyCatalogosForV3 } from '@/lib/moscow-scope-options'
+import { getCanalPromptFields } from '@/lib/user-journey-channels'
 import { newMVPNotaId } from '@/lib/mvp-types'
 import { CLIENT, CLIENT_LONG_DESC } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
+
+const MOSCOW_SHEET = 'moscow'
+const MAX_MOSCOW_NOTAS = 50
 
 function getAuth() {
   return new google.auth.JWT({
@@ -19,48 +33,53 @@ function getAuth() {
   })
 }
 
-async function loadHMWMejor(): Promise<{ pregunta: string; respuesta: string; segmento: string }[]> {
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: CEO_SHEET_ID,
-    range: 'hmw!A2:C2',
-  })
-  const row = res.data.values?.[0]
-  if (!row || !row[1]) return []
+const MOSCOW_LABEL_SHORT: Record<MoSCoWCategoria, string> = {
+  must: 'Must',
+  should: 'Should',
+  could: 'Could',
+  wont: "Won't",
+}
 
-  const payload: HMWQuestionsPayload = JSON.parse(row[1])
-  const result: { pregunta: string; respuesta: string; segmento: string }[] = []
+interface MoscowFlatItem {
+  orden: number
+  categoria: MoSCoWCategoria
+  texto: string
+  origenMVP: string | null
+}
 
-  function extractMejor(items: HMWItem[], segmento: string) {
-    for (const item of items) {
-      if (!item.respuestasMarcas) continue
-      item.respuestasMarcas.forEach((marca, i) => {
-        if (marca === 'mejor' && item.respuestas[i]?.trim()) {
-          result.push({
-            pregunta: item.pregunta,
-            respuesta: item.respuestas[i].trim(),
-            segmento,
-          })
-        }
+function flattenMoSCoW(persist: MoSCoWPersist): MoscowFlatItem[] {
+  const out: MoscowFlatItem[] = []
+  let orden = 1
+  for (const cat of MOSCOW_CATEGORIAS) {
+    for (const n of persist.notas[cat]) {
+      const t = n.texto?.trim()
+      if (!t) continue
+      out.push({
+        orden: orden++,
+        categoria: cat,
+        texto: t.slice(0, 80),
+        origenMVP: n.origenMVP?.trim() ? n.origenMVP!.trim().slice(0, 120) : null,
       })
     }
   }
-
-  extractMejor(payload.clienteActual ?? [], 'cliente actual')
-  extractMejor(payload.clientePotencial ?? [], 'cliente potencial')
-  return result
+  return out
 }
 
-async function loadCEOInsights(): Promise<string> {
+async function loadMoSCoWForMvpScope(scope: string): Promise<MoSCoWPersist | null> {
   try {
     const sheets = google.sheets({ version: 'v4', auth: getAuth() })
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: CEO_SHEET_ID,
-      range: 'informe_ceo!A2:B2',
+      range: `${MOSCOW_SHEET}!A2:B2`,
     })
-    return res.data.values?.[0]?.[1] ?? ''
+    const row = res.data.values?.[0]
+    if (!row?.[1]?.trim()) return null
+    const bundle = normalizeMoSCoWStoredJson(JSON.parse(row[1]))
+    const p = getScopePersist(bundle, scope)
+    const n = MOSCOW_CATEGORIAS.reduce((s, c) => s + p.notas[c].length, 0)
+    return n > 0 ? p : null
   } catch {
-    return ''
+    return null
   }
 }
 
@@ -75,68 +94,130 @@ const notaSchema = z.object({
   origenHmw: z.string().max(120).nullable(),
 })
 
-const responseSchema = z.object({
-  notas: z.array(notaSchema).min(8).max(25),
-})
+function buildResponseSchema(count: number) {
+  return z.object({
+    notas: z.array(notaSchema).min(count).max(count),
+  })
+}
 
 // ── POST ──────────────────────────────────────────────────────────────────────
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const [ctx, hmwMejor, ceoInsights] = await Promise.all([
-      loadHmwIaContextOrFail(),
-      loadHMWMejor(),
-      loadCEOInsights(),
-    ])
-
-    if (!ctx.ok) {
-      return NextResponse.json({ error: ctx.message }, { status: 400 })
+    let mvpScope: string = MOSCOW_SCOPE_ALL
+    try {
+      const raw = (await req.json().catch(() => null)) as { scope?: unknown } | null
+      if (raw && typeof raw.scope === 'string' && raw.scope.trim()) {
+        const s = raw.scope.trim().slice(0, 48)
+        if (s !== MOSCOW_SCOPE_ALL) mvpScope = s
+      }
+    } catch {
+      /* cuerpo vacío */
     }
 
-    const contextoBase = hmwIaContextToMarkdown(ctx.ctx)
+    const [persist, insClientes, insPotenciales, ceoPlain, journeyRes] = await Promise.all([
+      loadMoSCoWForMvpScope(mvpScope),
+      fetchSavedInsights('clientes'),
+      fetchSavedInsights('potenciales'),
+      fetchCeoInterviewPlaintext(),
+      mvpScope === MOSCOW_SCOPE_ALL
+        ? Promise.resolve({ ok: false as const })
+        : fetchSavedUserJourneyFromSheets(),
+    ])
 
-    const hmwMejorText =
-      hmwMejor.length > 0
-        ? hmwMejor
-            .map((h) => `- [${h.segmento}] "${h.pregunta}" → ${h.respuesta}`)
-            .join('\n')
-        : '(No hay respuestas HMW marcadas como "mejor" todavia.)'
+    if (!persist) {
+      return NextResponse.json(
+        {
+          error:
+            mvpScope === MOSCOW_SCOPE_ALL
+              ? 'No hay MoSCoW en «Todos los canales» con notas. Guarda el tablero combinado en /moscow o elige un canal con MoSCoW.'
+              : `No hay notas MoSCoW guardadas para el canal seleccionado. Genera y guarda MoSCoW para ese canal en /moscow.`,
+        },
+        { status: 400 }
+      )
+    }
 
-    const ceoText = ceoInsights.trim()
-      ? `=== Insights de la entrevista a la ${CLIENT.ownerRole} (${CLIENT.ownerFirstName}) ===\n${ceoInsights.slice(0, 3000)}`
-      : '(No hay informe CEO guardado todavia.)'
+    const mergedCatalog = journeyRes.ok ? mergeJourneyCatalogosForV3(journeyRes.v3) : []
+    const ambitoLine =
+      mvpScope === MOSCOW_SCOPE_ALL
+        ? 'Ámbito: **Todos los canales** — el listado MoSCoW corresponde al tablero combinado guardado en Sheets.'
+        : `Ámbito: **solo el canal «${getCanalPromptFields(mvpScope, mergedCatalog).label}»** — posiciona solo en función de esas notas MoSCoW; no mezcles prioridades de otros medios.`
 
-    const prompt = `Eres un experto en diseño de producto y priorización de MVP para startups y negocios de servicios.
+    const flat = flattenMoSCoW(persist)
+    if (flat.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'El MoSCoW guardado no tiene notas con texto. Añade al menos una nota en la página MoSCoW y vuelve a guardar.',
+        },
+        { status: 400 }
+      )
+    }
 
-${contextoBase}
+    if (flat.length > MAX_MOSCOW_NOTAS) {
+      return NextResponse.json(
+        {
+          error: `Hay demasiadas notas en MoSCoW (${flat.length}). Reduce a ${MAX_MOSCOW_NOTAS} o menos para generar la matriz con IA.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    const listaMoscow = flat
+      .map((item) => {
+        const lab = MOSCOW_LABEL_SHORT[item.categoria]
+        const orig = item.origenMVP ? ` · trazo HMW/MVP: "${item.origenMVP}"` : ''
+        return `${item.orden}. [MoSCoW · ${lab}] "${item.texto}"${orig}`
+      })
+      .join('\n')
+
+    const bloqueClientes = insClientes.ok
+      ? `=== Insights IA — encuesta a CLIENTES ACTUALES ===\n${insightsToPlainText(insClientes.data).slice(0, 8000)}`
+      : '(No hay insights guardados para la encuesta a clientes actuales.)'
+
+    const bloquePotenciales = insPotenciales.ok
+      ? `=== Insights IA — encuesta a CLIENTES POTENCIALES ===\n${insightsToPlainText(insPotenciales.data).slice(0, 8000)}`
+      : '(No hay insights guardados para la encuesta a clientes potenciales.)'
+
+    const ceoText =
+      ceoPlain.trim() && !ceoPlain.startsWith('(Sin datos')
+        ? `=== Entrevista a la ${CLIENT.ownerRole} (${CLIENT.ownerFirstName}) — respuestas por tema ===\n${ceoPlain.slice(0, 12000)}`
+        : `(No hay respuestas de entrevista CEO en la hoja principal; posiciona según MoSCoW y los insights de encuesta si existen.)`
+
+    const n = flat.length
+    const responseSchema = buildResponseSchema(n)
+
+    const prompt = `Eres experto en priorización de MVP para ${CLIENT_LONG_DESC}.
+
+${ambitoLine}
+
+=== FUNCIONALIDADES Ya definidas en MoSCoW (orden fijo; cada línea es UNA nota en la matriz) ===
+${listaMoscow}
+
+${bloqueClientes}
+
+${bloquePotenciales}
 
 ${ceoText}
 
-=== Respuestas HMW marcadas como "mejor" (ideas clave del equipo) ===
-${hmwMejorText}
-
 === TU TAREA ===
-Genera entre 10 y 20 funcionalidades/características concretas para el MVP de la nueva web/app de ${CLIENT_LONG_DESC}.
+Debes devolver EXACTAMENTE ${n} entradas en "notas", en el MISMO ORDEN que el listado numerado de arriba (la entrada 1 del JSON corresponde a la línea 1, etc.).
 
-Para CADA funcionalidad define:
-1. "texto": nombre corto y claro (maximo 55 caracteres). Ejemplos: "Reserva online de sesiones", "Pago de cuota mensual", "Calendario de clases grupales".
-2. "x": posicion horizontal 0-100.
-   - 0 = Poco valor para el NEGOCIO (no genera ingresos ni ahorra costes a ${CLIENT.ownerFirstName} / ${CLIENT.name})
-   - 100 = Mucho valor para el NEGOCIO (genera ingresos directos, fideliza, ahorra tiempo de administracion)
-3. "y": posicion vertical 0-100.
-   - 0 = Mucho valor para el USUARIO/CLIENTA (resuelve un dolor claro, mejora su experiencia)
-   - 100 = Poco valor para el USUARIO/CLIENTA (es mas administrativa o tecnica, el usuario apenas la nota)
-4. "color":
-   - "naranja" si la funcionalidad esta en el cuadrante top-right (x>50 AND y<50): alta prioridad MVP
-   - "amarillo" para el resto
-5. "tamano": importancia relativa dentro de su cuadrante.
-   - "lg" = critica (sin esto el MVP no tiene sentido)
-   - "md" = importante pero no bloqueante
-   - "sm" = interesante a largo plazo
-6. "origenHmw": si la funcionalidad viene de una pregunta HMW, pon el texto de esa pregunta (maximo 100 chars). Si no, pon null.
+Para cada entrada i:
+1. "texto": el nombre corto de la funcionalidad tal como en MoSCoW (máximo 55 caracteres). Puedes acortar ligeramente si hace falta para caber; no cambies el significado ni inventes otra funcionalidad distinta.
+2. "x": 0–100 = valor para el NEGOCIO de ${CLIENT.name} (${CLIENT.ownerFirstName}).
+   - 0 = poco valor de negocio (no ingresos, poco ahorro operativo, poco impacto en retención).
+   - 100 = mucho valor de negocio (ingresos, eficiencia, fidelización clara).
+3. "y": 0–100 = valor para el USUARIO/cliente final.
+   - 0 = mucho valor percibido (resuelve un dolor o necesidad fuerte).
+   - 100 = poco valor percibido para quien usa el producto.
+4. "color": "naranja" si x>50 e y<50 (cuadrante MVP de alta prioridad); en caso contrario "amarillo".
+5. "tamano": "lg" si es crítica en ese cuadrante, "md" si es importante, "sm" si es secundaria (relativo al resto del listado).
+6. "origenHmw": cadena corta con la categoría MoSCoW de origen, por ejemplo "MoSCoW · Must". Si en la línea había trazo HMW/MVP, añade " — " y un fragmento breve (máx. ~80 caracteres en total).
 
-Usa solo informacion real del contexto (encuestas, CEO, HMW). No inventes datos demograficos ni funciones sin base.
-Posiciona las funcionalidades de forma realista y variada en la matriz; no las pongas todas en el mismo cuadrante.`
+Cómo posicionar: usa sobre todo los insights de las dos encuestas y la entrevista CEO para situar x e y. La etiqueta MoSCoW (Must/Should/Could/Won't) orienta prioridad global pero NO sustituye la evidencia de encuestas y CEO (por ejemplo, algo en "Could" puede tener alto valor de usuario si las encuestas lo muestran).
+
+No inventes datos demográficos ni funciones que no estén en el listado MoSCoW. Reparte las posiciones de forma realista; no apiles todas en el mismo punto.`
 
     const result = await generateObject({
       model: openai('gpt-4o'),
@@ -144,10 +225,15 @@ Posiciona las funcionalidades de forma realista y variada en la matriz; no las p
       prompt,
     })
 
-    const notas = result.object.notas.map((n) => ({
-      ...n,
-      id: newMVPNotaId(),
-    }))
+    const notas = result.object.notas.map((row, idx) => {
+      const src = flat[idx]
+      const fallbackTexto = src ? src.texto.slice(0, 60) : row.texto
+      return {
+        ...row,
+        texto: row.texto?.trim() ? row.texto.trim().slice(0, 60) : fallbackTexto,
+        id: newMVPNotaId(),
+      }
+    })
 
     return NextResponse.json({ notas })
   } catch (e) {

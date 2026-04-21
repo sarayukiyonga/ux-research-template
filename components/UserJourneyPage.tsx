@@ -166,7 +166,7 @@ function SegmentCanalPanel({
       <div>
         <h2 className="text-sm font-bold text-gray-900">Tipo de cliente y canales</h2>
         <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-          <strong>Recorrido base</strong>: mapa end-to-end sin un solo medio (HMW + persona + POV). Los demás canales
+          <strong>Todos los canales</strong>: mapa end-to-end sin un solo medio (HMW + persona + POV). Los demás canales
           detallan la experiencia en <strong>cada medio</strong> (web, WhatsApp, etc.). Puedes añadir canales
           personalizados y borrarlos con la <strong className="font-semibold">X</strong> (solo los propios). El{' '}
           <strong>User Flow</strong> usa el canal guardado <strong>por segmento</strong>.

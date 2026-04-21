@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import { normalizeMVPPersist, createEmptyMVPPersist } from '@/lib/mvp-types'
+import {
+  createEmptyMVPBundle,
+  MVP_BUNDLE_VERSION,
+  normalizeMVPStoredJson,
+  normalizeMVPPersist,
+  type MVPBundlePersist,
+} from '@/lib/mvp-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,8 +47,8 @@ export async function GET() {
     const row = res.data.values?.[0]
     if (!row || !row[1]) return NextResponse.json({ saved: null })
 
-    const data = normalizeMVPPersist(JSON.parse(row[1]))
-    return NextResponse.json({ saved: { savedAt: row[0] ?? '', data } })
+    const bundle = normalizeMVPStoredJson(JSON.parse(row[1]))
+    return NextResponse.json({ saved: { savedAt: row[0] ?? '', bundle } })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error'
     return NextResponse.json({ error: msg }, { status: 500 })
@@ -53,8 +59,20 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const data = normalizeMVPPersist(body.data ?? createEmptyMVPPersist())
+    const body = (await req.json()) as { bundle?: unknown; data?: unknown }
+
+    let bundle: MVPBundlePersist
+    if (body.bundle != null) {
+      bundle = normalizeMVPStoredJson(body.bundle)
+    } else if (body.data != null) {
+      bundle = {
+        version: MVP_BUNDLE_VERSION,
+        generic: normalizeMVPPersist(body.data),
+        canales: {},
+      }
+    } else {
+      bundle = createEmptyMVPBundle()
+    }
 
     const sheets = google.sheets({ version: 'v4', auth: getAuth() })
     await ensureSheetExists(sheets)
@@ -73,8 +91,8 @@ export async function POST(req: Request) {
       requestBody: {
         valueInputOption: 'RAW',
         data: [
-          { range: `${SHEET_NAME}!A1:B1`, values: [['Guardado el', 'MVP (JSON)']] },
-          { range: `${SHEET_NAME}!A2:B2`, values: [[savedAt, JSON.stringify(data)]] },
+          { range: `${SHEET_NAME}!A1:B1`, values: [['Guardado el', 'MVP bundle (JSON)']] },
+          { range: `${SHEET_NAME}!A2:B2`, values: [[savedAt, JSON.stringify(bundle)]] },
         ],
       },
     })

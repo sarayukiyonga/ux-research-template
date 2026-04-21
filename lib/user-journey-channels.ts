@@ -1,8 +1,8 @@
 /** Canales de comunicación para los que se puede generar un User Journey Map distinto. */
 
 /**
- * Mapa **base**: recorrido end-to-end sin ceñirse a un solo medio (HMW + persona + POV).
- * Los demás canales del catálogo sirven para detallar la interacción en cada medio concreto.
+ * **Todos los canales** (`journey_base`): recorrido end-to-end sin ceñirse a un solo medio (HMW + persona + POV).
+ * Los demás canales del catálogo detallan la interacción en cada medio concreto.
  */
 export const JOURNEY_BASE_CANAL_ID = 'journey_base' as const
 
@@ -78,7 +78,7 @@ export interface JourneyCanalDef {
 
 const JOURNEY_BASE_DEF: JourneyCanalDef = {
   id: JOURNEY_BASE_CANAL_ID,
-  label: 'Recorrido base (sin canal único)',
+  label: 'Todos los canales',
   esPreset: true,
 }
 
@@ -119,7 +119,7 @@ export type CanalPromptFields = {
 export function getCanalPromptFields(canalId: string, catalogo: JourneyCanalDef[]): CanalPromptFields {
   if (canalId === JOURNEY_BASE_CANAL_ID) {
     return {
-      label: 'Recorrido base (sin canal único)',
+      label: 'Todos los canales',
       descripcionCorta: 'el recorrido end-to-end de la persona',
       focoExperiencia:
         'cómo descubre su necesidad, busca información, evalúa opciones, encuentra a MOA y da el paso a contratar o continuar el servicio — usando los datos del HMW, la persona y el POV, sin forzar un único medio (web, boca a boca, salud, redes, etc. pueden aparecer a lo largo del relato)',

@@ -22,18 +22,25 @@ export default function MoSCoWRoute() {
             Must · Should · Could · Won&apos;t
           </h1>
           <p className="mt-1 text-gray-500 text-sm">
-            MOA · Priorización de funcionalidades para el MVP con el método MoSCoW
+            MoSCoW a partir del User Journey guardado y la entrevista a la CEO
           </p>
         </div>
 
         {/* Info */}
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-5 py-4 mb-8 space-y-2 text-sm text-violet-950 leading-relaxed">
           <p>
-            La IA clasifica las funcionalidades de la{' '}
-            <Link href="/mvp" className="font-semibold underline underline-offset-2 text-violet-700">
-              matriz MVP
+            La IA propone y clasifica funcionalidades a partir de los{' '}
+            <Link href="/user-journey" className="font-semibold underline underline-offset-2 text-violet-700">
+              mapas de User Journey
             </Link>{' '}
-            en cuatro categorías según su prioridad para el lanzamiento.
+            y las{' '}
+            <strong>ideas [FUNC] y [CONT]</strong> guardadas por canal. Usa el selector <strong>Canal</strong> para un
+            tablero MoSCoW por medio o <strong>Todos los canales</strong> en conjunto; cada ámbito se guarda por
+            separado en Sheets. Complemento:{' '}
+            <Link href="/ceo" className="font-semibold underline underline-offset-2 text-violet-700">
+              entrevista a la CEO
+            </Link>
+            .
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
             <div className="rounded-lg bg-orange-100 border border-orange-200 px-3 py-2">
@@ -58,11 +65,11 @@ export default function MoSCoWRoute() {
         <MoSCoWPage />
 
         <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
-          <Link href="/mvp" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            ← Matriz MVP
+          <Link href="/user-journey" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            ← User Journey Map
           </Link>
-          <Link href="/mapa-sitio" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            Mapa del Sitio →
+          <Link href="/mvp" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            Matriz MVP →
           </Link>
         </div>
       </div>

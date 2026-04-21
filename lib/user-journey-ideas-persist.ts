@@ -72,6 +72,19 @@ export function getIdeasForSegmentChannel(
   return bucket[canalId] ?? []
 }
 
+/** Cuenta todas las ideas guardadas (todos los canales y segmentos). */
+export function countAllJourneyIdeas(persist: UserJourneyIdeasPersist): number {
+  let n = 0
+  for (const arr of Object.values(persist.clienteActual)) n += arr?.length ?? 0
+  for (const arr of Object.values(persist.clientePotencial)) n += arr?.length ?? 0
+  return n
+}
+
+/** Ideas FUNC/CONT para un canal concreto (cliente actual + potencial). */
+export function countJourneyIdeasForCanal(persist: UserJourneyIdeasPersist, canalId: string): number {
+  return (persist.clienteActual[canalId]?.length ?? 0) + (persist.clientePotencial[canalId]?.length ?? 0)
+}
+
 /** Texto para prompts (User Flow): ideas agrupadas por etapa del journey. */
 export function ideasToFlowPromptBlock(
   items: JourneyIdeaItem[],
@@ -102,5 +115,43 @@ export function ideasToFlowPromptBlock(
   })
 
   return `### IDEAS DE FUNCIONALIDADES Y CONTENIDOS (fuente principal del diagrama)\nCanal: **${canalLabel}**. Persona en mapa: ${journey.etiquetaPersona}.\n\n${blocks.join('\n\n')}\n\n**Instrucción**: cada paso del User Flow debe ejecutar, refinar o mostrar en pantalla estas ideas donde encaje; no inventes un producto distinto al que describen las ideas salvo que el contexto POV lo exija explícitamente.`
+}
+
+/** Ideas agrupadas por etapa para prompts de MoSCoW (misma estructura que el bloque de User Flow, instrucción distinta). */
+export function ideasToMoSCoWPromptBlock(
+  items: JourneyIdeaItem[],
+  journey: JourneyForPersona,
+  canalLabel: string,
+  segmentoLabel: string
+): string {
+  if (items.length === 0) return ''
+
+  const etapaTitulo = (orden: number) => {
+    const e = journey.etapas.find((x) => x.orden === orden)
+    return e ? `${orden}. ${e.titulo}` : `Etapa orden ${orden}`
+  }
+
+  const byEtapa = new Map<number, JourneyIdeaItem[]>()
+  for (const it of items) {
+    const k = it.etapaOrden
+    if (!byEtapa.has(k)) byEtapa.set(k, [])
+    byEtapa.get(k)!.push(it)
+  }
+  const ordenes = [...byEtapa.keys()].sort((a, b) => a - b)
+
+  const blocks = ordenes.map((ord) => {
+    const list = byEtapa.get(ord)!
+    const lines = list.map(
+      (i) => `    - [${i.tipo === 'funcionalidad' ? 'FUNC' : 'CONT'}] ${i.texto.replace(/\s+/g, ' ').trim()}`
+    )
+    return `  **${etapaTitulo(ord)}** (${canalLabel})\n${lines.join('\n')}`
+  })
+
+  return `### IDEAS de funcionalidades y contenidos — ${segmentoLabel} · ${canalLabel}
+Persona en mapa: ${journey.etiquetaPersona}.
+
+${blocks.join('\n\n')}
+
+**Instrucción (MoSCoW):** cada nota MoSCoW debe poder rastrearse a una o varias líneas **[FUNC]** / **[CONT]** anteriores y/o a las **etapas** del mismo bloque de journey; si fusionas varias ideas, indícalo en \`origenMVP\`. No inventes capacidades que no estén en ideas o etapas de este contexto. La **entrevista a la CEO** del mismo prompt sirve para **priorizar** y alinear con negocio; no sustituye por completo el listado de ideas.`
 }
 

@@ -1,29 +1,22 @@
 # UX Research Template — IA para proyectos web de servicios
 
-Plantilla Next.js para realizar investigación UX completa (encuestas, entrevistas CEO, user personas, empathy maps, HMW, POV, MoSCoW, MVP, mapa del sitio, user journey y user flow) con generación de análisis mediante IA (OpenAI GPT-4o).
+Plantilla Next.js para realizar investigación UX en **7 fases** (Research → Understanding → Define → ideación y priorización → arquitectura → interacción → identidad), con generación de análisis mediante IA (OpenAI GPT-4o). El orden canónico vive en `lib/research-journey-steps.ts` y alimenta el dashboard y la barra de recorrido.
 
 Diseñada para proyectos web de **negocios de servicios presenciales**: centros de salud, entrenadores personales, clínicas, estudios, consultorios, etc.
 
 ---
 
-## Módulos incluidos
+## Fases y módulos (orden recomendado)
 
-| Módulo | Ruta | Descripción |
-|--------|------|-------------|
-| Dashboard CEO | `/ceo` | Entrevista al fundador/a con análisis IA |
-| Encuesta clientes actuales | `/survey` | Resultados y filtros de encuesta de satisfacción |
-| Encuesta clientes potenciales | `/potential` | Encuesta de descubrimiento de mercado |
-| Insights IA | `/insights` | Síntesis automática de respuestas abiertas |
-| Mapa de empatía | `/empathy` | Generado con IA a partir de encuestas + CEO |
-| User Persona | `/user-persona` | Perfiles de cliente actual y potencial |
-| Point of View | `/pov` | Declaraciones POV (Design Thinking) |
-| How Might We | `/hmw` | Preguntas HMW generadas por IA |
-| MoSCoW | `/moscow` | Priorización de funcionalidades |
-| MVP | `/mvp` | Matriz de valor usuario vs. negocio |
-| Mapa del sitio | `/mapa-sitio` | Arquitectura de la web generada con IA |
-| User Journey | `/user-journey` | Mapa de viaje por canal (web, Instagram, etc.) |
-| User Flow | `/user-flow` | Flujos de usuario con IA (usa journey + mapa guardados) |
-| Principios de diseño | `/design` | Principios visuales y de comunicación |
+| Fase | Rutas | Rol |
+|------|--------|-----|
+| **1. Investigación (Research)** | `/ceo`, `/survey`, `/potential` | Recoger datos sin forzar la interpretación. |
+| **2. Síntesis (Understanding)** | `/empathy`, `/insights`, `/user-persona` | Empatía → insights (crítico) → personas. |
+| **3. Definición (Define)** | `/pov`, `/hmw`, `/user-journey` | POV → HMW → User Journey por canal (sobre el HMW guardado). |
+| **4. Ideación + priorización** | `/moscow`, `/mvp` | MoSCoW desde User Journey + entrevista CEO; luego matriz MVP. |
+| **5. Estructura (Arquitectura UX)** | `/mapa-sitio` | Arquitectura de información a partir del MVP guardado. |
+| **6. Interacción** | `/user-flow` | Flujo real de navegación (requiere mapa + journey + ideas guardados en Sheets). |
+| **7. Identidad y diseño** | `/design` | Principios al cierre o en paralelo al diseño visual. |
 
 ---
 
@@ -53,6 +46,8 @@ npm install
 ### 3. Configurar las hojas de Google Sheets
 
 Necesitas **tres hojas de cálculo** en Google Sheets (pueden estar en el mismo documento o en documentos separados):
+
+Yo he vinculado las hojas de calculo generadas desde Google forms. Así las hojas de calculo se van actualizando conforme van llegando respuestas a las encuestas.
 
 | Variable | Contenido |
 |----------|-----------|
@@ -123,23 +118,23 @@ Abre [http://localhost:3000](http://localhost:3000) e inicia sesión con la cont
 
 ## Flujo de trabajo recomendado
 
-El orden natural de los módulos sigue el proceso de Design Thinking:
+Orden lineal (14 pasos); la barra superior y el dashboard del proyecto siguen esta secuencia definida en `lib/research-journey-steps.ts`:
 
 ```
-1. /ceo          → Entrevista al cliente/fundador
-2. /survey       → Resultados encuesta clientes actuales
-3. /potential    → Resultados encuesta clientes potenciales
-4. /insights     → Síntesis de respuestas con IA
-5. /empathy      → Mapa de empatía
-6. /user-persona → Perfiles de usuario
-7. /pov          → Point of View
-8. /hmw          → How Might We
-9. /moscow       → Priorización MoSCoW (la IA del mapa del sitio puede usarlo)
-10. /mvp         → Matriz de valor MVP
-11. /mapa-sitio → Arquitectura web (conviente tenerla guardada antes del user flow)
-12. /user-journey → Viaje del usuario (obligatorio guardar antes del user flow)
-13. /user-flow   → Flujos de usuario (requiere journey + ideas en Sheets; usa el mapa)
-14. /design      → Principios de diseño
+1. /ceo           → Entrevista CEO (negocio, objetivos, restricciones)
+2. /survey        → Encuesta clientes actuales
+3. /potential     → Encuesta clientes potenciales
+4. /empathy       → Mapa de empatía
+5. /insights      → Patrones con IA (crítico antes de personas)
+6. /user-persona  → User personas
+7. /pov           → Point of View
+8. /hmw           → How Might We
+9. /user-journey  → User journey por canal (después del HMW)
+10. /moscow       → MoSCoW (User Journey + ideas + entrevista CEO)
+11. /mvp          → Matriz MVP
+12. /mapa-sitio   → Mapa del sitio (arquitectura)
+13. /user-flow    → User flow (mapa + journey + ideas guardados)
+14. /design       → Principios de diseño
 ```
 
 Cada módulo tiene un botón **"Generar con IA"** que usa el contexto acumulado de los pasos anteriores, y un botón **"Guardar en Sheets"** para persistir los resultados.

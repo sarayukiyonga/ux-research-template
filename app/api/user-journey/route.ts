@@ -19,6 +19,7 @@ import {
 import type { UserJourneySegmento } from '@/lib/user-journey-persist'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -127,11 +128,11 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
 function buildSystemBase(canal: CanalPromptFields, journeyBaseMode: boolean, esClienteActual: boolean): string {
   const mapaDesc = journeyBaseMode
     ? esClienteActual
-      ? `un **User Journey Map base** para **cliente actual**: la persona **ya entrena con Patri / ya es clienta de MOA**. Describe el recorrido end-to-end **en la vida de clienta** (continuidad, motivación, comunicación, resolución de dudas, sensaciones entre sesiones, otros canales de apoyo…) usando **HMW**, **POV** y **User Persona**. No sustituyas esto por un embudo de captación salvo que el HMW lo describa explícitamente.`
-      : `un **User Journey Map base**: recorrido **end-to-end** sin centrarse en un solo canal de comunicación. Describe cómo la persona pasa de tener una necesidad a **encontrar a MOA y contratar o reafirmar** el servicio, usando **HMW**, **POV** y **User Persona**. Puedes mencionar varios medios (web, salud, boca a boca, redes…) si encajan con los datos; no fuerces todo el relato por un único medio.`
+      ? `un **User Journey Map base** para **cliente actual**: la persona **ya entrena con Patri / ya es clienta de MOA**. Describe el recorrido end-to-end **en la vida de clienta** (continuidad, motivación, comunicación, resolución de dudas, sensaciones entre sesiones, otros canales de apoyo…) usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. No sustituyas esto por un embudo de captación salvo que el HMW lo describa explícitamente.`
+      : `un **User Journey Map base**: recorrido **end-to-end** sin centrarse en un solo canal de comunicación. Describe cómo la persona pasa de tener una necesidad a **encontrar a MOA y contratar o reafirmar** el servicio, usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. Puedes mencionar varios medios (web, salud, boca a boca, redes…) si encajan con los datos; no fuerces todo el relato por un único medio.`
     : esClienteActual
-      ? `un **User Journey Map** en **${canal.label}** (${canal.focoExperiencia}) para **quien ya es clienta** de MOA: cómo vive ese medio **durante el servicio** (antes/durante/después de sesiones, avisos, reservas, dudas, vínculo con Patri…) hasta **${canal.cierreExperiencia}**. No narres por defecto el descubrimiento de MOA o la primera toma de contacto salvo que el HMW de cliente actual lo plantee así.`
-      : `un **User Journey Map** para **${canal.label}** (${canal.focoExperiencia}), desde el problema o la necesidad hasta **${canal.cierreExperiencia}**.`
+      ? `un **User Journey Map** en **${canal.label}** (${canal.focoExperiencia}) para **quien ya es clienta** de MOA: cómo vive ese medio **durante el servicio** (antes/durante/después de sesiones, avisos, reservas, dudas, vínculo con Patri…) hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt. No narres por defecto el descubrimiento de MOA o la primera toma de contacto salvo que el HMW de cliente actual lo plantee así.`
+      : `un **User Journey Map** para **${canal.label}** (${canal.focoExperiencia}), desde el problema o la necesidad hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt.`
 
   const requisitoRol = journeyBaseMode
     ? '- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de **MOA** frente al POV en esa fase del recorrido; el nombre del campo es heredado del formato).'
@@ -140,9 +141,10 @@ function buildSystemBase(canal: CanalPromptFields, journeyBaseMode: boolean, esC
   return `Eres un UX strategist para MOA (Patri, entrenamiento y salud en Martorell).
 
 ## Jerarquía de fuentes (obligatoria)
-1. **HOW MIGHT WE (HMW)** — Es la **fuente principal**: las preguntas e ideas del prompt definen **qué retos** cubre el journey y cómo se traducen en **etapas**, **dolores** y el ritmo del relato. Respeta el **orden** de las ideas y las marcas **[mejor]** / **[no viable]** (nunca presentes como solución viable algo marcado como no viable).
-2. **POV** — **Complementa** el HMW: acota **dónde** MOA debe aportar más valor al insight de necesidad (etapa \`etapaOrdenPovResuelto\`). No sustituyas retos que solo aparecen en el HMW.
-3. **User Persona** — **Complementa** con contexto humano (motivaciones, miedos, contexto vital). No inventes etapas o dolores que contradigan el HMW.
+1. **HOW MIGHT WE (HMW)** — Es la **fuente principal** del relato: las preguntas e ideas del prompt definen **qué retos** cubre el journey y cómo se traducen en **etapas**, **dolores** y el ritmo del relato. Respeta el **orden** de las ideas y las marcas **[mejor]** / **[no viable]** (nunca presentes como solución viable algo marcado como no viable).
+2. **Encuesta / entrevista a la ${CLIENT.ownerRole} (${CLIENT.ownerFirstName})** — El bloque **ENTREVISTA** al inicio del mensaje de usuario resume la **encuesta guiada** en Sheets. Es **fuente de verdad** para modelo de negocio, operación presencial vs digital, prioridades, tono y límites. Úsala para dar **realismo** a etapas, canales y dolores; **no contradigas** lo que afirme de forma explícita.
+3. **POV** — **Complementa** el HMW: acota **dónde** MOA debe aportar más valor al insight de necesidad (etapa \`etapaOrdenPovResuelto\`). No sustituyas retos que solo aparecen en el HMW; mantén **coherencia** con la encuesta CEO si hay tensión, priorizando CEO en datos de negocio y HMW/POV en la experiencia de usuario.
+4. **User Persona** — **Complementa** con contexto humano (motivaciones, miedos, contexto vital). No inventes etapas o dolores que contradigan el HMW.
 
 Construyes ${mapaDesc}
 
@@ -160,7 +162,7 @@ ${
 
 Requisitos:
 ${requisitoRol}
-- **Una** etapa debe marcar con claridad el **momento clave** en que MOA más contribuye al POV, **alineado con el HMW**.
+- **Una** etapa debe marcar con claridad el **momento clave** en que MOA más contribuye al POV, **alineado con el HMW** y coherente con la **encuesta CEO** cuando trate de promesas o límites del servicio.
 - Español de España, tono profesional y empático.
 ${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 }
@@ -318,13 +320,13 @@ export async function POST(req: Request) {
 
   const modoIntro = journeyBaseMode
     ? esClienteActual
-      ? `Modo: **recorrido base · cliente actual**. La persona **ya entrena con Patri**. El mapa es el viaje end-to-end **como clienta** según **HMW**, **POV** y **persona** (no un embudo de captación por defecto).`
-      : `Modo: **recorrido base** (sin un único canal de comunicación). El mapa describe el camino end-to-end hacia MOA según **HMW**, **POV** y **persona**; los mapas por canal concreto se generan aparte.`
+      ? `Modo: **todos los canales · cliente actual**. La persona **ya entrena con Patri**. El mapa es el viaje end-to-end **como clienta** según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona** (no un embudo de captación por defecto).`
+      : `Modo: **todos los canales** (sin un único medio de comunicación). El mapa describe el camino end-to-end hacia MOA según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona**; los mapas por canal concreto se generan aparte.`
     : esClienteActual
-      ? `Canal: **${canal.label}** · **Cliente actual**. Mapa del uso de este medio **siendo ya clienta** de MOA; coherente con los hábitos de la persona si aparecen abajo.`
-      : `Canal de trabajo: **${canal.label}**. Las etapas deben describir la experiencia en **este** medio; coherente con los hábitos de búsqueda de la persona si aparecen abajo.`
+      ? `Canal: **${canal.label}** · **Cliente actual**. Mapa del uso de este medio **siendo ya clienta** de MOA; coherente con la **encuesta CEO** (arriba) y los hábitos de la persona si aparecen abajo.`
+      : `Canal de trabajo: **${canal.label}**. Las etapas deben describir la experiencia en **este** medio; coherente con la **encuesta CEO** (arriba) y los hábitos de búsqueda de la persona si aparecen abajo.`
 
-  const prompt = `=== ENTREVISTA — PATRICIA / MOA (modelo de servicio; ceñir el relato a lo que encaje aquí) ===
+  const prompt = `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) — modelo de servicio y negocio ===
 ${ceoInterview}
 
 ${modoIntro}
@@ -343,6 +345,7 @@ ${povBlock}
 ${personaBlock}${personaCanalesBlock}
 
 ===
+Ceñe etapas, dolores y rol de MOA a la **encuesta CEO** cuando defina límites, formato del servicio o prioridades; no inventes ofertas que contradigan ese bloque.
 Devuelve el mapa en "journey".`
 
   const { object } = await generateObject({
@@ -350,7 +353,7 @@ Devuelve el mapa en "journey".`
     schema: z.object({ journey: journeyForPersonaSchema }),
     system: `${systemBase}
 
-Segmento: **${segNombre}**. Sigue la jerarquía **HMW → POV → User Persona**. ${
+Segmento: **${segNombre}**. Sigue la jerarquía **HMW → encuesta CEO → POV → User Persona**. ${
       journeyBaseMode
         ? esClienteActual
           ? 'Mapa base para **clienta activa**: end-to-end en la vida de cliente; no fuerces un solo canal ni un embudo de captación por defecto.'

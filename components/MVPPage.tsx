@@ -1,8 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MVPNota, MVPNotaColor, MVPNotaTamano } from '@/lib/mvp-types'
-import { newMVPNotaId } from '@/lib/mvp-types'
+import {
+  createEmptyMVPBundle,
+  getMVPScopePersist,
+  MVP_BUNDLE_VERSION,
+  MVP_VERSION,
+  newMVPNotaId,
+  normalizeMVPStoredJson,
+  normalizeMVPPersist,
+  setMVPScopePersist,
+  type MVPBundlePersist,
+} from '@/lib/mvp-types'
+import { MOSCOW_SCOPE_ALL } from '@/lib/moscow-types'
 
 // ── Helpers de visualización ──────────────────────────────────────────────────
 
@@ -26,10 +37,19 @@ interface EditForm {
   tamano: MVPNotaTamano
 }
 
+interface MvpScopeOptionRow {
+  id: string
+  label: string
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export function MVPPage() {
-  const [notas, setNotas] = useState<MVPNota[]>([])
+  const [bundle, setBundle] = useState<MVPBundlePersist>(createEmptyMVPBundle())
+  const [scope, setScope] = useState<string>(MOSCOW_SCOPE_ALL)
+  const [scopeOptions, setScopeOptions] = useState<MvpScopeOptionRow[]>([
+    { id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' },
+  ])
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -44,31 +64,66 @@ export function MVPPage() {
     origPct: { x: number; y: number }
   } | null>(null)
 
-  // ── Carga inicial ────────────────────────────────────────────────────────────
+  const patchNotas = useCallback(
+    (fn: (prev: MVPNota[]) => MVPNota[]) => {
+      setBundle((b) => {
+        const cur = getMVPScopePersist(b, scope).notas
+        return setMVPScopePersist(b, scope, { version: MVP_VERSION, notas: fn(cur) })
+      })
+    },
+    [scope]
+  )
+
+  const notas = useMemo(() => getMVPScopePersist(bundle, scope).notas, [bundle, scope])
+
+  // ── Carga inicial (matrices + mismos ámbitos que MoSCoW) ───────────────────────
 
   useEffect(() => {
     setLoadStatus('loading')
-    fetch('/api/mvp-saved')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.saved) {
-          setNotas(data.saved.data?.notas ?? [])
-          setSavedAt(data.saved.savedAt)
+    Promise.all([fetch('/api/mvp-saved'), fetch('/api/moscow-scopes')])
+      .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
+      .then(([data, scopesData]) => {
+        let initial = createEmptyMVPBundle()
+        if (data.saved?.bundle) {
+          initial = normalizeMVPStoredJson(data.saved.bundle)
+        } else if (data.saved?.data) {
+          initial = {
+            version: MVP_BUNDLE_VERSION,
+            generic: normalizeMVPPersist(data.saved.data),
+            canales: {},
+          }
         }
+        setBundle(initial)
+        if (data.saved?.savedAt) setSavedAt(data.saved.savedAt)
+        const opts = Array.isArray(scopesData.options) ? scopesData.options : []
+        setScopeOptions(
+          opts.length ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        )
         setLoadStatus('loaded')
       })
       .catch(() => setLoadStatus('error'))
   }, [])
+
+  useEffect(() => {
+    if (loadStatus !== 'loaded') return
+    if (!scopeOptions.some((o) => o.id === scope)) {
+      setScope(MOSCOW_SCOPE_ALL)
+    }
+  }, [loadStatus, scopeOptions, scope])
 
   // ── Guardar ──────────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
     setSaveStatus('saving')
     try {
+      if (notas.length === 0) {
+        setSaveStatus('idle')
+        return
+      }
       const res = await fetch('/api/mvp-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { version: 1, notas } }),
+        body: JSON.stringify({ bundle }),
       })
       const json = await res.json()
       if (json.ok) {
@@ -81,7 +136,7 @@ export function MVPPage() {
     } catch {
       setSaveStatus('error')
     }
-  }, [notas])
+  }, [bundle, notas])
 
   // ── Generar con IA ───────────────────────────────────────────────────────────
 
@@ -89,10 +144,16 @@ export function MVPPage() {
     setIaError(null)
     setIaStatus('loading')
     try {
-      const res = await fetch('/api/mvp-ia', { method: 'POST' })
+      const res = await fetch('/api/mvp-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+      })
       const json = await res.json()
       if (json.notas) {
-        setNotas(json.notas)
+        setBundle((b) =>
+          setMVPScopePersist(b, scope, { version: MVP_VERSION, notas: json.notas as MVPNota[] })
+        )
         setIaStatus('idle')
       } else {
         setIaError(json.error ?? 'Error desconocido')
@@ -102,7 +163,7 @@ export function MVPPage() {
       setIaError(e instanceof Error ? e.message : 'Error de red')
       setIaStatus('error')
     }
-  }, [])
+  }, [scope])
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────────
 
@@ -127,10 +188,8 @@ export function MVPPage() {
     const dy = ((e.clientY - drag.startPx.y) / rect.height) * 100
     const newX = Math.max(0, Math.min(100, drag.origPct.x + dx))
     const newY = Math.max(0, Math.min(100, drag.origPct.y + dy))
-    setNotas((prev) =>
-      prev.map((n) => (n.id === drag.id ? { ...n, x: newX, y: newY } : n))
-    )
-  }, [])
+    patchNotas((prev) => prev.map((n) => (n.id === drag.id ? { ...n, x: newX, y: newY } : n)))
+  }, [patchNotas])
 
   const handlePointerUp = useCallback(() => {
     draggingRef.current = null
@@ -145,12 +204,12 @@ export function MVPPage() {
     const x = Math.max(2, Math.min(98, ((e.clientX - rect.left) / rect.width) * 100))
     const y = Math.max(2, Math.min(98, ((e.clientY - rect.top) / rect.height) * 100))
     const id = newMVPNotaId()
-    setNotas((prev) => [
+    patchNotas((prev) => [
       ...prev,
       { id, texto: 'Nueva funcionalidad', x, y, color: 'amarillo', tamano: 'md', origenHmw: null },
     ])
     setEdit({ id, texto: 'Nueva funcionalidad', color: 'amarillo', tamano: 'md' })
-  }, [])
+  }, [patchNotas])
 
   // ── Edición ───────────────────────────────────────────────────────────────────
 
@@ -164,7 +223,7 @@ export function MVPPage() {
       setEdit(null)
       return
     }
-    setNotas((prev) =>
+    patchNotas((prev) =>
       prev.map((n) =>
         n.id === edit.id
           ? { ...n, texto: edit.texto.trim() || n.texto, color: edit.color, tamano: edit.tamano }
@@ -172,12 +231,15 @@ export function MVPPage() {
       )
     )
     setEdit(null)
-  }, [edit])
+  }, [edit, patchNotas])
 
-  const deleteNota = useCallback((id: string) => {
-    setNotas((prev) => prev.filter((n) => n.id !== id))
-    setEdit(null)
-  }, [])
+  const deleteNota = useCallback(
+    (id: string) => {
+      patchNotas((prev) => prev.filter((n) => n.id !== id))
+      setEdit(null)
+    },
+    [patchNotas]
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -185,6 +247,22 @@ export function MVPPage() {
     <div className="space-y-6">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm text-gray-600 mr-1">
+          <span className="sr-only">Ámbito</span>
+          <span className="text-gray-500 shrink-0">Canal</span>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            disabled={loadStatus !== 'loaded'}
+            className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100 min-w-40 max-w-[16rem]"
+          >
+            {scopeOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           onClick={handleGenerate}
           disabled={iaStatus === 'loading'}
@@ -232,7 +310,8 @@ export function MVPPage() {
 
       {/* Instrucción */}
       <p className="text-xs text-gray-400">
-        Doble clic en la matriz para añadir una funcionalidad · Clic en una nota para editarla · Arrastra para reposicionar
+        «Generar con IA» usa el MoSCoW del <strong>canal seleccionado</strong> (mismas opciones que en /moscow) · Doble
+        clic en la matriz para añadir · Clic para editar · Arrastra para reposicionar
       </p>
 
       {/* Matriz */}

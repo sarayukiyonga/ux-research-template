@@ -29,11 +29,10 @@ export default function MVPRoute() {
         {/* Info */}
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-5 py-4 mb-8 space-y-2 text-sm text-violet-950 leading-relaxed">
           <p>
-            La IA genera funcionalidades basándose en las respuestas HMW marcadas como{' '}
-            <strong>«mejor»</strong>, los resultados de encuestas y la entrevista a la CEO.
-            Cada nota se posiciona según su{' '}
-            <span className="font-semibold">valor para el usuario</span> (eje vertical) y{' '}
-            <span className="font-semibold">valor para el negocio</span> (eje horizontal).
+            El selector <strong>Canal</strong> elige el mismo ámbito que en MoSCoW (todos los canales o un medio
+            concreto). La IA lee las notas MoSCoW guardadas de ese ámbito y las coloca en la matriz según los{' '}
+            <strong>insights</strong> (clientes actuales y potenciales) y la <strong>entrevista a la CEO</strong>. Cada
+            vista se guarda por separado en Sheets.
           </p>
           <p className="text-violet-800/80 text-xs">
             Las funcionalidades en el cuadrante <strong>superior derecho</strong>{' '}
@@ -44,12 +43,14 @@ export default function MVPRoute() {
 
         <MVPPage />
 
-        <p className="mt-10 text-center text-xs text-gray-400">
-          Siguiente paso:{' '}
+        <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
           <Link href="/moscow" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            Must · Should · Could · Won&apos;t →
+            ← Must · Should · Could · Won&apos;t
           </Link>
-        </p>
+          <Link href="/mapa-sitio" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            Mapa del sitio →
+          </Link>
+        </div>
       </div>
     </main>
   )

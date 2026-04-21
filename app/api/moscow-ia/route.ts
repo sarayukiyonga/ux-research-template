@@ -1,46 +1,37 @@
 import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
 import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
-import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import { loadHmwIaContextOrFail, hmwIaContextToMarkdown } from '@/lib/hmw-ia-context'
 import { newMoSCoWId } from '@/lib/moscow-types'
-import type { MVPNota } from '@/lib/mvp-types'
 import { CLIENT } from '@/lib/client-config'
+import { fetchSavedUserJourneyFromSheets, journeySegmentToMoSCoWBlock } from '@/lib/fetch-saved-user-journey'
+import { fetchSavedUserJourneyIdeasFromSheets } from '@/lib/fetch-saved-user-journey-ideas'
+import {
+  createEmptyIdeasPersist,
+  getIdeasForSegmentChannel,
+  ideasToMoSCoWPromptBlock,
+  type UserJourneyIdeasPersist,
+} from '@/lib/user-journey-ideas-persist'
+import { getCanalPromptFields } from '@/lib/user-journey-channels'
+import type { UserJourneyV3Persist } from '@/lib/user-journey-persist'
+import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
+import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import {
+  hasIdeasForAllScope,
+  journeyCanalReadyForMoscowIa,
+  mergeJourneyCatalogosForV3,
+} from '@/lib/moscow-scope-options'
+import { MOSCOW_SCOPE_ALL } from '@/lib/moscow-types'
 
 export const dynamic = 'force-dynamic'
 
-function getAuth() {
-  return new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  })
-}
-
-async function loadMVPNotas(): Promise<MVPNota[]> {
-  try {
-    const sheets = google.sheets({ version: 'v4', auth: getAuth() })
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: CEO_SHEET_ID,
-      range: 'mvp!A2:B2',
-    })
-    const row = res.data.values?.[0]
-    if (!row || !row[1]) return []
-    const parsed = JSON.parse(row[1])
-    return Array.isArray(parsed?.notas) ? parsed.notas : []
-  } catch {
-    return []
-  }
-}
-
-// ── Esquema de respuesta ──────────────────────────────────────────────────────
+const CEO_PROMPT_MAX = 12000
 
 const notaSchema = z.object({
   texto: z.string().max(65),
   color: z.enum(['amarillo', 'naranja', 'blanco']),
   tamano: z.enum(['sm', 'md', 'lg']),
+  /** Idea FUNC/CONT, etapa del journey o fragmento CEO (campo persistido como origenMVP). */
   origenMVP: z.string().max(100).nullable(),
 })
 
@@ -51,63 +42,145 @@ const responseSchema = z.object({
   wont: z.array(notaSchema),
 })
 
-// ── POST ──────────────────────────────────────────────────────────────────────
+/** Si `canalFilter` es null, incluye todos los canales; si es id, solo ese canal (ambos segmentos). */
+function buildJourneyAndIdeasBlock(
+  v3: UserJourneyV3Persist,
+  ideas: UserJourneyIdeasPersist,
+  canalFilter: string | null
+): string | null {
+  const mergedCatalog = mergeJourneyCatalogosForV3(v3)
+  const parts: string[] = []
+  let anyMap = false
+  for (const seg of ['clienteActual', 'clientePotencial'] as const) {
+    const st = v3[seg]
+    const segHuman = seg === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'
+    for (const canal of st.catalogo) {
+      if (canalFilter !== null && canal.id !== canalFilter) continue
+      const j = st.mapas[canal.id]
+      if (!j?.etapas?.length) continue
+      anyMap = true
+      const meta = getCanalPromptFields(canal.id, mergedCatalog)
+      parts.push(journeySegmentToMoSCoWBlock(j, `USER JOURNEY — ${segHuman}`, meta.label))
+      const ideaChunk = ideasToMoSCoWPromptBlock(
+        getIdeasForSegmentChannel(ideas, seg, canal.id),
+        j,
+        meta.label,
+        segHuman
+      )
+      if (ideaChunk.trim()) parts.push(ideaChunk)
+    }
+  }
+  if (!anyMap) return null
+  return parts.join('\n\n---\n\n')
+}
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const [ctx, mvpNotas] = await Promise.all([
-      loadHmwIaContextOrFail(),
-      loadMVPNotas(),
-    ])
-
-    if (!ctx.ok) {
-      return NextResponse.json({ error: ctx.message }, { status: 400 })
+    let iaScope: string = MOSCOW_SCOPE_ALL
+    try {
+      const raw = (await req.json().catch(() => null)) as { scope?: unknown } | null
+      if (raw && typeof raw.scope === 'string' && raw.scope.trim()) {
+        const s = raw.scope.trim().slice(0, 48)
+        if (s !== MOSCOW_SCOPE_ALL) iaScope = s
+      }
+    } catch {
+      /* cuerpo vacío → todos los canales */
     }
 
-    const contextoBase = hmwIaContextToMarkdown(ctx.ctx)
+    const canalFilter = iaScope === MOSCOW_SCOPE_ALL ? null : iaScope
 
-    const notasTexto =
-      mvpNotas.length > 0
-        ? mvpNotas
-            .map((n) => {
-              const prioUsuario = Math.round(100 - n.y)
-              const prioNegocio = Math.round(n.x)
-              return `- "${n.texto}" (valor usuario: ${prioUsuario}/100, valor negocio: ${prioNegocio}/100)`
-            })
-            .join('\n')
-        : '(No hay notas guardadas en la matriz MVP. Genera funcionalidades basandote en el contexto.)'
+    const [journeyRes, ideasRes, ceoRaw] = await Promise.all([
+      fetchSavedUserJourneyFromSheets(),
+      fetchSavedUserJourneyIdeasFromSheets(),
+      fetchCeoInterviewPlaintext(),
+    ])
 
-    const prompt = `Eres un experto en diseño de producto y priorización de MVP con el metodo MoSCoW.
+    if (!journeyRes.ok) {
+      const extra = journeyRes.code === 'no_journey_for_channel' && journeyRes.detalle ? ` ${journeyRes.detalle}` : ''
+      return NextResponse.json(
+        {
+          error: `No se pudo cargar el User Journey guardado.${extra} Ve a /user-journey, genera y guarda mapas por canal, y vuelve a intentar.`,
+        },
+        { status: 400 }
+      )
+    }
 
-${contextoBase}
+    const ideasPersist = ideasRes.ok ? ideasRes.data : createEmptyIdeasPersist()
 
-=== Funcionalidades de la matriz MVP (con puntuacion de valor) ===
-${notasTexto}
+    if (canalFilter === null) {
+      if (!hasIdeasForAllScope(ideasPersist)) {
+        return NextResponse.json(
+          {
+            error:
+              'No hay ideas de funcionalidades ni contenidos guardadas. En /user-journey, sección «Funcionalidades y contenido por canal», añade ideas por canal y guarda en Sheets antes de generar MoSCoW.',
+          },
+          { status: 400 }
+        )
+      }
+    } else if (!journeyCanalReadyForMoscowIa(journeyRes.v3, ideasPersist, canalFilter)) {
+      return NextResponse.json(
+        {
+          error: `No hay mapa con etapas e ideas FUNC/CONT guardadas para el canal seleccionado («${canalFilter}»). Completa ese canal en /user-journey y guarda.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    const bloqueJourney = buildJourneyAndIdeasBlock(journeyRes.v3, ideasPersist, canalFilter)
+    if (!bloqueJourney?.trim()) {
+      return NextResponse.json(
+        {
+          error:
+            canalFilter === null
+              ? 'No hay mapas de User Journey con etapas guardados. Genera y guarda al menos un mapa por segmento y canal en /user-journey.'
+              : 'No hay mapas con etapas para ese canal. Revisa el User Journey guardado.',
+        },
+        { status: 400 }
+      )
+    }
+
+    const ceoPlain = ceoRaw.trim()
+    const ceoBlock =
+      ceoPlain && !ceoPlain.startsWith('(Sin datos')
+        ? `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) — respuestas por tema ===\n${ceoRaw.slice(0, CEO_PROMPT_MAX)}`
+        : `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) ===\n(No hay respuestas en la hoja principal de la encuesta; prioriza solo con las ideas y etapas del User Journey.)`
+
+    const mergedCatalog = mergeJourneyCatalogosForV3(journeyRes.v3)
+    const ambitoLine =
+      canalFilter === null
+        ? 'Ámbito: **todos los canales** del journey (cliente actual y potencial). Usa **todas** las etapas e ideas [FUNC]/[CONT] del bloque siguiente.'
+        : `Ámbito: **solo el canal «${getCanalPromptFields(canalFilter, mergedCatalog).label}»** (${canalFilter}). Ignora otros canales: prioriza etapas e ideas [FUNC]/[CONT] de ese medio únicamente.`
+
+    const prompt = `Eres un experto en diseño de producto y priorización con el método MoSCoW.
+
+=== REGLA ABSOLUTA (origen de las funcionalidades) ===
+- Tu base principal son: (1) los **User Journey Map** y las **ideas [FUNC]/[CONT]** del bloque siguiente, y (2) la **encuesta / entrevista a la ${CLIENT.ownerRole}** más abajo.
+- **No** uses la matriz MVP, el HMW como fuente principal ni documentos que no estén en este prompt.
+- Cada nota MoSCoW debe **colgar** de una o varias ideas o etapas del journey; la encuesta CEO sirve para **priorizar** (Must vs Should vs Could vs Won't), **coherencia de negocio** (recursos, modelo presencial, visión) y **no contradecir** lo que la ${CLIENT.ownerRole} afirma de forma explícita.
+- ${ambitoLine}
+
+${ceoBlock}
+
+=== USER JOURNEY — MAPAS E IDEAS (fuente principal) ===
+${bloqueJourney}
 
 === TU TAREA ===
-Clasifica TODAS las funcionalidades anteriores en las 4 categorias MoSCoW para la nueva web/app de ${CLIENT.name}.
-Si no habia funcionalidades en la matriz, genera entre 8 y 15 funcionalidades nuevas para ${CLIENT.name} y clasificalas.
+Genera entre **8 y 18** funcionalidades concretas para la nueva web/app de ${CLIENT.name}, clasificadas en las 4 categorías MoSCoW.
 
-Criterios de clasificacion:
-- MUST: Critico para el MVP. Sin esto el producto no tiene sentido. (valor usuario >65 Y valor negocio >60, o absolutamente imprescindible por otro motivo)
-- SHOULD: Muy importante pero puede esperar a la version 2 si el tiempo no da. (valor alto en al menos uno de los dos ejes)
-- COULD: Deseable pero opcional. Se hara si hay tiempo y recursos en v1.
-- WONT: Descartado para esta version. Demasiado complejo, muy bajo valor, o fuera del alcance del MVP.
+Criterios de clasificación (journey + ideas + encuesta CEO):
+- **MUST**: Imprescindible para un primer lanzamiento coherente con ideas/etapas críticas y con lo que la encuesta CEO marca como núcleo o bloqueante.
+- **SHOULD**: Muy importante; puede ir a v2 si hace falta.
+- **COULD**: Deseable si hay tiempo.
+- **WON'T**: Fuera de alcance en esta versión (según CEO o bajo valor relativo frente al resto).
 
-Para cada nota define:
-1. "texto": nombre de la funcionalidad (maximo 55 caracteres)
-2. "color":
-   - "naranja" para Must con alta prioridad critica
-   - "amarillo" para Should y Could normales
-   - "blanco" para Won't (descartadas)
-3. "tamano":
-   - "lg" = absolutamente critica (MUST principal)
-   - "md" = importante
-   - "sm" = menor importancia o descartada
-4. "origenMVP": texto de la funcionalidad original de la que proviene (o null si es nueva)
+Para cada nota:
+1. "texto": nombre breve (máximo 55 caracteres).
+2. "color": "naranja" (Must críticas), "amarillo" (Should/Could), "blanco" (Won't).
+3. "tamano": "lg" | "md" | "sm".
+4. "origenMVP": texto corto (máx. 100) que cite la **idea FUNC/CONT** o el **título de etapa** del journey de la que procede; si fusionas varias, sepáralas con "; ". **null** solo si la nota se apoya **exclusivamente** en un fragmento claro de la **encuesta a la ${CLIENT.ownerRole}** (y entonces el "texto" debe reflejar ese fragmento).
 
-Distribuye de forma realista. Tipicamente: 4-7 Must, 3-6 Should, 3-5 Could, 2-4 Won't.
-Usa el contexto de ${CLIENT.name} (${CLIENT.serviceShort}, servicios ${CLIENT.serviceModel}s, ${CLIENT.ownerFirstName}/${CLIENT.ownerRole}) para justificar las decisiones.`
+Distribución realista típica: 4–7 Must, 3–6 Should, 3–5 Could, 2–4 Won't.
+Contexto: ${CLIENT.name} (${CLIENT.serviceShort}, ${CLIENT.ownerFirstName}).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 
     const result = await generateObject({
       model: openai('gpt-4o'),

@@ -3,151 +3,12 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PdfDashboardFullExport } from '@/components/PdfDashboardFullExport'
+import { RESEARCH_PHASES, type DashboardColor } from '@/lib/research-journey-steps'
 
-const sections = [
-  {
-    href: '/survey',
-    emoji: '📊',
-    tag: 'Tiempo real',
-    tagPulse: true,
-    title: 'Encuesta de clientes',
-    description:
-      'Respuestas abiertas de los clientes de Patri, agrupadas por pregunta con análisis de IA y User Persona generada automáticamente.',
-    color: 'violet',
-  },
-  {
-    href: '/potential',
-    emoji: '🔍',
-    tag: 'Tiempo real',
-    tagPulse: true,
-    title: 'Encuesta a clientes potenciales',
-    description:
-      'Perfil del público objetivo de MOA: barreras, motivaciones, conocimiento del mercado y oportunidades de captación.',
-    color: 'orange',
-  },
-  {
-    href: '/ceo',
-    emoji: '🎙️',
-    tag: 'Entrevista',
-    tagPulse: false,
-    title: 'Entrevista a la CEO',
-    description:
-      'Respuestas de Patricia Dorado sobre marca, negocio, web y competencia, con informe estratégico generado por IA.',
-    color: 'blue',
-  },
-  {
-    href: '/empathy',
-    emoji: '🗺️',
-    tag: 'Conocimiento del cliente',
-    tagPulse: false,
-    title: 'Mapa de empatía',
-    description:
-      'Qué piensa, siente, ve, oye, dice y hace el cliente: dos pestañas; el filtrado coincide con el de cada encuesta.',
-    color: 'rose',
-  },
-  {
-    href: '/insights',
-    emoji: '💡',
-    tag: 'Conocimiento del cliente',
-    tagPulse: false,
-    title: 'Insights',
-    description:
-      'Patrones accionables con IA a partir del mapa de empatía guardado (filtros en las páginas de encuesta).',
-    color: 'amber',
-  },
-  {
-    href: '/user-persona',
-    emoji: '👤',
-    tag: 'Conocimiento del cliente',
-    tagPulse: false,
-    title: 'User Persona',
-    description:
-      'Dos perfiles desde insights guardados; edad y género (y más datos de encuesta) siguen el filtrado de /survey y /potential.',
-    color: 'violet',
-  },
-  {
-    href: '/pov',
-    emoji: '💬',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'Point of View (POV)',
-    description:
-      'Dos declaraciones generadas a partir de los user persona guardados (cliente actual y potencial), formato Design Thinking.',
-    color: 'sky',
-  },
-  {
-    href: '/hmw',
-    emoji: '❓',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'How Might We (HMW)',
-    description:
-      'Preguntas «¿Cómo podríamos…?» generadas a partir de los dos POV guardados: retos de diseño para web y experiencia MOA.',
-    color: 'indigo',
-  },
-  {
-    href: '/user-journey',
-    emoji: '🛤️',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'User Journey Map',
-    description:
-      'Recorrido en la web por cada persona: etapas, dolores por paso y el momento exacto en que la interfaz resuelve el POV guardado.',
-    color: 'teal',
-  },
-  {
-    href: '/mvp',
-    emoji: '🎯',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'Priorizar los accionables (MVP)',
-    description:
-      'Matriz de valor (usuario vs. negocio) generada con IA a partir de las respuestas HMW «mejor», encuestas y entrevista CEO. Funcionalidades arrastrables.',
-    color: 'violet',
-  },
-  {
-    href: '/moscow',
-    emoji: '📋',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'Must · Should · Could · Won\'t',
-    description:
-      'Clasificación MoSCoW de las funcionalidades del MVP: qué es imprescindible, importante, deseable o descartado para el lanzamiento.',
-    color: 'violet',
-  },
-  {
-    href: '/mapa-sitio',
-    emoji: '🗺️',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'Mapa del Sitio',
-    description:
-      'Arquitectura de información generada a partir del MoSCoW: árbol jerárquico de secciones y páginas de la nueva web de MOA.',
-    color: 'teal',
-  },
-  {
-    href: '/user-flow',
-    emoji: '🔀',
-    tag: 'Design Thinking',
-    tagPulse: false,
-    title: 'User Flow (flujo de usuario)',
-    description:
-      'Diagrama de flujo basado en el mapa del sitio y el User Journey: pantallas reales, clics y ramas hasta conversión.',
-    color: 'cyan',
-  },
-  {
-    href: '/design',
-    emoji: '🎨',
-    tag: 'Identidad de marca',
-    tagPulse: false,
-    title: 'Principios de diseño',
-    description:
-      'Principios de diseño de MOA generados a partir de la entrevista, las respuestas de los clientes y las decisiones de Patricia.',
-    color: 'emerald',
-  },
-]
-
-const colorMap: Record<string, { tag: string; border: string; icon: string; arrow: string }> = {
+const colorMap: Record<
+  DashboardColor,
+  { tag: string; border: string; icon: string; arrow: string }
+> = {
   violet: {
     tag: 'bg-violet-100 text-violet-700',
     border: 'hover:border-violet-300',
@@ -220,73 +81,81 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="mx-auto w-full max-w-2xl px-4 py-14 flex-1">
-
+    <main className="flex min-h-screen flex-col bg-gray-50">
+      <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:py-14">
         {/* Header */}
         <div className="mb-10 text-center">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-violet-100 text-3xl mb-4">
+          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-3xl">
             ✦
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             MOA | Patricia Dorado Trainer
           </h1>
-          <p className="mt-2 text-gray-500 text-sm">
-            Panel de análisis · Marca y estrategia
-          </p>
+          <p className="mt-2 text-sm text-gray-500">Panel de análisis · Marca y estrategia</p>
           <PdfDashboardFullExport />
         </div>
 
-        {/* Section cards */}
-        <div className="space-y-3">
-          {sections.map((s) => {
-            const c = colorMap[s.color]
-            return (
-              <Link
-                key={s.href}
-                href={s.href}
-                className={`group flex items-start gap-4 rounded-2xl border-2 border-gray-100 bg-white px-5 py-5 transition-all hover:shadow-md ${c.border}`}
-              >
-                {/* Icon */}
-                <div className={`shrink-0 h-11 w-11 rounded-xl flex items-center justify-center text-2xl ${c.icon}`}>
-                  {s.emoji}
-                </div>
+        {/* Fases agrupadas en cards */}
+        <div className="space-y-8">
+          {RESEARCH_PHASES.map((phase) => (
+            <section
+              key={phase.id}
+              className="rounded-2xl border-2 border-gray-200/90 bg-white p-5 shadow-sm sm:p-6"
+            >
+              <header className="mb-4 border-b border-gray-100 pb-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-violet-600">
+                  Fase {phase.number} de 7
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-gray-900 sm:text-xl">{phase.title}</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{phase.subtitle}</p>
+              </header>
 
-                {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${c.tag}`}>
-                      {s.tagPulse && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                      )}
-                      {s.tag}
-                    </span>
-                  </div>
-                  <p className="font-semibold text-gray-900 text-base leading-snug">
-                    {s.title}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                    {s.description}
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                <span className={`shrink-0 text-xl mt-1 transition-all group-hover:translate-x-0.5 ${c.arrow}`}>
-                  →
-                </span>
-              </Link>
-            )
-          })}
+              <div className="space-y-2.5">
+                {phase.steps.map((s) => {
+                  const c = colorMap[s.color]
+                  return (
+                    <Link
+                      key={s.href}
+                      href={s.href}
+                      className={`group flex items-start gap-3 rounded-xl border-2 border-gray-100 bg-gray-50/50 px-4 py-4 transition-all hover:bg-white hover:shadow-md sm:gap-4 sm:px-5 ${c.border}`}
+                    >
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl sm:h-11 sm:w-11 sm:text-2xl ${c.icon}`}
+                      >
+                        {s.emoji}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span
+                          className={`mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${c.tag}`}
+                        >
+                          {s.tagPulse && (
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                          )}
+                          {s.tag}
+                        </span>
+                        <p className="text-base font-semibold leading-snug text-gray-900">{s.title}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-gray-500">{s.description}</p>
+                      </div>
+                      <span
+                        className={`mt-1 shrink-0 text-xl transition-all group-hover:translate-x-0.5 ${c.arrow}`}
+                      >
+                        →
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
         </div>
-
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-center gap-4 pb-8">
         <p className="text-xs text-gray-300">MOA · Martorell</p>
         <button
+          type="button"
           onClick={handleLogout}
-          className="text-xs text-gray-300 hover:text-gray-500 transition-colors underline underline-offset-2"
+          className="text-xs text-gray-300 underline underline-offset-2 transition-colors hover:text-gray-500"
         >
           Cerrar sesión
         </button>

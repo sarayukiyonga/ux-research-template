@@ -156,6 +156,27 @@ export async function fetchSavedUserJourneyFromSheets(): Promise<FetchSavedUserJ
   return { ok: true, v3, pair, savedAt, journeyFiltersRaw }
 }
 
+/** Texto del journey para prompts de MoSCoW (etapas, dolores, rol; sin redacción de User Flow). */
+export function journeySegmentToMoSCoWBlock(
+  j: JourneyForPersona,
+  titulo: string,
+  canalEtiqueta: string
+): string {
+  const etapas = [...j.etapas]
+    .sort((a, b) => a.orden - b.orden)
+    .map(
+      (e) =>
+        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales: ${e.canalesDeMarketing}` : ''}\n    Rol MOA frente al POV (${canalEtiqueta}): ${e.rolWebFrenteAlPov}`
+    )
+    .join('\n')
+  return `### ${titulo} — ${j.etiquetaPersona} · Canal: **${canalEtiqueta}**
+Síntesis: ${j.sintesis}
+Etapa clave para el POV (orden): ${j.etapaOrdenPovResuelto}
+
+Etapas del User Journey Map:
+${etapas}`
+}
+
 export function journeySegmentToPlainText(j: JourneyForPersona, titulo: string): string {
   const etapas = j.etapas
     .map((e) => {

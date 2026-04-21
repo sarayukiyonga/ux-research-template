@@ -159,7 +159,8 @@ export function SitemapMoaPage() {
       {loadStatus === 'loading' && <p className="text-sm text-gray-400 animate-pulse">Cargando datos guardados…</p>}
 
       <p className="text-xs text-gray-400">
-        Doble clic para editar · + para añadir hijos · × para eliminar
+        «Generar con IA» usa solo la matriz MVP del canal <strong>Página web</strong> en Sheets (y MoSCoW/POV si existen)
+        · Doble clic para editar · + para añadir hijos · × para eliminar
       </p>
 
       {/* Árbol vertical */}
@@ -176,7 +177,9 @@ export function SitemapMoaPage() {
         ) : loadStatus === 'loaded' ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <span className="text-3xl mb-3">🗺️</span>
-            <p className="text-sm">Usa «Generar con IA» para crear el mapa del sitio</p>
+            <p className="text-sm">
+              En /mvp elige <strong>Página web</strong>, guarda la matriz MVP y usa «Generar con IA» para crear el mapa
+            </p>
           </div>
         ) : null}
       </div>

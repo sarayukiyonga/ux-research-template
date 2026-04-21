@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import { normalizeMoSCoWPersist, createEmptyMoSCoWPersist } from '@/lib/moscow-types'
+import {
+  createEmptyMoSCoWBundle,
+  normalizeMoSCoWPersist,
+  normalizeMoSCoWStoredJson,
+  type MoSCoWBundlePersist,
+} from '@/lib/moscow-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +31,8 @@ async function ensureSheetExists(sheets: ReturnType<typeof google.sheets>) {
   }
 }
 
+// ── GET ───────────────────────────────────────────────────────────────────────
+
 export async function GET() {
   try {
     const sheets = google.sheets({ version: 'v4', auth: getAuth() })
@@ -39,18 +46,32 @@ export async function GET() {
     const row = res.data.values?.[0]
     if (!row || !row[1]) return NextResponse.json({ saved: null })
 
-    const data = normalizeMoSCoWPersist(JSON.parse(row[1]))
-    return NextResponse.json({ saved: { savedAt: row[0] ?? '', data } })
+    const bundle = normalizeMoSCoWStoredJson(JSON.parse(row[1]))
+    return NextResponse.json({ saved: { savedAt: row[0] ?? '', bundle } })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
 
+// ── POST ──────────────────────────────────────────────────────────────────────
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const data = normalizeMoSCoWPersist(body.data ?? createEmptyMoSCoWPersist())
+    const body = (await req.json()) as { bundle?: unknown; data?: unknown }
+
+    let bundle: MoSCoWBundlePersist
+    if (body.bundle != null) {
+      bundle = normalizeMoSCoWStoredJson(body.bundle)
+    } else if (body.data != null) {
+      bundle = {
+        version: 2,
+        generic: normalizeMoSCoWPersist(body.data),
+        canales: {},
+      }
+    } else {
+      bundle = createEmptyMoSCoWBundle()
+    }
 
     const sheets = google.sheets({ version: 'v4', auth: getAuth() })
     await ensureSheetExists(sheets)
@@ -69,8 +90,8 @@ export async function POST(req: Request) {
       requestBody: {
         valueInputOption: 'RAW',
         data: [
-          { range: `${SHEET_NAME}!A1:B1`, values: [['Guardado el', 'MoSCoW (JSON)']] },
-          { range: `${SHEET_NAME}!A2:B2`, values: [[savedAt, JSON.stringify(data)]] },
+          { range: `${SHEET_NAME}!A1:B1`, values: [['Guardado el', 'MoSCoW bundle (JSON)']] },
+          { range: `${SHEET_NAME}!A2:B2`, values: [[savedAt, JSON.stringify(bundle)]] },
         ],
       },
     })

@@ -2,7 +2,6 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 import { fetchSavedPovFromSheets, type POVStatement } from '@/lib/fetch-saved-pov'
 import {
@@ -22,34 +21,11 @@ import {
   ideasToFlowPromptBlock,
 } from '@/lib/user-journey-ideas-persist'
 import { userFlowLineSchema, normalizeUserFlowLine } from '@/lib/user-flow-tree'
-import { getCanalPromptFields } from '@/lib/user-journey-channels'
+import { DEFAULT_USER_JOURNEY_CANAL_ID, getCanalPromptFields } from '@/lib/user-journey-channels'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
-import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import { normalizeSitemapPersist, sitemapToPromptBlock } from '@/lib/sitemap-moa-types'
-
-function getSitemapAuth() {
-  return new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  })
-}
-
-async function loadSitemapBlock(): Promise<string> {
-  try {
-    const sheets = google.sheets({ version: 'v4', auth: getSitemapAuth() })
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: CEO_SHEET_ID,
-      range: 'sitemap_moa!A2:B2',
-    })
-    const row = res.data.values?.[0]
-    if (!row || !row[1]) return ''
-    const persist = normalizeSitemapPersist(JSON.parse(row[1]))
-    return sitemapToPromptBlock(persist.root)
-  } catch {
-    return ''
-  }
-}
+import { fetchSitemapPromptBlockFromSheets } from '@/lib/fetch-saved-sitemap-prompt'
+import { fetchMVPBundleFromSheets } from '@/lib/fetch-mvp-bundle-sheets'
+import { getMVPScopePersist, mvpPersistToPlainTextForIa, type MVPBundlePersist } from '@/lib/mvp-types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -102,23 +78,54 @@ Reglas:
 ${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 }
 
+function buildMvpPromptBlock(bundle: MVPBundlePersist, canalId: string, canalLabel: string): string {
+  const p = getMVPScopePersist(bundle, canalId)
+  if (p.notas.length === 0) {
+    return `=== MATRIZ MVP — ${canalLabel} (id: ${canalId}) ===\n(No hay notas guardadas en /mvp para este canal. Prioriza con ideas FUNC/CONT y el journey; si el canal es web y existe mapa del sitio, alinea nombres cuando encaje.)`
+  }
+  return `=== MATRIZ MVP — ${canalLabel} (id: ${canalId}; misma vista que en /mvp para este canal) ===\n${mvpPersistToPlainTextForIa(p)}`
+}
+
 async function generateOneFlow(opts: {
   ideasBlock: string
   journeyBlock: string
   personaBlock: string
   povBlock: string
-  moscowBlock: string
+  mvpBlock: string
+  /** Solo canal web: mapa del sitio guardado en Sheets. */
+  sitemapBlockWeb: string
   segmentLabel: string
   canalEtiqueta: string
+  canalId: string
 }) {
   const systemBase = buildSystemBase(opts.canalEtiqueta)
+  const esWeb = opts.canalId === DEFAULT_USER_JOURNEY_CANAL_ID
+  const tieneMapaWeb = esWeb && Boolean(opts.sitemapBlockWeb.trim())
+  const mapaInstrucción = tieneMapaWeb
+    ? 'El **mapa del sitio web** (bloque siguiente) define páginas reales: usa sus **nombres exactos** como títulos de pasos que ocurran en el sitio. Las entradas [MUST] del mapa deben tener presencia en el flujo.'
+    : esWeb
+      ? 'Canal **web** pero sin mapa del sitio guardado: nombra pasos de pantalla coherentes con el journey y el MVP; evita inventar secciones que contradigan el MVP del canal web.'
+      : 'Este canal **no es la web**: no uses el mapa del sitio ni nombres de páginas web salvo que el journey describa explícitamente un salto a la web; céntrate en el journey y las ideas de este medio.'
+
+  const mvpInstrucción =
+    'La **matriz MVP** del mismo canal prioriza qué pasos o pantallas son críticos (valor negocio/usuario); no contradigas prioridades fuertes del MVP al ordenar el flujo.'
+
   const { object } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema: z.object({ flow: userFlowLineSchema }),
     system: `${systemBase}
 
-Segmento: **${opts.segmentLabel}**. El mapa del sitio define las paginas reales que existen: usa sus nombres exactos como titulos de los pasos (rectangulos). Las ideas del canal son el contexto de interaccion. El journey y persona/POV dan coherencia al recorrido.`,
-    prompt: `${opts.moscowBlock ? opts.moscowBlock + '\n\n' : ''}=== IDEAS DE FUNCIONALIDADES Y CONTENIDO (canal ${opts.canalEtiqueta}) ===
+Segmento: **${opts.segmentLabel}**.
+
+## Jerarquía de fuentes
+1. **User Journey Map** del canal (bloque dedicado): etapas, dolores y rol MOA↔POV — **no contradigas** su orden ni sus tensiones.
+2. **Ideas FUNC/CONT** del mismo canal: base del diagrama (rectángulos y transiciones).
+3. **Matriz MVP** del mismo canal: ${mvpInstrucción}
+4. **User Persona y POV**: tono y coherencia.
+${tieneMapaWeb ? `5. **Mapa del sitio web** (solo aquí): ${mapaInstrucción}` : `5. **Mapa web**: ${mapaInstrucción}`}`,
+    prompt: `${opts.mvpBlock}
+
+${tieneMapaWeb ? opts.sitemapBlockWeb + '\n\n' : ''}=== IDEAS DE FUNCIONALIDADES Y CONTENIDO (canal ${opts.canalEtiqueta}) ===
 ${opts.ideasBlock}
 
 === USER JOURNEY MAP — contexto de etapas, dolores y POV ===
@@ -131,7 +138,11 @@ ${opts.personaBlock}
 ${opts.povBlock}
 
 ===
-Devuelve el objeto "flow" con **raiz** como arbol vertical. Usa los nombres de pagina del mapa del sitio como titulos de los pasos. Las paginas [MUST] del mapa deben aparecer en el flujo. Usa el journey para no contradecir etapas y dolores.`,
+Devuelve el objeto "flow" con **raiz** como árbol vertical. El recorrido debe **colgar** del journey y las ideas; el MVP ajusta prioridad de pasos.${
+      tieneMapaWeb
+        ? ' En pasos en el sitio web, usa títulos del mapa del sitio.'
+        : ''
+    }`,
   })
   return normalizeUserFlowLine(object.flow)
 }
@@ -166,10 +177,11 @@ export async function POST(req: Request) {
       /* sin cuerpo: generar ambos */
     }
 
-    const [personas, pov, moscowBlock] = await Promise.all([
+    const [personas, pov, sitemapBlockFull, mvpBundle] = await Promise.all([
       fetchSavedUserPersonas(),
       fetchSavedPovFromSheets(),
-      loadSitemapBlock(),
+      fetchSitemapPromptBlockFromSheets(),
+      fetchMVPBundleFromSheets(),
     ])
 
     if (!personas.ok) {
@@ -235,14 +247,19 @@ export async function POST(req: Request) {
         personas.data.clienteActual
       )
       const povActual = povLine('POV — CLIENTE ACTUAL', pov.data.clienteActual)
+      const mvpBlock = buildMvpPromptBlock(mvpBundle, one.canalId, canalMeta.label)
+      const sitemapBlockWeb =
+        one.canalId === DEFAULT_USER_JOURNEY_CANAL_ID ? sitemapBlockFull : ''
       const flow = await generateOneFlow({
         ideasBlock,
         journeyBlock: journeyActual,
         personaBlock: textoPersonaActual,
         povBlock: povActual,
-        moscowBlock,
+        mvpBlock,
+        sitemapBlockWeb,
         segmentLabel: 'cliente actual',
         canalEtiqueta: canalMeta.label,
+        canalId: one.canalId,
       })
       return NextResponse.json({
         version: 3 as const,
@@ -288,14 +305,19 @@ export async function POST(req: Request) {
         personas.data.clientePotencial
       )
       const povPotencial = povLine('POV — CLIENTE POTENCIAL', pov.data.clientePotencial)
+      const mvpBlock = buildMvpPromptBlock(mvpBundle, one.canalId, canalMeta.label)
+      const sitemapBlockWeb =
+        one.canalId === DEFAULT_USER_JOURNEY_CANAL_ID ? sitemapBlockFull : ''
       const flow = await generateOneFlow({
         ideasBlock,
         journeyBlock: journeyPotencial,
         personaBlock: textoPersonaPotencial,
         povBlock: povPotencial,
-        moscowBlock,
+        mvpBlock,
+        sitemapBlockWeb,
         segmentLabel: 'cliente potencial',
         canalEtiqueta: canalMeta.label,
+        canalId: one.canalId,
       })
       return NextResponse.json({
         version: 3 as const,
@@ -363,14 +385,19 @@ export async function POST(req: Request) {
         personas.data.clienteActual
       )
       const povActual = povLine('POV — CLIENTE ACTUAL', pov.data.clienteActual)
+      const mvpBlock = buildMvpPromptBlock(mvpBundle, pair.clienteActual.canalId, canalMetaA.label)
+      const sitemapBlockWeb =
+        pair.clienteActual.canalId === DEFAULT_USER_JOURNEY_CANAL_ID ? sitemapBlockFull : ''
       return generateOneFlow({
         ideasBlock: ideasBlockA,
         journeyBlock: journeyActual,
         personaBlock: textoPersonaActual,
         povBlock: povActual,
-        moscowBlock,
+        mvpBlock,
+        sitemapBlockWeb,
         segmentLabel: 'cliente actual',
         canalEtiqueta: canalMetaA.label,
+        canalId: pair.clienteActual.canalId,
       })
     }
 
@@ -385,14 +412,19 @@ export async function POST(req: Request) {
         personas.data.clientePotencial
       )
       const povPotencial = povLine('POV — CLIENTE POTENCIAL', pov.data.clientePotencial)
+      const mvpBlock = buildMvpPromptBlock(mvpBundle, pair.clientePotencial.canalId, canalMetaP.label)
+      const sitemapBlockWeb =
+        pair.clientePotencial.canalId === DEFAULT_USER_JOURNEY_CANAL_ID ? sitemapBlockFull : ''
       return generateOneFlow({
         ideasBlock: ideasBlockP,
         journeyBlock: journeyPotencial,
         personaBlock: textoPersonaPotencial,
         povBlock: povPotencial,
-        moscowBlock,
+        mvpBlock,
+        sitemapBlockWeb,
         segmentLabel: 'cliente potencial',
         canalEtiqueta: canalMetaP.label,
+        canalId: pair.clientePotencial.canalId,
       })
     }
 

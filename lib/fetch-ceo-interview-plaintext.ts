@@ -9,7 +9,7 @@ function getAuth() {
   })
 }
 
-/** Texto plano de la entrevista CEO para prompts de IA (misma forma que en otras rutas). */
+/** Texto plano de la encuesta / entrevista guiada a la CEO (hoja principal) para prompts de IA. */
 export async function fetchCeoInterviewPlaintext(): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: CEO_SHEET_ID, range: 'A:N' })

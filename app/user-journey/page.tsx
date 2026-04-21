@@ -59,8 +59,8 @@ export default function UserJourneyRoute() {
 
           <p className="mt-10 text-center text-xs text-gray-400">
             Siguiente paso:{' '}
-            <Link href="/user-flow" className="text-teal-700 font-medium hover:underline underline-offset-2">
-              User Flow (diagrama de flujo) →
+            <Link href="/moscow" className="text-teal-700 font-medium hover:underline underline-offset-2">
+              MoSCoW →
             </Link>
           </p>
         </div>

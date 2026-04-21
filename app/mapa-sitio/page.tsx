@@ -22,22 +22,22 @@ export default function MapaSitioRoute() {
             Mapa del Sitio
           </h1>
           <p className="mt-1 text-gray-500 text-sm">
-            MOA · Arquitectura de información generada a partir del MoSCoW · Estructura jerárquica de páginas y secciones
+            Arquitectura de información a partir de la <strong>matriz MVP del canal Página web</strong> · Estructura
+            jerárquica de páginas y secciones
           </p>
         </div>
 
         {/* Info */}
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-5 py-4 mb-8 space-y-2 text-sm text-violet-950 leading-relaxed">
           <p>
-            La IA organiza las funcionalidades{' '}
-            <Link href="/moscow" className="font-semibold underline underline-offset-2 text-violet-700">
-              Must · Should · Could
+            La IA construye el mapa solo con la{' '}
+            <Link href="/mvp" className="font-semibold underline underline-offset-2 text-violet-700">
+              matriz MVP
             </Link>{' '}
-            en secciones y páginas concretas de la web de MOA.
-            El mapa resultante se usa como base para el{' '}
-            <Link href="/user-flow" className="font-semibold underline underline-offset-2 text-violet-700">
-              User Flow
-            </Link>.
+            del canal <strong>Página web</strong> (valor negocio / valor usuario). Si tienes MoSCoW guardado, sirve de
+            referencia cruzada para prioridades;
+            el mapa resultante alimenta el{' '}
+            <Link href="/user-flow" className="font-semibold underline underline-offset-2 text-violet-700">User Flow</Link>.
           </p>
           <ul className="text-xs text-violet-800/80 space-y-0.5 pl-4 list-disc">
             <li><strong>Nivel 1</strong>: secciones principales de navegación</li>
@@ -49,8 +49,8 @@ export default function MapaSitioRoute() {
         <SitemapMoaPage />
 
         <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
-          <Link href="/moscow" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            ← Must · Should · Could · Won&apos;t
+          <Link href="/mvp" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            ← Matriz MVP
           </Link>
           <Link href="/user-flow" className="text-violet-600 font-medium hover:underline underline-offset-2">
             User Flow →

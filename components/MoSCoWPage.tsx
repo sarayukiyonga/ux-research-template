@@ -1,16 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MOSCOW_CATEGORIAS,
   MOSCOW_LABELS,
+  MOSCOW_VERSION,
   MoSCoWCategoria,
   MoSCoWColor,
   MoSCoWNota,
   MoSCoWNotas,
   MoSCoWTamano,
+  createEmptyMoSCoWBundle,
   createEmptyNotas,
+  getScopePersist,
   newMoSCoWId,
+  normalizeMoSCoWPersist,
+  normalizeMoSCoWStoredJson,
+  setScopePersist,
+  MOSCOW_SCOPE_ALL,
+  type MoSCoWBundlePersist,
 } from '@/lib/moscow-types'
 
 // ── Estilos visuales de las notas ─────────────────────────────────────────────
@@ -42,10 +50,19 @@ interface EditForm {
   tamano: MoSCoWTamano
 }
 
+interface MoscowScopeOptionRow {
+  id: string
+  label: string
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export function MoSCoWPage() {
-  const [notas, setNotas] = useState<MoSCoWNotas>(createEmptyNotas())
+  const [bundle, setBundle] = useState<MoSCoWBundlePersist>(createEmptyMoSCoWBundle())
+  const [scope, setScope] = useState<string>(MOSCOW_SCOPE_ALL)
+  const [scopeOptions, setScopeOptions] = useState<MoscowScopeOptionRow[]>([
+    { id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' },
+  ])
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -57,21 +74,52 @@ export function MoSCoWPage() {
   const dragRef = useRef<DragState | null>(null)
   const laneRefs = useRef<Partial<Record<MoSCoWCategoria, HTMLDivElement | null>>>({})
 
-  // ── Carga inicial ────────────────────────────────────────────────────────────
+  const patchNotas = useCallback(
+    (fn: (prev: MoSCoWNotas) => MoSCoWNotas) => {
+      setBundle((b) => {
+        const cur = getScopePersist(b, scope).notas
+        return setScopePersist(b, scope, { version: MOSCOW_VERSION, notas: fn(cur) })
+      })
+    },
+    [scope]
+  )
+
+  const notas = useMemo(() => getScopePersist(bundle, scope).notas, [bundle, scope])
+
+  // ── Carga inicial (tablero + ámbitos desde journey) ───────────────────────────
 
   useEffect(() => {
     setLoadStatus('loading')
-    fetch('/api/moscow-saved')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.saved) {
-          setNotas(data.saved.data?.notas ?? createEmptyNotas())
-          setSavedAt(data.saved.savedAt)
+    Promise.all([fetch('/api/moscow-saved'), fetch('/api/moscow-scopes')])
+      .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
+      .then(([data, scopesData]) => {
+        let initial = createEmptyMoSCoWBundle()
+        if (data.saved?.bundle) {
+          initial = normalizeMoSCoWStoredJson(data.saved.bundle)
+        } else if (data.saved?.data) {
+          initial = {
+            version: 2,
+            generic: normalizeMoSCoWPersist(data.saved.data),
+            canales: {},
+          }
         }
+        setBundle(initial)
+        if (data.saved?.savedAt) setSavedAt(data.saved.savedAt)
+        const opts = Array.isArray(scopesData.options) ? scopesData.options : []
+        setScopeOptions(
+          opts.length ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        )
         setLoadStatus('loaded')
       })
       .catch(() => setLoadStatus('error'))
   }, [])
+
+  useEffect(() => {
+    if (loadStatus !== 'loaded') return
+    if (!scopeOptions.some((o) => o.id === scope)) {
+      setScope(MOSCOW_SCOPE_ALL)
+    }
+  }, [loadStatus, scopeOptions, scope])
 
   // ── Guardar ──────────────────────────────────────────────────────────────────
 
@@ -79,11 +127,14 @@ export function MoSCoWPage() {
     setSaveStatus('saving')
     try {
       const totalNotas = MOSCOW_CATEGORIAS.reduce((sum, c) => sum + notas[c].length, 0)
-      if (totalNotas === 0) { setSaveStatus('idle'); return }
+      if (totalNotas === 0) {
+        setSaveStatus('idle')
+        return
+      }
       const res = await fetch('/api/moscow-saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { version: 1, notas } }),
+        body: JSON.stringify({ bundle }),
       })
       const json = await res.json()
       if (json.ok) {
@@ -96,7 +147,7 @@ export function MoSCoWPage() {
     } catch {
       setSaveStatus('error')
     }
-  }, [notas])
+  }, [bundle, notas])
 
   // ── Generar con IA ───────────────────────────────────────────────────────────
 
@@ -104,10 +155,16 @@ export function MoSCoWPage() {
     setIaError(null)
     setIaStatus('loading')
     try {
-      const res = await fetch('/api/moscow-ia', { method: 'POST' })
+      const res = await fetch('/api/moscow-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+      })
       const json = await res.json()
       if (json.notas) {
-        setNotas(json.notas)
+        setBundle((b) =>
+          setScopePersist(b, scope, { version: MOSCOW_VERSION, notas: json.notas as MoSCoWNotas })
+        )
         setIaStatus('idle')
       } else {
         setIaError(json.error ?? 'Error desconocido')
@@ -117,7 +174,7 @@ export function MoSCoWPage() {
       setIaError(e instanceof Error ? e.message : 'Error de red')
       setIaStatus('error')
     }
-  }, [])
+  }, [scope])
 
   // ── Drag & Drop entre lanes ───────────────────────────────────────────────────
 
@@ -166,7 +223,7 @@ export function MoSCoWPage() {
       setDropTarget(null)
       if (!targetCat || targetCat === drag.fromCat) return
 
-      setNotas((prev) => {
+      patchNotas((prev) => {
         const nota = prev[drag.fromCat].find((n) => n.id === drag.notaId)
         if (!nota) return prev
         return {
@@ -176,18 +233,21 @@ export function MoSCoWPage() {
         }
       })
     },
-    [detectLane]
+    [detectLane, patchNotas]
   )
 
   // ── Añadir nota ──────────────────────────────────────────────────────────────
 
-  const addNota = useCallback((cat: MoSCoWCategoria) => {
-    const id = newMoSCoWId()
-    const defaultColor: MoSCoWColor = cat === 'must' ? 'naranja' : cat === 'wont' ? 'blanco' : 'amarillo'
-    const nota: MoSCoWNota = { id, texto: 'Nueva funcionalidad', color: defaultColor, tamano: 'md', origenMVP: null }
-    setNotas((prev) => ({ ...prev, [cat]: [...prev[cat], nota] }))
-    setEdit({ notaId: id, cat, texto: nota.texto, color: defaultColor, tamano: 'md' })
-  }, [])
+  const addNota = useCallback(
+    (cat: MoSCoWCategoria) => {
+      const id = newMoSCoWId()
+      const defaultColor: MoSCoWColor = cat === 'must' ? 'naranja' : cat === 'wont' ? 'blanco' : 'amarillo'
+      const nota: MoSCoWNota = { id, texto: 'Nueva funcionalidad', color: defaultColor, tamano: 'md', origenMVP: null }
+      patchNotas((prev) => ({ ...prev, [cat]: [...prev[cat], nota] }))
+      setEdit({ notaId: id, cat, texto: nota.texto, color: defaultColor, tamano: 'md' })
+    },
+    [patchNotas]
+  )
 
   // ── Edición ───────────────────────────────────────────────────────────────────
 
@@ -197,7 +257,7 @@ export function MoSCoWPage() {
 
   const saveEdit = useCallback(() => {
     if (!edit) return
-    setNotas((prev) => ({
+    patchNotas((prev) => ({
       ...prev,
       [edit.cat]: prev[edit.cat].map((n) =>
         n.id === edit.notaId
@@ -206,12 +266,15 @@ export function MoSCoWPage() {
       ),
     }))
     setEdit(null)
-  }, [edit])
+  }, [edit, patchNotas])
 
-  const deleteNota = useCallback((notaId: string, cat: MoSCoWCategoria) => {
-    setNotas((prev) => ({ ...prev, [cat]: prev[cat].filter((n) => n.id !== notaId) }))
-    setEdit(null)
-  }, [])
+  const deleteNota = useCallback(
+    (notaId: string, cat: MoSCoWCategoria) => {
+      patchNotas((prev) => ({ ...prev, [cat]: prev[cat].filter((n) => n.id !== notaId) }))
+      setEdit(null)
+    },
+    [patchNotas]
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -225,6 +288,22 @@ export function MoSCoWPage() {
     >
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm text-gray-600 mr-1">
+          <span className="sr-only">Ámbito</span>
+          <span className="text-gray-500 shrink-0">Canal</span>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            disabled={loadStatus !== 'loaded'}
+            className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-800 shadow-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100 min-w-40 max-w-[16rem]"
+          >
+            {scopeOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           onClick={handleGenerate}
           disabled={iaStatus === 'loading'}
