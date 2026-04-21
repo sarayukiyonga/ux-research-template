@@ -68,14 +68,6 @@ El JSON **raiz** representa un **árbol que se lee de arriba abajo** (diagrama d
    - **tituloDiamante**: pregunta breve para el rombo.
    - **ramas**: **2 o 3** \`{ "etiqueta": "...", "siguiente": <FlowNodo> }\`; cada \`siguiente\` continúa el flujo **vertical** por debajo de esa rama.
 
-### Campo opcional de retroceso en un paso (`retornoTipo` / `retornoA` / `retornoLabel`)
-
-Úsalo **solo** cuando la persona deba **volver a repetir un paso ANTERIOR** (por ejemplo, "Si no encuentra hueco libre, vuelve a consultar horarios"). Reglas estrictas:
-- `retornoA` debe ser el `tituloBolita` de un paso con **orden menor** al paso actual (nunca el siguiente ni el mismo).
-- Nunca uses retornoA para avanzar: si la persona "continúa" o "va al siguiente paso", eso es un `clicEntrePasos`, no un retorno.
-- Usa retornoA con moderación: máximo 1–2 veces en todo el flujo, solo cuando el journey muestre una **reincidencia** real.
-- Si no hay retroceso real en el journey, deja `retornoTipo: null`, `retornoA: null`, `retornoLabel: null` en todos los pasos.
-
 Reglas:
 - Responde en español.
 - Incluye **al menos una decisión** en el árbol.
