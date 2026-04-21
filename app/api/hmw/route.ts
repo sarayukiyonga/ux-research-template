@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { fetchSavedPovFromSheets, povPairToPlainTextForHmw, type POVStatement } from '@/lib/fetch-saved-pov'
 import type { HMWQuestionsPayload } from '@/lib/hmw-payload'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT, CLIENT_SHORT_DESC } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -14,7 +15,7 @@ const hmwListSchema = z
   .min(4)
   .max(8)
   .describe(
-    'Preguntas How Might We en español; cada una empieza por "¿Cómo podríamos" (con tilde en cómo). Enfocadas a producto digital, web o experiencia MOA.'
+    `Preguntas How Might We en español; cada una empieza por "¿Cómo podríamos" (con tilde en cómo). Enfocadas a producto digital, web o experiencia ${CLIENT.name}.`
   )
 
 const schema = z.object({
@@ -37,7 +38,7 @@ function povLineHmw(label: string, s: POVStatement): string {
   return `### ${label}\n${s.usuario} necesita ${s.necesidad} porque ${s.insight}.`
 }
 
-const HMW_SYSTEM_BASE = `Eres un facilitador de Design Thinking para MOA (entrenadora Patri, salud y fitness en Martorell).
+const HMW_SYSTEM_BASE = `Eres un facilitador de Design Thinking para ${CLIENT_SHORT_DESC}.
 
 Tu tarea: convertir el POV indicado en una lista de preguntas **How Might We (HMW)** en español.
 

@@ -1,4 +1,7 @@
-export const CEO_SHEET_ID = '1X-L4I1OQJ6MR-c4IK19Er-d2bi2rgWvxXfr7po_n-KA'
+import { CLIENT } from './client-config'
+
+export const CEO_SHEET_ID =
+  process.env.GOOGLE_SHEETS_ID ?? '1X-L4I1OQJ6MR-c4IK19Er-d2bi2rgWvxXfr7po_n-KA'
 
 export interface CeoQuestion {
   id: number
@@ -12,7 +15,7 @@ export const CEO_QUESTIONS: CeoQuestion[] = [
   {
     id: 1,
     columnIndex: 1,
-    question: '¿Qué significa MOA, por qué lo elegiste y qué valores debe transmitir el nuevo local?',
+    question: `¿Qué significa ${CLIENT.name}, por qué lo elegiste y qué valores debe transmitir el nuevo local?`,
     theme: 'brand',
     themeLabel: 'Marca',
   },
@@ -54,7 +57,7 @@ export const CEO_QUESTIONS: CeoQuestion[] = [
   {
     id: 7,
     columnIndex: 7,
-    question: '¿Tienes pensado contratar a más entrenadores bajo la marca MOA o siempre serás tú la cara visible?',
+    question: `¿Tienes pensado contratar a más personas bajo la marca ${CLIENT.name} o siempre serás tú la cara visible?`,
     theme: 'team',
     themeLabel: 'Equipo',
   },
@@ -75,7 +78,7 @@ export const CEO_QUESTIONS: CeoQuestion[] = [
   {
     id: 10,
     columnIndex: 10,
-    question: 'Si MOA hablara, ¿cómo se dirigiría a sus clientes?',
+    question: `Si ${CLIENT.name} hablara, ¿cómo se dirigiría a sus clientes?`,
     theme: 'communication',
     themeLabel: 'Comunicación',
   },

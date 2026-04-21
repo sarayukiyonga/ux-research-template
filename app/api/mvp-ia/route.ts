@@ -7,6 +7,7 @@ import { CEO_SHEET_ID } from '@/lib/ceo-questions'
 import { loadHmwIaContextOrFail, hmwIaContextToMarkdown } from '@/lib/hmw-ia-context'
 import type { HMWQuestionsPayload, HMWItem } from '@/lib/hmw-payload'
 import { newMVPNotaId } from '@/lib/mvp-types'
+import { CLIENT, CLIENT_LONG_DESC } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,7 +103,7 @@ export async function POST() {
         : '(No hay respuestas HMW marcadas como "mejor" todavia.)'
 
     const ceoText = ceoInsights.trim()
-      ? `=== Insights de la entrevista a la CEO (Patri) ===\n${ceoInsights.slice(0, 3000)}`
+      ? `=== Insights de la entrevista a la ${CLIENT.ownerRole} (${CLIENT.ownerFirstName}) ===\n${ceoInsights.slice(0, 3000)}`
       : '(No hay informe CEO guardado todavia.)'
 
     const prompt = `Eres un experto en diseño de producto y priorización de MVP para startups y negocios de servicios.
@@ -115,12 +116,12 @@ ${ceoText}
 ${hmwMejorText}
 
 === TU TAREA ===
-Genera entre 10 y 20 funcionalidades/características concretas para el MVP de la nueva web/app de MOA (centro de osteopatia y movimiento de Patri).
+Genera entre 10 y 20 funcionalidades/características concretas para el MVP de la nueva web/app de ${CLIENT_LONG_DESC}.
 
 Para CADA funcionalidad define:
 1. "texto": nombre corto y claro (maximo 55 caracteres). Ejemplos: "Reserva online de sesiones", "Pago de cuota mensual", "Calendario de clases grupales".
 2. "x": posicion horizontal 0-100.
-   - 0 = Poco valor para el NEGOCIO (no genera ingresos ni ahorra costes a Patri / MOA)
+   - 0 = Poco valor para el NEGOCIO (no genera ingresos ni ahorra costes a ${CLIENT.ownerFirstName} / ${CLIENT.name})
    - 100 = Mucho valor para el NEGOCIO (genera ingresos directos, fideliza, ahorra tiempo de administracion)
 3. "y": posicion vertical 0-100.
    - 0 = Mucho valor para el USUARIO/CLIENTA (resuelve un dolor claro, mejora su experiencia)

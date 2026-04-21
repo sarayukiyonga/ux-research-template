@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -56,7 +57,7 @@ const ERR: Record<string, string> = {
   invalid_shape: 'Los user personas guardados no tienen el formato esperado (clienteActual / clientePotencial).',
 }
 
-const SYSTEM_CLIENTE_ACTUAL = `Eres un UX researcher experto en Design Thinking (Point of View) para MOA (entrenadora Patri, salud y entrenamiento en Martorell).
+const SYSTEM_CLIENTE_ACTUAL = `Eres un UX researcher experto en Design Thinking (Point of View) para ${CLIENT.name} (${CLIENT.ownerFirstName} como ${CLIENT.ownerRole}, ${CLIENT.sector} en ${CLIENT.location}).
 
 Contexto que NO debes confundir: el documento describe al **CLIENTE ACTUAL** — persona que **ya** entrena con Patri o ya forma parte de su comunidad de clientas. No es un prospecto que está valorando si ir al gimnasio.
 
@@ -68,12 +69,12 @@ CRÍTICO — Los tres campos se concatenan en una sola frase en la interfaz. El 
 
 Reglas solo para CLIENTE ACTUAL:
 - usuario: arquetipo concreto (edad, ocupación, ciudad); la idea de "ya es clienta" se infiere del segmento, **no** la escribas como "que ya" al final del usuario.
-- necesidad: infinitivos o frases verbales de **continuidad, adherencia, sentirse acompañada, no perder progreso, gestionar su salud con guía conocida, encajar el entreno en su vida**. Evita redacciones de descubrimiento ("conocer MOA", "decidir si Patri encaja", "probar un centro nuevo") — eso sería cliente potencial.
-- insight: emoción o contexto que encaje con **quien ya confía en Patri** (miedo a retroceder, cansancio con otros modelos, valor del grupo, vergüenza o limitación física que Patri ya conoce, etc.), tomado del persona.
+- necesidad: infinitivos o frases verbales de **continuidad, adherencia, sentirse acompañada, no perder progreso, gestionar su salud con guía conocida, encajar el servicio en su vida**. Evita redacciones de descubrimiento ("conocer ${CLIENT.name}", "decidir si ${CLIENT.ownerFirstName} encaja", "probar un centro nuevo") — eso sería cliente potencial.
+- insight: emoción o contexto que encaje con **quien ya confía en ${CLIENT.ownerFirstName}** (miedo a retroceder, cansancio con otros modelos, valor del grupo, vergüenza o limitación física que ${CLIENT.ownerFirstName} ya conoce, etc.), tomado del persona.
 
 Solo usa el bloque de texto que te damos. Español natural y conciso.`
 
-const SYSTEM_CLIENTE_POTENCIAL = `Eres un UX researcher experto en Design Thinking (Point of View) para MOA (entrenadora Patri, Martorell).
+const SYSTEM_CLIENTE_POTENCIAL = `Eres un UX researcher experto en Design Thinking (Point of View) para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.location}).
 
 Contexto: el documento describe al **CLIENTE POTENCIAL** — persona que **aún no** es clienta de Patri; podría valorar MOA frente a otras opciones o tiene dudas/barreras previas.
 
@@ -103,11 +104,11 @@ export async function POST() {
   }
 
   const textoActual = personaRecordToPlainText(
-    'USER PERSONA — CLIENTE ACTUAL (ya clientas de Patri / MOA)',
+    `USER PERSONA — CLIENTE ACTUAL (ya clientes de ${CLIENT.ownerFirstName} / ${CLIENT.name})`,
     personas.data.clienteActual
   )
   const textoPotencial = personaRecordToPlainText(
-    'USER PERSONA — CLIENTE POTENCIAL (aún no clientas; podrían valorar MOA)',
+    `USER PERSONA — CLIENTE POTENCIAL (aún no clientes; podrían valorar ${CLIENT.name})`,
     personas.data.clientePotencial
   )
 

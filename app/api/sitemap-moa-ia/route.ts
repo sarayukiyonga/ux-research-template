@@ -7,6 +7,7 @@ import { CEO_SHEET_ID } from '@/lib/ceo-questions'
 import { loadHmwIaContextOrFail, hmwIaContextToMarkdown } from '@/lib/hmw-ia-context'
 import { normalizeMoSCoWPersist } from '@/lib/moscow-types'
 import { newSitemapId } from '@/lib/sitemap-moa-types'
+import { CLIENT, CLIENT_LONG_DESC } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,15 +93,15 @@ ${contextoBase}
 ${moscowBlock}
 
 === TU TAREA ===
-Genera el MAPA DEL SITIO completo de la nueva web de MOA (centro de osteopatia y movimiento de Patri).
+Genera el MAPA DEL SITIO completo de la nueva web de ${CLIENT_LONG_DESC}.
 
-El nodo raiz (tituloInicio) representa la pagina de BIENVENIDA de la web — usa un nombre evocador tipo "Bienvenida a MOA" o "Inicio — Bienvenida", no un titulo tecnico como "Mapa del sitio".
+El nodo raiz (tituloInicio) representa la pagina de BIENVENIDA de la web — usa un nombre evocador tipo "Bienvenida a ${CLIENT.name}" o "Inicio — Bienvenida", no un titulo tecnico como "Mapa del sitio".
 
 Debes generar DOS partes:
 
 --- PARTE 1: portadaDestacados ---
 Lista de 3 a 7 BLOQUES o ACCESOS DIRECTOS que aparecen visiblemente en la pagina de inicio (no en el menu, sino en el cuerpo de la home). Son "shortcuts" o cards destacadas que el usuario ve nada mas entrar.
-Ejemplos reales: "Hero: Reserva tu sesion" (CTA principal arriba), "Bloque: Proximas clases grupales", "Bloque: Sobre Patri / Quienes somos", "Widget: Ultimas noticias o novedades", "Social proof: Testimonios de clientas", "Acceso rapido: Mi cuenta".
+Ejemplos reales: "Hero: Reserva tu sesion" (CTA principal arriba), "Bloque: Proximas clases grupales", "Bloque: Sobre ${CLIENT.ownerFirstName} / Quienes somos", "Widget: Ultimas noticias o novedades", "Social proof: Testimonios de clientas", "Acceso rapido: Mi cuenta".
 Para cada destacado: titulo (max 45 chars), descripcion breve (que ve o hace el usuario en este bloque), prioridad segun MoSCoW o null.
 
 --- PARTE 2: secciones ---
@@ -112,12 +113,12 @@ Estructura jerarquica de navegacion de la web:
 - IMPORTANTE: NO incluyas una seccion llamada "Inicio", "Home" o similar. La pagina de inicio ya esta representada por el nodo raiz y la Parte 1 (portadaDestacados). Las secciones son las que aparecen en el MENU de navegacion, excluyendo la pagina de inicio.
 
 Para cada nodo:
-- "titulo": nombre claro y especifico para MOA (max 45 chars)
+- "titulo": nombre claro y especifico para ${CLIENT.name} (max 45 chars)
 - "tipo": "seccion" o "pagina" para nivel 1; "pagina", "modal", "accion" o "widget" para nivel 2
 - "prioridad": "must" | "should" | "could" | null
 - "descripcion": una frase de que hace esta pagina (max 80 chars) o null
 
-Genera 4-8 secciones principales, cada una con 1-5 sub-paginas. Usa nombres reales especificos para MOA.`
+Genera 4-8 secciones principales, cada una con 1-5 sub-paginas. Usa nombres reales especificos para ${CLIENT.name}.`
 
     const result = await generateObject({
       model: openai('gpt-4o'),
@@ -137,7 +138,7 @@ Genera 4-8 secciones principales, cada una con 1-5 sub-paginas. Usa nombres real
 
     const root = {
       id: newSitemapId(),
-      titulo: result.object.tituloInicio || 'Bienvenida',
+      titulo: result.object.tituloInicio || `Bienvenida a ${CLIENT.name}`,
       tipo: 'inicio' as const,
       prioridad: 'must' as const,
       descripcion: null,

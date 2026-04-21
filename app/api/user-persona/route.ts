@@ -6,6 +6,7 @@ import { google } from 'googleapis'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS, QUESTIONS } from '@/lib/questions'
+import { CLIENT } from '@/lib/client-config'
 import {
   POTENTIAL_SHEET_ID,
   POTENTIAL_SHEET_RANGE,
@@ -37,7 +38,7 @@ const PersonaSchema = z.object({
       'Edad en años: entero dentro de la franja de edad más frecuente en DATOS ENCUESTA FILTRADOS (usa el valor sugerido o uno muy cercano en esa franja).'
     ),
   educacion: z.string().describe('Nivel de estudios plausible; si no hay dato en encuesta, infiere con moderación alineado al resto.'),
-  ubicacion: z.string().describe('Zona o contexto de vida (p. ej. Martorell / Baix Llobregat) alineado con MOA'),
+  ubicacion: z.string().describe(`Zona o contexto de vida (p. ej. ${CLIENT.location} / ${CLIENT.locationRegion}) alineado con ${CLIENT.name}`),
   ocupacion: z.string().describe('Ocupación principal: prioriza lo que aparece en DATOS ENCUESTA (ocupaciones citadas); complementa con insights si hace falta.'),
   tags: z
     .array(z.string().max(20))

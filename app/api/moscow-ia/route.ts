@@ -7,6 +7,7 @@ import { CEO_SHEET_ID } from '@/lib/ceo-questions'
 import { loadHmwIaContextOrFail, hmwIaContextToMarkdown } from '@/lib/hmw-ia-context'
 import { newMoSCoWId } from '@/lib/moscow-types'
 import type { MVPNota } from '@/lib/mvp-types'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,8 +85,8 @@ ${contextoBase}
 ${notasTexto}
 
 === TU TAREA ===
-Clasifica TODAS las funcionalidades anteriores en las 4 categorias MoSCoW para la nueva web/app de MOA.
-Si no habia funcionalidades en la matriz, genera entre 8 y 15 funcionalidades nuevas para MOA y clasificalas.
+Clasifica TODAS las funcionalidades anteriores en las 4 categorias MoSCoW para la nueva web/app de ${CLIENT.name}.
+Si no habia funcionalidades en la matriz, genera entre 8 y 15 funcionalidades nuevas para ${CLIENT.name} y clasificalas.
 
 Criterios de clasificacion:
 - MUST: Critico para el MVP. Sin esto el producto no tiene sentido. (valor usuario >65 Y valor negocio >60, o absolutamente imprescindible por otro motivo)
@@ -106,7 +107,7 @@ Para cada nota define:
 4. "origenMVP": texto de la funcionalidad original de la que proviene (o null si es nueva)
 
 Distribuye de forma realista. Tipicamente: 4-7 Must, 3-6 Should, 3-5 Could, 2-4 Won't.
-Usa el contexto de MOA (osteopatia, servicios presenciales, Patri/CEO) para justificar las decisiones.`
+Usa el contexto de ${CLIENT.name} (${CLIENT.serviceShort}, servicios ${CLIENT.serviceModel}s, ${CLIENT.ownerFirstName}/${CLIENT.ownerRole}) para justificar las decisiones.`
 
     const result = await generateObject({
       model: openai('gpt-4o'),
