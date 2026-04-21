@@ -578,6 +578,13 @@ export function UserJourneyPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editOrden, setEditOrden] = useState(1)
   const [editDraft, setEditDraft] = useState<EditEtapaDraft | null>(null)
+  const [generatingAll, setGeneratingAll] = useState(false)
+  const [genAllProgress, setGenAllProgress] = useState<{
+    current: number
+    total: number
+    segmento: UserJourneySegmento
+    canalLabel: string
+  } | null>(null)
 
   const segState = persist ? persist[segmento] : null
   const canalActivoId = segState?.canalActivoId ?? DEFAULT_USER_JOURNEY_CANAL_ID
@@ -900,6 +907,69 @@ export function UserJourneyPage() {
     }
   }
 
+  /**
+   * Genera journeys para todos los canales de ambos segmentos.
+   * Si regenerate=false, solo genera los que aún no tienen mapa.
+   */
+  const generateAll = async (regenerate: boolean) => {
+    if (!persist) return
+    const pairs: Array<{ segmento: UserJourneySegmento; canalId: string; canalLabel: string }> = []
+    for (const seg of ['clienteActual', 'clientePotencial'] as const) {
+      for (const canal of persist[seg].catalogo) {
+        if (regenerate || !persist[seg].mapas[canal.id]) {
+          pairs.push({ segmento: seg, canalId: canal.id, canalLabel: canal.label })
+        }
+      }
+    }
+    if (!pairs.length) return
+
+    setGeneratingAll(true)
+    setGenError(null)
+    setSaveError(null)
+
+    let currentPersist = persist
+    const errors: string[] = []
+
+    for (let i = 0; i < pairs.length; i++) {
+      const { segmento: seg, canalId, canalLabel } = pairs[i]
+      setGenAllProgress({ current: i + 1, total: pairs.length, segmento: seg, canalLabel })
+      try {
+        const segState = currentPersist[seg]
+        const res = await fetch('/api/user-journey', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ canalId, segmento: seg, catalogo: segState.catalogo }),
+        })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok || !isJourneyForPersona(d.journey)) {
+          errors.push(
+            `${seg === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'} · ${canalLabel}`
+          )
+          continue
+        }
+        currentPersist = {
+          ...currentPersist,
+          [seg]: {
+            ...currentPersist[seg],
+            mapas: { ...currentPersist[seg].mapas, [canalId]: d.journey },
+          },
+        }
+        setPersist(currentPersist)
+        await saveCanalPersist(currentPersist, seg, canalId)
+      } catch {
+        errors.push(
+          `${seg === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'} · ${canalLabel}`
+        )
+      }
+    }
+
+    setGenAllProgress(null)
+    setGeneratingAll(false)
+    if (errors.length > 0) {
+      setGenError(`No se pudieron generar: ${errors.join(', ')}`)
+    }
+  }
+
   const prereqOk = depsOk.persona && depsOk.pov
 
   if (loadingSaved || !persist) {
@@ -919,6 +989,55 @@ export function UserJourneyPage() {
   const panelPersist = persist
   const segLabel = segmento === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'
   const accent = segmento === 'clienteActual' ? 'teal' : 'orange'
+
+  // Cuenta cuántos canales faltan en total (ambos segmentos)
+  const missingCount =
+    persist.clienteActual.catalogo.filter((c) => !persist.clienteActual.mapas[c.id]).length +
+    persist.clientePotencial.catalogo.filter((c) => !persist.clientePotencial.mapas[c.id]).length
+  const totalCount =
+    persist.clienteActual.catalogo.length + persist.clientePotencial.catalogo.length
+
+  const batchBar = prereqOk ? (
+    generatingAll && genAllProgress ? (
+      <div className="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 flex items-center gap-3">
+        <span className="inline-block h-4 w-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-teal-900">
+            Generando todos los mapas ({genAllProgress.current}/{genAllProgress.total})
+          </p>
+          <p className="text-xs text-teal-700 mt-0.5">
+            {genAllProgress.segmento === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'}{' '}
+            · {genAllProgress.canalLabel}
+          </p>
+        </div>
+      </div>
+    ) : (
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void generateAll(false)}
+          disabled={generatingAll || generating || missingCount === 0}
+          className="inline-flex items-center gap-1.5 text-xs px-4 py-2 rounded-full bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+        >
+          ✦ Generar los que faltan
+          {missingCount > 0 && (
+            <span className="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+              {missingCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => void generateAll(true)}
+          disabled={generatingAll || generating || totalCount === 0}
+          className="inline-flex items-center gap-1.5 text-xs px-4 py-2 rounded-full border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+        >
+          ↺ Regenerar todos
+          <span className="text-gray-400 text-[10px]">({totalCount})</span>
+        </button>
+      </div>
+    )
+  ) : null
 
   if (generating) {
     return (
@@ -958,6 +1077,7 @@ export function UserJourneyPage() {
           onAddCustomCanal={() => void handleAddCustomCanal()}
           onRemoveCanal={(id) => void handleRemoveCanal(id)}
         />
+        {batchBar}
         <div className="rounded-xl bg-red-50 border border-red-100 px-5 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-sm text-red-600">{genError}</p>
           <button
@@ -1009,7 +1129,9 @@ export function UserJourneyPage() {
           onSelectCanal={(id) => void handleSelectCanal(id)}
           onAddCustomCanal={() => void handleAddCustomCanal()}
           onRemoveCanal={(id) => void handleRemoveCanal(id)}
+          disabled={generatingAll}
         />
+        {batchBar}
         {intro}
         {(!depsOk.persona || !depsOk.pov) && (
           <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
@@ -1048,7 +1170,9 @@ export function UserJourneyPage() {
         onSelectCanal={(id) => void handleSelectCanal(id)}
         onAddCustomCanal={() => void handleAddCustomCanal()}
         onRemoveCanal={(id) => void handleRemoveCanal(id)}
+        disabled={generatingAll}
       />
+      {batchBar}
       <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 flex flex-wrap items-center justify-between gap-2">
         <p>
           <strong>{segLabel}</strong> · canal <strong>{canalPrompt.label}</strong>. Fuente principal:{' '}
@@ -1081,7 +1205,8 @@ export function UserJourneyPage() {
           <button
             type="button"
             onClick={() => void generate()}
-            className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
+            disabled={generatingAll}
+            className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             ↺ Regenerar este mapa
           </button>
