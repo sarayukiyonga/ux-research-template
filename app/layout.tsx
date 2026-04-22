@@ -2,13 +2,29 @@ import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ResearchJourneyShell } from '@/components/ResearchJourneyShell'
+import { CLIENT } from '@/lib/client-config'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: 'Encuesta Patri — Resultados',
-  description: 'Dashboard de resultados de la encuesta de satisfacción',
+/** Título y descripción derivados de `CLIENT_*` (.env) para forks de la plantilla. */
+export function generateMetadata(): Metadata {
+  const name = CLIENT.name
+  const defaultTitle = `${name} — Investigación UX`
+  const description = [
+    `Recorrido UX con IA para ${name}: ${CLIENT.serviceShort}.`,
+    `Sector ${CLIENT.sector} · ${CLIENT.location}. Encuestas, mapas de empatía, journey, MVP y Sheets.`,
+  ]
+    .join(' ')
+    .slice(0, 160)
+
+  return {
+    title: {
+      default: defaultTitle,
+      template: `%s · ${name}`,
+    },
+    description,
+  }
 }
 
 export default function RootLayout({
