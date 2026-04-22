@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
 import type { JourneyForPersona } from '@/lib/user-journey-bundle'
+import { CLIENT } from '@/lib/client-config'
 import {
   getJourneyPairForUserFlow,
   parsePersistedJourneyCell,
@@ -166,7 +167,7 @@ export function journeySegmentToMoSCoWBlock(
     .sort((a, b) => a.orden - b.orden)
     .map(
       (e) =>
-        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales: ${e.canalesDeMarketing}` : ''}\n    Rol MOA frente al POV (${canalEtiqueta}): ${e.rolWebFrenteAlPov}`
+        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales: ${e.canalesDeMarketing}` : ''}\n    Rol ${CLIENT.name} frente al POV (${canalEtiqueta}): ${e.rolWebFrenteAlPov}`
     )
     .join('\n')
   return `### ${titulo} — ${j.etiquetaPersona} · Canal: **${canalEtiqueta}**
@@ -197,12 +198,12 @@ export function journeySegmentToFlowGrounding(
     .sort((a, b) => a.orden - b.orden)
     .map(
       (e) =>
-        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales de marketing: ${e.canalesDeMarketing}` : ''}\n    Rol de MOA (${canalEtiqueta}) frente al POV: ${e.rolWebFrenteAlPov}`
+        `  - **Orden ${e.orden} · ${e.titulo}** — ${e.descripcion}\n    Dolores: ${e.puntosDeDolor.join('; ')}${e.canalesDeMarketing ? `\n    Canales de marketing: ${e.canalesDeMarketing}` : ''}\n    Rol de ${CLIENT.name} (${canalEtiqueta}) frente al POV: ${e.rolWebFrenteAlPov}`
     )
     .join('\n')
   return `### ${titulo} — ${j.etiquetaPersona}
 Síntesis del journey: ${j.sintesis}
-**Etapa en que MOA (${canalEtiqueta}) aporta más al POV (orden): ${j.etapaOrdenPovResuelto}**
+**Etapa en que ${CLIENT.name} (${canalEtiqueta}) aporta más al POV (orden): ${j.etapaOrdenPovResuelto}**
 
 Etapas del User Journey Map en **${canalEtiqueta}** (el User Flow debe basarse en este orden y contenido; cada rectángulo del diagrama debe corresponder de forma explícita a una o varias etapas contiguas; las flechas son las acciones o transiciones coherentes con el relato en este canal):
 ${etapas}`

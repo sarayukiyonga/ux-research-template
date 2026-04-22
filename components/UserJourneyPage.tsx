@@ -561,7 +561,7 @@ function EtapaEditModal({
   )
 }
 
-export function UserJourneyPage() {
+export function UserJourneyPage({ businessName }: { businessName: string }) {
   const [persist, setPersist] = useState<UserJourneyV3Persist | null>(null)
   const [segmento, setSegmento] = useState<UserJourneySegmento>('clienteActual')
   const [nuevoCanalLabel, setNuevoCanalLabel] = useState('')
@@ -593,10 +593,10 @@ export function UserJourneyPage() {
   const isBaseChannel = canalActivoId === JOURNEY_BASE_CANAL_ID
   const clavePovLabel = isBaseChannel ? 'POV ↔ recorrido' : `POV ↔ ${canalPrompt.label}`
   const rolBloqueTitulo = isBaseChannel
-    ? 'MOA frente al POV (recorrido global)'
+    ? `${businessName} frente al POV (recorrido global)`
     : `${canalPrompt.label} y el POV`
   const clavePovCheckboxLabel = isBaseChannel
-    ? 'Momento clave: MOA aporta más al POV en el recorrido'
+    ? `Momento clave: ${businessName} aporta más al POV en el recorrido`
     : `Esta etapa es el momento clave POV ↔ ${canalPrompt.label}`
 
   useEffect(() => {
@@ -1222,7 +1222,7 @@ export function UserJourneyPage() {
         clavePovLabel={clavePovLabel}
       />
 
-      <UserJourneyIdeasSection persist={panelPersist} segmento={segmento} />
+      <UserJourneyIdeasSection persist={panelPersist} segmento={segmento} businessName={businessName} />
 
       <EtapaEditModal
         open={editOpen}

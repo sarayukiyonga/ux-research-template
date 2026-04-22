@@ -1,3 +1,5 @@
+import { CLIENT } from '@/lib/client-config'
+
 /** Canales de comunicación para los que se puede generar un User Journey Map distinto. */
 
 /**
@@ -20,7 +22,7 @@ export const USER_JOURNEY_CANALES = [
     label: 'Correo electrónico',
     descripcionCorta: 'el correo electrónico',
     focoExperiencia:
-      'buzón, asunto y cuerpo del mensaje, enlaces desde el email, respuestas de MOA, cadencia y sensación de cercanía o frío',
+      `buzón, asunto y cuerpo del mensaje, enlaces desde el email, respuestas de ${CLIENT.name}, cadencia y sensación de cercanía o frío`,
     cierreExperiencia: 'deja de interactuar por este hilo (archiva, no responde más o pasa a otro canal)',
   },
   {
@@ -44,7 +46,7 @@ export const USER_JOURNEY_CANALES = [
     label: 'Centro / presencial',
     descripcionCorta: 'la experiencia en el centro',
     focoExperiencia:
-      'llegada, acogida, conversación con staff o Patri, material físico, incertidumbre antes/después de la visita',
+      `llegada, acogida, conversación con staff o ${CLIENT.ownerFirstName}, material físico, incertidumbre antes/después de la visita`,
     cierreExperiencia: 'termina la visita o el intercambio en recepción/sala',
   },
   {
@@ -122,9 +124,9 @@ export function getCanalPromptFields(canalId: string, catalogo: JourneyCanalDef[
       label: 'Todos los canales',
       descripcionCorta: 'el recorrido end-to-end de la persona',
       focoExperiencia:
-        'cómo descubre su necesidad, busca información, evalúa opciones, encuentra a MOA y da el paso a contratar o continuar el servicio — usando los datos del HMW, la persona y el POV, sin forzar un único medio (web, boca a boca, salud, redes, etc. pueden aparecer a lo largo del relato)',
+        `cómo descubre su necesidad, busca información, evalúa opciones, encuentra a ${CLIENT.name} y da el paso a contratar o continuar el servicio — usando los datos del HMW, la persona y el POV, sin forzar un único medio (web, boca a boca, salud, redes, etc. pueden aparecer a lo largo del relato)`,
       cierreExperiencia:
-        'cierra el arco con decisión o continuidad respecto a MOA alineada con el POV y el HMW del segmento',
+        `cierra el arco con decisión o continuidad respecto a ${CLIENT.name} alineada con el POV y el HMW del segmento`,
     }
   }
   const preset = USER_JOURNEY_CANALES.find((c) => c.id === canalId)
@@ -134,7 +136,7 @@ export function getCanalPromptFields(canalId: string, catalogo: JourneyCanalDef[
   return {
     label,
     descripcionCorta: `el canal «${label}»`,
-    focoExperiencia: `interacción de la persona con MOA a través de ${label}`,
+    focoExperiencia: `interacción de la persona con ${CLIENT.name} a través de ${label}`,
     cierreExperiencia: `cierra o abandona la interacción en ${label}`,
   }
 }

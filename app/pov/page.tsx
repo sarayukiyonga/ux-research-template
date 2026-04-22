@@ -1,5 +1,6 @@
 import { POVPage } from '@/components/POVPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT, CLIENT_PDF_BASENAME, PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function POVRoute() {
@@ -7,10 +8,10 @@ export default function POVRoute() {
     <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-3xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
-          <PdfDownloadButton fileName="moa-pov.pdf" />
+          <PdfDownloadButton fileName={`${CLIENT_PDF_BASENAME}-pov.pdf`} />
         </div>
 
-        <div id="moa-pdf-root">
+        <div id={PDF_CAPTURE_ROOT_ID}>
           {/* Nav */}
           <Link
             href="/"
@@ -30,7 +31,8 @@ export default function POVRoute() {
                 Point of View (POV)
               </h1>
               <p className="mt-1 text-gray-500 text-sm">
-                MOA · Declaraciones generadas a partir de los user persona guardados (cliente actual y potencial)
+                {CLIENT.name} · Declaraciones generadas a partir de los user persona guardados (cliente actual y
+                potencial)
               </p>
             </div>
           </div>
@@ -67,7 +69,11 @@ export default function POVRoute() {
             />
           </div>
 
-          <POVPage />
+          <POVPage
+            businessName={CLIENT.name}
+            ownerFirstName={CLIENT.ownerFirstName}
+            ownerLocation={CLIENT.location}
+          />
 
           <p className="mt-10 text-center text-xs text-gray-400">
             Siguiente paso:{' '}

@@ -1,3 +1,5 @@
+import { CLIENT } from '@/lib/client-config'
+
 export interface Question {
   id: number
   columnIndex: number
@@ -83,7 +85,7 @@ export const QUESTIONS: Question[] = [
   {
     id: 13,
     columnIndex: 15,
-    title: 'En el sistema actual de Patri, ¿qué es lo que más te cuesta o te da más pereza?',
+    title: `En el sistema actual de ${CLIENT.ownerFirstName}, ¿qué es lo que más te cuesta o te da más pereza?`,
     shortTitle: 'Dificultades del sistema actual',
     type: 'open',
   },

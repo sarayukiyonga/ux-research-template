@@ -3,6 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { NextResponse } from 'next/server'
 import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -29,7 +30,7 @@ function buildPotentialPersonaPrompt(
     .filter(Boolean)
     .join('\n\n')
 
-  const prompt = `Analiza estas ${totalResponses} respuestas de una encuesta a clientes potenciales de MOA (centro de entrenamiento y salud en Martorell) y genera un Perfil de Cliente Potencial con este formato exacto:
+  const prompt = `Analiza estas ${totalResponses} respuestas de una encuesta a clientes potenciales de ${CLIENT.name} (${CLIENT.serviceShort} en ${CLIENT.location}) y genera un Perfil de Cliente Potencial con este formato exacto:
 
 ## 🎯 Perfil del cliente potencial
 
@@ -42,14 +43,14 @@ function buildPotentialPersonaPrompt(
 ### Su relación actual con el ejercicio
 [Cómo se relaciona hoy con el ejercicio: si va o no a un centro, qué hace, qué le frena]
 
-### Qué piensa del concepto MOA
-[Cómo percibe el "Entrenamiento Personal de Salud": qué le atrae, qué le genera dudas o barreras]
+### Qué piensa del concepto ${CLIENT.name}
+[Cómo percibe el posicionamiento de ${CLIENT.name}: qué le atrae, qué le genera dudas o barreras]
 
 ### Lo que busca y no encuentra
 [Qué echa de menos en la oferta actual, qué valoraría en un profesional]
 
-### Por qué MOA encaja con él/ella
-[Por qué el modelo combinado de MOA (ejercicio + quiromasaje + fisio) le resultaría atractivo]
+### Por qué ${CLIENT.name} encaja con él/ella
+[Por qué el modelo combinado (${CLIENT.serviceCombo}) le resultaría atractivo]
 
 ---
 

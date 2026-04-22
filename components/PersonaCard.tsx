@@ -84,7 +84,7 @@ export function PersonaCard({
   byQuestion,
   demographic,
   apiPath = '/api/persona',
-  title = 'User Persona — Cliente tipo de Patri',
+  title = 'User Persona — Perfil compuesto',
   subtitle = 'Generado con IA a partir de todas las respuestas',
   cacheKey = 'persona_default',
   sheetBacked = false,

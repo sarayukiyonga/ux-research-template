@@ -10,7 +10,7 @@ export interface JourneyEtapa {
   puntosDeDolor: string[]
   /** Canales de marketing activos en esta etapa (boca a boca, Instagram, web, WhatsApp…). */
   canalesDeMarketing: string
-  /** Qué debe hacer MOA/la web en esta etapa respecto al POV y al HMW. */
+  /** Qué debe hacer la marca / el canal (p. ej. web) en esta etapa respecto al POV y al HMW. */
   rolWebFrenteAlPov: string
 }
 

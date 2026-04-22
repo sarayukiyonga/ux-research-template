@@ -3,13 +3,14 @@ import { openai } from '@ai-sdk/openai'
 import { NextResponse } from 'next/server'
 import { QUESTIONS } from '@/lib/questions'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const SYSTEM = `Eres un investigador UX y estratega de marca especializado en salud, bienestar y entrenamiento personal. 
 Tu tarea es crear User Personas a partir de respuestas reales de encuestas.
-Responde siempre en español. Sé empático, humano y orientado a insights accionables para la entrenadora Patri.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+Responde siempre en español. Sé empático, humano y orientado a insights accionables para ${CLIENT.ownerFirstName} (${CLIENT.ownerRole}).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 
 function buildPersonaPrompt(
   byQuestion: { questionId: number; answers: string[] }[],
@@ -39,7 +40,7 @@ function buildPersonaPrompt(
     .filter(Boolean)
     .join('\n\n')
 
-  const prompt = `A continuación tienes las respuestas reales de ${totalRespondents} clientes de Patri, entrenadora personal especializada en personas con limitaciones físicas o de salud.
+  const prompt = `A continuación tienes las respuestas reales de ${totalRespondents} clientes de ${CLIENT.ownerFirstName}, ${CLIENT.serviceDescription} especializada en personas con limitaciones físicas o de salud.
 
 **DATOS DEMOGRÁFICOS:**
 ${demographicSummary}
@@ -49,7 +50,7 @@ ${questionsBlock}
 
 ---
 
-Crea un User Persona compuesto que represente al cliente típico de Patri. Usa este formato exacto:
+Crea un User Persona compuesto que represente al cliente típico de ${CLIENT.ownerFirstName}. Usa este formato exacto:
 
 ## 👤 Nombre ficticio, edad representativa
 
@@ -60,10 +61,10 @@ Crea un User Persona compuesto que represente al cliente típico de Patri. Usa e
 ### Quién es
 2-3 frases describiendo su perfil: situación de salud, vida cotidiana, contexto personal.
 
-### Antes de Patri
+### Antes de ${CLIENT.ownerFirstName}
 Qué le frenaba, qué le decían los médicos, qué actividades le costaban. 2-3 frases.
 
-### Por qué eligió a Patri
+### Por qué eligió a ${CLIENT.ownerFirstName}
 Qué le dio confianza. Qué vio en ella que no encontraba en otros. 2 frases.
 
 ### Cómo se siente entrenando
@@ -78,8 +79,8 @@ El instante concreto en que sintió el cambio real. 1-2 frases.
 ### Sus roces con el sistema actual
 Qué le cuesta o le da pereza del modelo actual. 1-2 frases.
 
-### Oportunidades para Patri
-3 bullets concisos con acciones concretas que Patri podría tomar basándose en este perfil.`
+### Oportunidades para ${CLIENT.ownerFirstName}
+3 bullets concisos con acciones concretas que ${CLIENT.ownerFirstName} podría tomar basándose en este perfil.`
 
   return { prompt, totalRespondents }
 }

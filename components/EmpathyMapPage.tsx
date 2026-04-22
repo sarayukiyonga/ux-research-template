@@ -629,7 +629,7 @@ const SEGMENT_META: Record<
     accent: 'rose',
     mapCardTitle: 'Mapa de empatía · Clientes actuales',
     emptyLead:
-      'La IA usará el mismo filtrado que tengas activo en la encuesta de clientes (página Encuesta de satisfacción) más el contexto de la entrevista a Patricia.',
+      'La IA usará el mismo filtrado que tengas activo en la encuesta de clientes (página Encuesta de satisfacción) más el contexto de la entrevista CEO guardada.',
   },
   potenciales: {
     otherHref: '/empathy/clientes',
@@ -639,7 +639,7 @@ const SEGMENT_META: Record<
     accent: 'orange',
     mapCardTitle: 'Mapa de empatía · Clientes potenciales',
     emptyLead:
-      'La IA usará el mismo filtrado que tengas activo en la encuesta a clientes potenciales (página /potential) más el contexto de la entrevista a Patricia.',
+      'La IA usará el mismo filtrado que tengas activo en la encuesta a clientes potenciales (página /potential) más el contexto de la entrevista CEO guardada.',
   },
 }
 

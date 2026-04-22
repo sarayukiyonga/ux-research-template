@@ -29,7 +29,7 @@ const statementSchemaActual = z.object({
     .describe(
       'SOLO el sujeto del enunciado (arquetipo: nombre o rol + edad y un matiz breve). La app une después la palabra "necesita". ' +
         'PROHIBIDO terminar en subordinadas: no uses al final "que", "que ya", "quien", "a la que", comas + "ya", etc. ' +
-        'Ejemplo válido: "Marta, 48 años, administrativa, clienta de Patri en Martorell". ' +
+        `Ejemplo válido: "Marta, 48 años, administrativa, clienta de ${CLIENT.ownerFirstName} en ${CLIENT.location}". ` +
         'Ejemplo inválido: "Una clienta que ya" (sobra antes de "necesita").'
     ),
   necesidad: necesidadField,
@@ -44,7 +44,7 @@ const statementSchemaPotencial = z.object({
       'SOLO el sujeto del enunciado (arquetipo + edad y un matiz breve). La app une después "necesita". ' +
         'PROHIBIDO terminar en "que busca", "que busca un", "que busca un ambiente", "que busca un ambiente a", etc. ' +
         'Lo de buscar ambiente / local / centro va en necesidad o insight, no en usuario. ' +
-        'Ejemplo válido: "Carlos, 61 años, jubilado en Martorell".'
+        `Ejemplo válido: "Carlos, 61 años, jubilado en ${CLIENT.location}".`
     ),
   necesidad: necesidadField,
   insight: insightField,
@@ -59,7 +59,7 @@ const ERR: Record<string, string> = {
 
 const SYSTEM_CLIENTE_ACTUAL = `Eres un UX researcher experto en Design Thinking (Point of View) para ${CLIENT.name} (${CLIENT.ownerFirstName} como ${CLIENT.ownerRole}, ${CLIENT.sector} en ${CLIENT.location}).
 
-Contexto que NO debes confundir: el documento describe al **CLIENTE ACTUAL** — persona que **ya** entrena con Patri o ya forma parte de su comunidad de clientas. No es un prospecto que está valorando si ir al gimnasio.
+Contexto que NO debes confundir: el documento describe al **CLIENTE ACTUAL** — persona que **ya** entrena con ${CLIENT.ownerFirstName} o ya forma parte de su comunidad de clientas. No es un prospecto que está valorando si ir al gimnasio.
 
 Genera UNA declaración POV con tres campos: usuario, necesidad, insight.
 
@@ -76,7 +76,7 @@ Solo usa el bloque de texto que te damos. Español natural y conciso.`
 
 const SYSTEM_CLIENTE_POTENCIAL = `Eres un UX researcher experto en Design Thinking (Point of View) para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.location}).
 
-Contexto: el documento describe al **CLIENTE POTENCIAL** — persona que **aún no** es clienta de Patri; podría valorar MOA frente a otras opciones o tiene dudas/barreras previas.
+Contexto: el documento describe al **CLIENTE POTENCIAL** — persona que **aún no** es clienta de ${CLIENT.ownerFirstName}; podría valorar ${CLIENT.name} frente a otras opciones o tiene dudas/barreras previas.
 
 Genera UNA declaración POV: usuario, necesidad, insight.
 

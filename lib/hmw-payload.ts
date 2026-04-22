@@ -1,3 +1,5 @@
+import { CLIENT } from '@/lib/client-config'
+
 /** Máximo de campos de respuesta por pregunta (notas / ideas) en la UI y en la generación con IA. */
 export const HMW_RESPUESTAS_MAX = 5
 
@@ -229,12 +231,12 @@ export const HMW_AYUDA_CRITERIOS = {
     'Cuando la IA genera o reordena ideas, la posición 0 es la de máxima prioridad. El criterio es en cascada:',
   ordenPasos: [
     'Impacto para la persona usuaria del bloque (cliente actual o potencial, según persona, mapa de empatía y POV): primero las ideas que mejor resuelven la necesidad o frustración del contexto.',
-    'Factibilidad para Patri / MOA: entre ideas de impacto parecido, antes las que se puedan implementar con menos riesgo (tiempo, coste, complejidad técnica, carga operativa).',
+    `Factibilidad para ${CLIENT.ownerFirstName} / ${CLIENT.name}: entre ideas de impacto parecido, antes las que se puedan implementar con menos riesgo (tiempo, coste, complejidad técnica, carga operativa).`,
   ],
   ordenNota: 'Las ranuras vacías solo al final del listado. Si escribes las respuestas a mano, el orden lo decides tú.',
   marcasTitulo: 'Marcas «Mejor» y «No viable»',
   marcasMejor:
-    'Solo puede haber una «Mejor» por pregunta: la idea recomendada para priorizar, equilibrando impacto para la usuaria y viabilidad para Patri. La IA aplica ese criterio; tú puedes cambiar la marca en cualquier momento.',
+    `Solo puede haber una «Mejor» por pregunta: la idea recomendada para priorizar, equilibrando impacto para la usuaria y viabilidad para ${CLIENT.ownerFirstName}. La IA aplica ese criterio; tú puedes cambiar la marca en cualquier momento.`,
   marcasNoViable:
     '«No viable» marca ideas que conviene descartar por coste, tiempo, riesgo u otros motivos claros de negocio u operativos.',
   marcasMotivo:

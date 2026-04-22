@@ -1,4 +1,5 @@
 import { MVPPage } from '@/components/MVPPage'
+import { CLIENT } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function MVPRoute() {
@@ -22,7 +23,8 @@ export default function MVPRoute() {
             Priorizar los accionables
           </h1>
           <p className="mt-1 text-gray-500 text-sm">
-            MOA · Matriz de valor para definir el MVP — Eje X: valor para el negocio · Eje Y: valor para el usuario
+            {CLIENT.name} · Matriz de valor para definir el MVP — Eje X: valor para el negocio · Eje Y: valor para el
+            usuario
           </p>
         </div>
 

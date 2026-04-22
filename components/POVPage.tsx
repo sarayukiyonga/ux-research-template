@@ -36,8 +36,15 @@ function normalizeSavedStatements(raw: unknown): POVPair | null {
   return null
 }
 
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /** La vista previa concatena "[usuario] necesita …"; limpia colas típicas de la IA que chocan con esa plantilla. */
-function sanitizePovUsuario(usuario: string): string {
+function sanitizePovUsuario(
+  usuario: string,
+  fixTruncatedCity?: { ownerFirstName: string; location: string }
+): string {
   let s = usuario.trim()
   const stripEnd = (re: RegExp) => {
     const next = s.replace(re, '').trim()
@@ -49,8 +56,11 @@ function sanitizePovUsuario(usuario: string): string {
   stripEnd(/\s+que\s+busca\s+un\s+ambiente\s*$/i)
   stripEnd(/\s*,\s*que\s+ya\s*$/i)
   stripEnd(/\s+que\s+ya\s*$/i)
-  if (/Patri\s+en\s+M\s*$/i.test(s)) {
-    s = s.replace(/Patri\s+en\s+M\s*$/i, 'Patri en Martorell').trim()
+  const first = fixTruncatedCity?.ownerFirstName.trim() ?? ''
+  const loc = fixTruncatedCity?.location.trim() ?? ''
+  if (first && loc) {
+    const re = new RegExp(`${escapeRegExp(first)}\\s+en\\s+M\\s*$`, 'i')
+    if (re.test(s)) s = s.replace(re, `${first} en ${loc}`).trim()
   }
   return s.trim()
 }
@@ -82,16 +92,18 @@ function formatInsightForPov(insight: string): { text: string; showClosingDot: b
 function POVSentencePreview({
   statement,
   withTopBorder,
+  usuarioFix,
 }: {
   statement: POVStatement
   withTopBorder?: boolean
+  usuarioFix?: { ownerFirstName: string; location: string }
 }) {
   const { text: insightText, showClosingDot } = formatInsightForPov(statement.insight)
   return (
     <p
       className={`text-sm leading-relaxed text-sky-900/90 italic ${withTopBorder ? 'border-t border-sky-200/80 pt-3 mt-1' : 'pr-10'}`}
     >
-      <span className="text-sky-500 font-normal not-italic">{sanitizePovUsuario(statement.usuario)}</span>
+      <span className="text-sky-500 font-normal not-italic">{sanitizePovUsuario(statement.usuario, usuarioFix)}</span>
       {' '}
       <span className="font-bold text-sky-800 not-italic">necesita</span>
       {' '}
@@ -148,12 +160,14 @@ function POVEditableCard({
   sectionLabel,
   tailLeft,
   onFieldChange,
+  usuarioFix,
 }: {
   blockKey: 'clienteActual' | 'clientePotencial'
   statement: POVStatement
   sectionLabel: string
   tailLeft: boolean
   onFieldChange: (block: 'clienteActual' | 'clientePotencial', field: keyof POVStatement, value: string) => void
+  usuarioFix?: { ownerFirstName: string; location: string }
 }) {
   const [formOpen, setFormOpen] = useState(false)
   const ring = 'focus:border-sky-400 focus:ring-sky-200'
@@ -197,7 +211,7 @@ function POVEditableCard({
 
         {!formOpen ? (
           <div className="pt-2">
-            <POVSentencePreview statement={statement} withTopBorder={false} />
+            <POVSentencePreview statement={statement} withTopBorder={false} usuarioFix={usuarioFix} />
           </div>
         ) : (
           <>
@@ -209,7 +223,7 @@ function POVEditableCard({
 
             <div>
               <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-700/80">Vista previa</span>
-              <POVSentencePreview statement={statement} withTopBorder />
+              <POVSentencePreview statement={statement} withTopBorder usuarioFix={usuarioFix} />
             </div>
           </>
         )}
@@ -235,7 +249,16 @@ function POVEditableCard({
 
 const SAVE_DEBOUNCE_MS = 850
 
-export function POVPage() {
+export function POVPage({
+  businessName,
+  ownerFirstName,
+  ownerLocation,
+}: {
+  businessName: string
+  ownerFirstName: string
+  ownerLocation: string
+}) {
+  const usuarioFix = { ownerFirstName, location: ownerLocation }
   const [statements, setStatements] = useState<POVPair | null>(null)
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
@@ -398,7 +421,7 @@ export function POVPage() {
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">💬</div>
           <div className="space-y-1">
-            <p className="font-semibold text-gray-800">Genera los POV de MOA</p>
+            <p className="font-semibold text-gray-800">Genera los POV de {businessName}</p>
             <p className="text-sm text-gray-500 max-w-md mx-auto">
               Dos declaraciones <span className="italic">[Usuario] necesita [Necesidad] porque [Insight]</span>, una por
               cada <strong>user persona</strong> guardado (cliente actual y cliente potencial).
@@ -456,6 +479,7 @@ export function POVPage() {
           sectionLabel="Clientes actuales"
           tailLeft
           onFieldChange={updateStatementField}
+          usuarioFix={usuarioFix}
         />
         <POVEditableCard
           blockKey="clientePotencial"
@@ -463,6 +487,7 @@ export function POVPage() {
           sectionLabel="Clientes potenciales"
           tailLeft={false}
           onFieldChange={updateStatementField}
+          usuarioFix={usuarioFix}
         />
       </div>
     </div>

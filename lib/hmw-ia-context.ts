@@ -1,4 +1,5 @@
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 import { fetchSavedPovFromSheets, povPairToPlainTextForHmw } from '@/lib/fetch-saved-pov'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
 import { empathyMapToPlainText, fetchSavedEmpathyMap } from '@/lib/fetch-saved-empathy-map'
@@ -62,7 +63,7 @@ export async function loadHmwIaContextOrFail(): Promise<
 const HMW_IA_SOLO_CONTEXTO = `
 
 ### Uso del contexto (obligatorio)
-Lo anterior es la **única** información fáctica que tienes sobre MOA, Patri y las personas. **No inventes** software, web, app, CRM, «plataforma existente», integraciones ni canales que **no aparezcan de forma explícita** en POV, user personas o mapas de empatía. Si no se nombra un producto digital concreto, **no asumas** que ya existe: las ideas y motivos deben basarse solo en lo escrito arriba o en supuestos neutros (p. ej. “desde cero”, “a valorar con Patri”), sin afirmar que hay un sistema previo.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+Lo anterior es la **única** información fáctica que tienes sobre ${CLIENT.name}, ${CLIENT.ownerFirstName} y las personas. **No inventes** software, web, app, CRM, «plataforma existente», integraciones ni canales que **no aparezcan de forma explícita** en POV, user personas o mapas de empatía. Si no se nombra un producto digital concreto, **no asumas** que ya existe: las ideas y motivos deben basarse solo en lo escrito arriba o en supuestos neutros (p. ej. “desde cero”, “a valorar con ${CLIENT.ownerFirstName}”), sin afirmar que hay un sistema previo.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 
 export function hmwIaContextToMarkdown(ctx: HmwIaContextSections): string {
   return `=== POV (obligatorio, alineación principal) ===

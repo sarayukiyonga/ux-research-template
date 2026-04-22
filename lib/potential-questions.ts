@@ -1,3 +1,5 @@
+import { CLIENT } from '@/lib/client-config'
+
 export const POTENTIAL_SHEET_ID =
   process.env.POTENTIAL_SURVEY_SHEET_ID ?? '17TiRexoLK-jEWhgJ3sgO2KiK5BbqikoaZfUlqXabAJU'
 export const POTENTIAL_SHEET_RANGE = 'A:Q'
@@ -75,7 +77,7 @@ export const POTENTIAL_QUESTIONS: PotentialQuestion[] = [
   {
     id: 9,
     columnIndex: 12,
-    title: '¿Conoces algún centro especializado en patologías en Martorell?',
+    title: `¿Conoces algún centro especializado en patologías en ${CLIENT.location}?`,
     shortTitle: 'Conocimiento de centros especializados',
     type: 'closed',
   },
@@ -97,13 +99,13 @@ export const POTENTIAL_QUESTIONS: PotentialQuestion[] = [
     id: 12,
     columnIndex: 15,
     title: '¿Te resultaría atractivo un centro que combine ejercicio, quiromasajista y/o fisioterapia en un mismo plan?',
-    shortTitle: 'Atractivo del modelo combinado MOA',
+    shortTitle: `Atractivo del modelo combinado (${CLIENT.name})`,
     type: 'closed',
   },
   {
     id: 13,
     columnIndex: 16,
-    title: '¿Qué echas de menos en la oferta de bienestar actual en Martorell?',
+    title: `¿Qué echas de menos en la oferta de bienestar actual en ${CLIENT.location}?`,
     shortTitle: 'Carencias en la oferta actual',
     type: 'open',
   },

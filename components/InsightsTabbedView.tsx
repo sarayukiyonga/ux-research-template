@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { SurveyInsightsPage, type InsightsSegment } from '@/components/SurveyInsightsPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 
-function InsightsTabsInner() {
+function InsightsTabsInner({ pdfFileName, pdfRootId }: { pdfFileName: string; pdfRootId: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -25,10 +25,10 @@ function InsightsTabsInner() {
   return (
     <div className="relative">
       <div className="absolute right-0 top-0 z-20">
-        <PdfDownloadButton fileName="moa-insights.pdf" />
+        <PdfDownloadButton fileName={pdfFileName} />
       </div>
 
-      <div id="moa-pdf-root">
+      <div id={pdfRootId}>
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 mb-3">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -71,7 +71,13 @@ function InsightsTabsInner() {
   )
 }
 
-export function InsightsTabbedView() {
+export function InsightsTabbedView({
+  pdfFileName,
+  pdfRootId,
+}: {
+  pdfFileName: string
+  pdfRootId: string
+}) {
   return (
     <Suspense
       fallback={
@@ -81,7 +87,7 @@ export function InsightsTabbedView() {
         </div>
       }
     >
-      <InsightsTabsInner />
+      <InsightsTabsInner pdfFileName={pdfFileName} pdfRootId={pdfRootId} />
     </Suspense>
   )
 }

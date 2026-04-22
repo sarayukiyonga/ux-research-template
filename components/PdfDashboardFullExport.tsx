@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { exportRoutesToCombinedPdf } from '@/lib/moa-pdf-export'
 import { MOA_FULL_PDF_ROUTES } from '@/lib/moa-pdf-routes'
 
-export function PdfDashboardFullExport() {
+export function PdfDashboardFullExport({ fileName }: { fileName: string }) {
   const [busy, setBusy] = useState(false)
 
   return (
@@ -15,7 +15,7 @@ export function PdfDashboardFullExport() {
       onClick={async () => {
         setBusy(true)
         try {
-          await exportRoutesToCombinedPdf(MOA_FULL_PDF_ROUTES, 'moa-panel-completo.pdf')
+          await exportRoutesToCombinedPdf(MOA_FULL_PDF_ROUTES, fileName)
         } catch (e) {
           console.error(e)
           window.alert(

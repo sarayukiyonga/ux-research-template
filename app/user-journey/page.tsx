@@ -1,5 +1,6 @@
 import { UserJourneyPage } from '@/components/UserJourneyPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT, CLIENT_PDF_BASENAME, PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function UserJourneyRoute() {
@@ -7,10 +8,10 @@ export default function UserJourneyRoute() {
     <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-5xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
-          <PdfDownloadButton fileName="moa-user-journey.pdf" />
+          <PdfDownloadButton fileName={`${CLIENT_PDF_BASENAME}-user-journey.pdf`} />
         </div>
 
-        <div id="moa-pdf-root">
+        <div id={PDF_CAPTURE_ROOT_ID}>
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-6"
@@ -26,8 +27,8 @@ export default function UserJourneyRoute() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">User Journey Map</h1>
               <p className="mt-1 text-gray-500 text-sm">
-                Mapa de recorrido del usuario · MOA · Dos viajes (actual y potencial) desde el problema hasta salir de la
-                web
+                Mapa de recorrido del usuario · {CLIENT.name} · Dos viajes (actual y potencial) desde el problema hasta
+                cerrar el contacto con la marca (web u otros canales)
               </p>
             </div>
           </div>
@@ -36,8 +37,8 @@ export default function UserJourneyRoute() {
             <p>
               Cada recorrido enlaza el <strong>User Persona</strong> con su <strong>POV</strong>: defines{' '}
               <strong>etapas</strong> en orden (de tener la necesidad a cerrar la visita en la web), los{' '}
-              <strong>puntos de dolor</strong> en cada paso, y se marca el momento en que la <strong>web de MOA</strong>{' '}
-              aporta más al POV.
+              <strong>puntos de dolor</strong> en cada paso, y se marca el momento en que la{' '}
+              <strong>presencia digital de {CLIENT.name}</strong> aporta más al POV.
             </p>
             <p className="text-xs text-teal-900/85">
               Objetivo: ver en qué pantalla o fase concreta tu web está resolviendo la declaración que redactaste en POV.
@@ -55,7 +56,7 @@ export default function UserJourneyRoute() {
             </p>
           </div>
 
-          <UserJourneyPage />
+          <UserJourneyPage businessName={CLIENT.name} />
 
           <p className="mt-10 text-center text-xs text-gray-400">
             Siguiente paso:{' '}

@@ -1,5 +1,6 @@
 import { HMWPage } from '@/components/HMWPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT, CLIENT_PDF_BASENAME, PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function HMWRoute() {
@@ -7,10 +8,10 @@ export default function HMWRoute() {
     <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-4xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
-          <PdfDownloadButton fileName="moa-hmw.pdf" />
+          <PdfDownloadButton fileName={`${CLIENT_PDF_BASENAME}-hmw.pdf`} />
         </div>
 
-        <div id="moa-pdf-root">
+        <div id={PDF_CAPTURE_ROOT_ID}>
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-6"
@@ -26,7 +27,7 @@ export default function HMWRoute() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">How Might We (HMW)</h1>
               <p className="mt-1 text-gray-500 text-sm">
-                MOA · Retos de diseño a partir de los dos POV guardados (cliente actual y potencial)
+                {CLIENT.name} · Retos de diseño a partir de los dos POV guardados (cliente actual y potencial)
               </p>
             </div>
           </div>

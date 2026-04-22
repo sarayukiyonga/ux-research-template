@@ -7,6 +7,7 @@ import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { CLIENT } from '@/lib/client-config'
 
 interface SurveyFilters {
   gender?: string
@@ -56,7 +57,9 @@ export const maxDuration = 60
 const schema = z.object({
   summary: z
     .string()
-    .describe('2-3 frases que sinteticen la esencia de diseño de MOA, usando las propias palabras de Patricia y de los clientes cuando sea posible'),
+    .describe(
+      `2-3 frases que sinteticen la esencia de diseño de ${CLIENT.name}, usando las propias palabras de ${CLIENT.ownerFirstName} y de los clientes cuando sea posible`
+    ),
   groups: z
     .array(
       z.object({
@@ -76,7 +79,9 @@ const schema = z.object({
         title: z.string().describe('Nombre del principio de diseño (3-5 palabras, orientado a decisiones visuales o comunicativas)'),
         description: z
           .string()
-          .describe('Qué implica este principio en términos de diseño y comunicación — con referencia a lo que Patricia o los clientes han dicho (2-3 frases). Debe quedar claro cómo afecta a decisiones concretas de diseño, NO a valores o promesas de servicio.'),
+          .describe(
+            `Qué implica este principio en términos de diseño y comunicación — con referencia a lo que ${CLIENT.ownerFirstName} o los clientes han dicho (2-3 frases). Debe quedar claro cómo afecta a decisiones concretas de diseño, NO a valores o promesas de servicio.`
+          ),
         guidelines: z
           .array(z.string())
           .describe('3 reglas de diseño concretas y aplicables: cómo se traduce este principio en tipografía, color, tono escrito, fotografía, layout, iconografía o interacción. Válidas para web, app, espacio físico y materiales impresos.'),
@@ -116,7 +121,7 @@ const POTENTIAL_DESIGN_COLS: { title: string; colIndex: number }[] = [
   { title: '¿Qué te gusta y qué no de tu centro actual?', colIndex: 8 },
   { title: 'Si buscaras ayuda para un dolor/lesión, ¿dónde mirarías primero?', colIndex: 13 },
   { title: '¿Qué valoras más en un profesional de la salud?', colIndex: 14 },
-  { title: '¿Qué echas de menos en la oferta de bienestar actual en Martorell?', colIndex: 16 },
+  { title: `¿Qué echas de menos en la oferta de bienestar actual en ${CLIENT.location}?`, colIndex: 16 },
 ]
 
 async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
@@ -199,9 +204,9 @@ export async function POST(req: Request) {
     model: openai('gpt-4o-mini'),
     schema,
     system: `Eres un director de diseño con experiencia en sistemas de diseño multiplataforma para marcas de salud y bienestar.
-Tu tarea es crear los PRINCIPIOS DE DISEÑO de MOA — no valores de empresa, no principios de negocio, no normas de atención al cliente.
+Tu tarea es crear los PRINCIPIOS DE DISEÑO de ${CLIENT.name} — no valores de empresa, no principios de negocio, no normas de atención al cliente.
 
-Un principio de diseño responde a: ¿Cómo debe verse, sentirse y comunicarse MOA en cualquier soporte? Afecta directamente a decisiones visuales y comunicativas: tipografía, color, espaciado, jerarquía, tono de voz escrito, iconografía, fotografía, layout, interacción, naming de secciones, microcopy.
+Un principio de diseño responde a: ¿Cómo debe verse, sentirse y comunicarse ${CLIENT.name} en cualquier soporte? Afecta directamente a decisiones visuales y comunicativas: tipografía, color, espaciado, jerarquía, tono de voz escrito, iconografía, fotografía, layout, interacción, naming de secciones, microcopy.
 
 Ejemplos de lo que SÍ es un principio de diseño:
 - "Usa espacio en blanco generoso para transmitir calma, no urgencia"
@@ -217,15 +222,15 @@ Fuentes que usarás para extraer los principios:
 1. La entrevista a su fundadora — su intención visual y de comunicación
 2. Las respuestas reales de sus clientes actuales — las palabras y sensaciones que describen la experiencia
 3. Las respuestas de clientes potenciales — sus expectativas visuales y comunicativas, sus barreras perceptivas
-4. Un formulario de prioridades de diseño respondido por Patricia — sus decisiones y límites
+4. Un formulario de prioridades de diseño respondido por ${CLIENT.ownerFirstName} — sus decisiones y límites
 
 Los principios deben ser válidos en cualquier soporte: web, app, espacio físico, materiales impresos.
 Cuando los clientes actuales y potenciales coincidan en algo, refuérzalo. Cuando haya diferencias entre lo que esperan los potenciales y lo que valoran los actuales, úsalas para afinar el principio.
-Usa las propias palabras de Patricia y de los clientes siempre que puedas.
+Usa las propias palabras de ${CLIENT.ownerFirstName} y de los clientes siempre que puedas.
 NO inventes nada que no se pueda trazar a las cuatro fuentes.
 ${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}
 Responde siempre en español.`,
-    prompt: `FUENTE 1 — ENTREVISTA A PATRICIA DORADO, FUNDADORA DE MOA:
+    prompt: `FUENTE 1 — ENTREVISTA A ${CLIENT.ownerFullName.toUpperCase()}, ${CLIENT.ownerRole.toUpperCase()} DE ${CLIENT.name.toUpperCase()}:
 
 ${interview}
 
@@ -243,19 +248,19 @@ ${potentialVoice}
 
 ---
 
-FUENTE 4 — FORMULARIO DE PRIORIDADES DE DISEÑO (respondido por Patricia):
+FUENTE 4 — FORMULARIO DE PRIORIDADES DE DISEÑO (respondido por ${CLIENT.ownerFirstName}):
 
 ${formAnswers}
 
 ---
 
-Genera los principios de DISEÑO de MOA integrando las cuatro fuentes.
+Genera los principios de DISEÑO de ${CLIENT.name} integrando las cuatro fuentes.
 - La entrevista define la intención visual y el carácter comunicativo de la marca.
 - Los clientes actuales validan las sensaciones y palabras que describen la experiencia percibida.
 - Los clientes potenciales revelan las expectativas visuales y las barreras perceptivas del público que aún no ha llegado.
 - El formulario fija las prioridades y los límites de diseño.
 
-Cada principio debe responder a: "¿Cómo reconozco que ESTE diseño es de MOA y no de cualquier otro centro de salud?"
+Cada principio debe responder a: "¿Cómo reconozco que ESTE diseño es de ${CLIENT.name} y no de cualquier otro centro de salud?"
 Cada guideline debe poder usarse para tomar una decisión de diseño concreta: elegir una fuente, escribir un CTA, seleccionar una foto, diseñar un layout.
 
 Además, agrupa los principios en exactamente 3 bloques temáticos (campo \`groups\`). Cada bloque debe:

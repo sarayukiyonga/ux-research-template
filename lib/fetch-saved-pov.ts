@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
+import { CLIENT } from '@/lib/client-config'
 
 const SHEET_NAME = 'pov'
 
@@ -74,7 +75,7 @@ export function povPairToPlainTextForHmw(data: SavedPOVPair): string {
     `### ${label}\n${s.usuario} necesita ${s.necesidad} porque ${s.insight}.`
 
   return [
-    line('POV — CLIENTES ACTUALES (ya con Patri / MOA)', data.clienteActual),
+    line(`POV — CLIENTES ACTUALES (ya con ${CLIENT.ownerFirstName} / ${CLIENT.name})`, data.clienteActual),
     '',
     line('POV — CLIENTES POTENCIALES', data.clientePotencial),
   ].join('\n')

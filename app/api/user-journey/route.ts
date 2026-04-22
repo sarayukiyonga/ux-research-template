@@ -27,11 +27,11 @@ export const maxDuration = 120
 function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, esClienteActual: boolean) {
   const contextoEtapa = journeyBaseMode
     ? esClienteActual
-      ? `Qué hace, piensa o siente **la persona ya como clienta de MOA** (entrena con Patri) en esta fase del recorrido global. Puede implicar varios puntos de contacto. Contexto: ${canal.focoExperiencia}. Debe rastrearse al HMW; **no** trates el relato como si aún no conociera a MOA salvo que el HMW lo pida explícitamente.`
-      : `Qué hace, piensa o siente el usuario en esta fase hacia MOA/Patri en el **recorrido global** (puede implicar varios puntos de contacto). Contexto: ${canal.focoExperiencia}. Debe poder rastrearse hasta ideas concretas del bloque HMW del prompt.`
+      ? `Qué hace, piensa o siente **la persona ya como clienta de ${CLIENT.name}** (relación con ${CLIENT.ownerFirstName}) en esta fase del recorrido global. Puede implicar varios puntos de contacto. Contexto: ${canal.focoExperiencia}. Debe rastrearse al HMW; **no** trates el relato como si aún no conociera a ${CLIENT.name} salvo que el HMW lo pida explícitamente.`
+      : `Qué hace, piensa o siente el usuario en esta fase hacia ${CLIENT.name} / ${CLIENT.ownerFirstName} en el **recorrido global** (puede implicar varios puntos de contacto). Contexto: ${canal.focoExperiencia}. Debe poder rastrearse hasta ideas concretas del bloque HMW del prompt.`
     : esClienteActual
-      ? `Qué hace, piensa o siente **la clienta ya activa** con MOA/Patri en esta fase en ${canal.descripcionCorta}. Contexto: ${canal.focoExperiencia}. Debe rastrearse al HMW; evita narrar descubrimiento o primera toma de contacto salvo que el HMW lo exija.`
-      : `Qué hace, piensa o siente el usuario en esta fase en relación con MOA/Patri y ${canal.descripcionCorta}. Contexto: ${canal.focoExperiencia}. Debe poder rastrearse hasta ideas concretas del bloque HMW del prompt.`
+      ? `Qué hace, piensa o siente **la clienta ya activa** con ${CLIENT.name} / ${CLIENT.ownerFirstName} en esta fase en ${canal.descripcionCorta}. Contexto: ${canal.focoExperiencia}. Debe rastrearse al HMW; evita narrar descubrimiento o primera toma de contacto salvo que el HMW lo exija.`
+      : `Qué hace, piensa o siente el usuario en esta fase en relación con ${CLIENT.name} / ${CLIENT.ownerFirstName} y ${canal.descripcionCorta}. Contexto: ${canal.focoExperiencia}. Debe poder rastrearse hasta ideas concretas del bloque HMW del prompt.`
 
   const etapaSchema = z.object({
     orden: z.number().int().min(1).max(12),
@@ -40,8 +40,8 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .max(72)
       .describe(
         esClienteActual
-          ? 'Nombre corto de la etapa en el viaje **como clienta** (p. ej. "Consulta horarios de la semana", "Escribe a Patri por WhatsApp tras la sesión").'
-          : 'Nombre corto de la etapa en el viaje (p. ej. "Descubre el perfil de MOA en Instagram").'
+          ? `Nombre corto de la etapa en el viaje **como clienta** (p. ej. "Consulta horarios de la semana", "Escribe a ${CLIENT.ownerFirstName} por WhatsApp tras la sesión").`
+          : `Nombre corto de la etapa en el viaje (p. ej. "Descubre el perfil de ${CLIENT.name} en Instagram").`
       ),
     descripcion: z.string().max(420).describe(contextoEtapa),
     puntosDeDolor: z
@@ -65,11 +65,11 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .describe(
         journeyBaseMode
           ? esClienteActual
-            ? `Qué debe hacer MOA/Patri para **acompañar a la clienta ya activa** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no actúes como si fuera captación salvo que el HMW lo indique.`
-            : `Qué debe hacer MOA para acompañar al usuario en esta etapa respecto al POV (contenido, tono, timing, confianza…). El campo JSON se llama "rolWebFrenteAlPov" por compatibilidad: aquí resume el **rol de MOA** en el recorrido (puede abarcar varios medios). Coherente con el HMW.`
+            ? `Qué debe hacer ${CLIENT.name} / ${CLIENT.ownerFirstName} para **acompañar a la clienta ya activa** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no actúes como si fuera captación salvo que el HMW lo indique.`
+            : `Qué debe hacer ${CLIENT.name} para acompañar al usuario en esta etapa respecto al POV (contenido, tono, timing, confianza…). El campo JSON se llama "rolWebFrenteAlPov" por compatibilidad: aquí resume el **rol de ${CLIENT.name}** en el recorrido (puede abarcar varios medios). Coherente con el HMW.`
           : esClienteActual
-            ? `Qué debe hacer MOA en ${canal.descripcionCorta} para la **persona que ya entrena** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no centres el relato en "convencer por primera vez" salvo que el HMW lo pida.`
-            : `Qué debe hacer MOA en ${canal.descripcionCorta} en esta etapa respecto al POV (contenido, tono, timing…). El nombre del campo en JSON es "rolWebFrenteAlPov" por compatibilidad; describe el rol del **canal ${canal.label}**. Debe ser coherente con las ideas HMW que esta etapa atiende.`
+            ? `Qué debe hacer ${CLIENT.name} en ${canal.descripcionCorta} para la **persona que ya entrena** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no centres el relato en "convencer por primera vez" salvo que el HMW lo pida.`
+            : `Qué debe hacer ${CLIENT.name} en ${canal.descripcionCorta} en esta etapa respecto al POV (contenido, tono, timing…). El nombre del campo en JSON es "rolWebFrenteAlPov" por compatibilidad; describe el rol del **canal ${canal.label}**. Debe ser coherente con las ideas HMW que esta etapa atiende.`
       ),
   })
 
@@ -79,7 +79,7 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .max(90)
       .describe(
         esClienteActual
-          ? 'Arquetipo + segmento; deja claro que **ya es clienta** (ej. "María · Clienta MOA / cliente actual").'
+          ? `Arquetipo + segmento; deja claro que **ya es clienta** (ej. "María · Clienta ${CLIENT.name} / cliente actual").`
           : 'Referencia al arquetipo + segmento, ej. "Ana · Cliente potencial".'
       ),
     etapas: z
@@ -89,10 +89,10 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .describe(
         journeyBaseMode
           ? esClienteActual
-            ? `Etapas en orden para **clienta que ya entrena con Patri**: continuidad, comunicación, resolución de dudas, sensaciones entre sesiones, uso del canal… hasta un cierre coherente (${canal.cierreExperiencia}). Pueden citarse varios medios si el HMW lo permite. **No** hagas por defecto un embudo de "descubrir MOA → primera clase" salvo que el HMW lo describa así.`
-            : `Etapas en orden cronológico: desde la necesidad o el problema hasta **contratar o reafirmar** el servicio con MOA (${canal.cierreExperiencia}). Pueden mencionarse varios medios a lo largo del relato. Cada etapa debe **colgar** del HMW.`
+            ? `Etapas en orden para **clienta que ya entrena con ${CLIENT.ownerFirstName}**: continuidad, comunicación, resolución de dudas, sensaciones entre sesiones, uso del canal… hasta un cierre coherente (${canal.cierreExperiencia}). Pueden citarse varios medios si el HMW lo permite. **No** hagas por defecto un embudo de "descubrir ${CLIENT.name} → primera clase" salvo que el HMW lo describa así.`
+            : `Etapas en orden cronológico: desde la necesidad o el problema hasta **contratar o reafirmar** el servicio con ${CLIENT.name} (${canal.cierreExperiencia}). Pueden mencionarse varios medios a lo largo del relato. Cada etapa debe **colgar** del HMW.`
           : esClienteActual
-            ? `Etapas en orden en **${canal.label}** para quien **ya es clienta** de MOA: uso recurrente del canal durante el servicio (avisos, reservas, dudas, motivación, seguimiento…). Cierre: ${canal.cierreExperiencia}. Cada etapa del HMW de cliente actual; evita narrar captación salvo que el HMW lo exija.`
+            ? `Etapas en orden en **${canal.label}** para quien **ya es clienta** de ${CLIENT.name}: uso recurrente del canal durante el servicio (avisos, reservas, dudas, motivación, seguimiento…). Cierre: ${canal.cierreExperiencia}. Cada etapa del HMW de cliente actual; evita narrar captación salvo que el HMW lo exija.`
             : `Etapas en orden cronológico: desde el problema o la necesidad hasta que el usuario ${canal.cierreExperiencia}. Cada etapa debe **colgar** de retos o ideas del HMW (puedes fusionar varias ideas en una etapa, pero sin ignorar el HMW).`
       ),
     etapaOrdenPovResuelto: z
@@ -102,11 +102,11 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .describe(
         journeyBaseMode
           ? esClienteActual
-            ? 'Orden de la etapa en la que MOA aporta **más valor al POV de la clienta ya activa** en este recorrido, sin contradecir el HMW.'
-            : 'Orden de la etapa en la que **MOA** aporta MÁS valor al POV en el recorrido global, **sin contradecir** el HMW (momento clave).'
+            ? `Orden de la etapa en la que ${CLIENT.name} aporta **más valor al POV de la clienta ya activa** en este recorrido, sin contradecir el HMW.`
+            : `Orden de la etapa en la que **${CLIENT.name}** aporta MÁS valor al POV en el recorrido global, **sin contradecir** el HMW (momento clave).`
           : esClienteActual
-            ? `Orden de la etapa en la que MOA en **${canal.label}** aporta más al POV **en la vida de clienta**, sin contradecir el HMW.`
-            : `Orden de la etapa en la que MOA (${canal.label}) aporta MÁS valor al POV, **sin contradecir** el HMW (momento clave).`
+            ? `Orden de la etapa en la que ${CLIENT.name} en **${canal.label}** aporta más al POV **en la vida de clienta**, sin contradecir el HMW.`
+            : `Orden de la etapa en la que ${CLIENT.name} (${canal.label}) aporta MÁS valor al POV, **sin contradecir** el HMW (momento clave).`
       ),
     sintesis: z
       .string()
@@ -128,22 +128,22 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
 function buildSystemBase(canal: CanalPromptFields, journeyBaseMode: boolean, esClienteActual: boolean): string {
   const mapaDesc = journeyBaseMode
     ? esClienteActual
-      ? `un **User Journey Map base** para **cliente actual**: la persona **ya entrena con Patri / ya es clienta de MOA**. Describe el recorrido end-to-end **en la vida de clienta** (continuidad, motivación, comunicación, resolución de dudas, sensaciones entre sesiones, otros canales de apoyo…) usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. No sustituyas esto por un embudo de captación salvo que el HMW lo describa explícitamente.`
-      : `un **User Journey Map base**: recorrido **end-to-end** sin centrarse en un solo canal de comunicación. Describe cómo la persona pasa de tener una necesidad a **encontrar a MOA y contratar o reafirmar** el servicio, usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. Puedes mencionar varios medios (web, salud, boca a boca, redes…) si encajan con los datos; no fuerces todo el relato por un único medio.`
+      ? `un **User Journey Map base** para **cliente actual**: la persona **ya entrena con ${CLIENT.ownerFirstName} / ya es clienta de ${CLIENT.name}**. Describe el recorrido end-to-end **en la vida de clienta** (continuidad, motivación, comunicación, resolución de dudas, sensaciones entre sesiones, otros canales de apoyo…) usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. No sustituyas esto por un embudo de captación salvo que el HMW lo describa explícitamente.`
+      : `un **User Journey Map base**: recorrido **end-to-end** sin centrarse en un solo canal de comunicación. Describe cómo la persona pasa de tener una necesidad a **encontrar a ${CLIENT.name} y contratar o reafirmar** el servicio, usando **HMW**, la **encuesta CEO** del prompt, **POV** y **User Persona**. Puedes mencionar varios medios (web, salud, boca a boca, redes…) si encajan con los datos; no fuerces todo el relato por un único medio.`
     : esClienteActual
-      ? `un **User Journey Map** en **${canal.label}** (${canal.focoExperiencia}) para **quien ya es clienta** de MOA: cómo vive ese medio **durante el servicio** (antes/durante/después de sesiones, avisos, reservas, dudas, vínculo con Patri…) hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt. No narres por defecto el descubrimiento de MOA o la primera toma de contacto salvo que el HMW de cliente actual lo plantee así.`
+      ? `un **User Journey Map** en **${canal.label}** (${canal.focoExperiencia}) para **quien ya es clienta** de ${CLIENT.name}: cómo vive ese medio **durante el servicio** (antes/durante/después de sesiones, avisos, reservas, dudas, vínculo con ${CLIENT.ownerFirstName}…) hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt. No narres por defecto el descubrimiento de ${CLIENT.name} o la primera toma de contacto salvo que el HMW de cliente actual lo plantee así.`
       : `un **User Journey Map** para **${canal.label}** (${canal.focoExperiencia}), desde el problema o la necesidad hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt.`
 
   const requisitoRol = journeyBaseMode
-    ? '- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de **MOA** frente al POV en esa fase del recorrido; el nombre del campo es heredado del formato).'
-    : `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de MOA en ${canal.descripcionCorta} frente al POV en esa etapa).`
+    ? `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de **${CLIENT.name}** frente al POV en esa fase del recorrido; el nombre del campo es heredado del formato).`
+    : `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de ${CLIENT.name} en ${canal.descripcionCorta} frente al POV en esa etapa).`
 
-  return `Eres un UX strategist para MOA (Patri, entrenamiento y salud en Martorell).
+  return `Eres un UX strategist para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.sector} en ${CLIENT.location}).
 
 ## Jerarquía de fuentes (obligatoria)
 1. **HOW MIGHT WE (HMW)** — Es la **fuente principal** del relato: las preguntas e ideas del prompt definen **qué retos** cubre el journey y cómo se traducen en **etapas**, **dolores** y el ritmo del relato. Respeta el **orden** de las ideas y las marcas **[mejor]** / **[no viable]** (nunca presentes como solución viable algo marcado como no viable).
 2. **Encuesta / entrevista a la ${CLIENT.ownerRole} (${CLIENT.ownerFirstName})** — El bloque **ENTREVISTA** al inicio del mensaje de usuario resume la **encuesta guiada** en Sheets. Es **fuente de verdad** para modelo de negocio, operación presencial vs digital, prioridades, tono y límites. Úsala para dar **realismo** a etapas, canales y dolores; **no contradigas** lo que afirme de forma explícita.
-3. **POV** — **Complementa** el HMW: acota **dónde** MOA debe aportar más valor al insight de necesidad (etapa \`etapaOrdenPovResuelto\`). No sustituyas retos que solo aparecen en el HMW; mantén **coherencia** con la encuesta CEO si hay tensión, priorizando CEO en datos de negocio y HMW/POV en la experiencia de usuario.
+3. **POV** — **Complementa** el HMW: acota **dónde** ${CLIENT.name} debe aportar más valor al insight de necesidad (etapa \`etapaOrdenPovResuelto\`). No sustituyas retos que solo aparecen en el HMW; mantén **coherencia** con la encuesta CEO si hay tensión, priorizando CEO en datos de negocio y HMW/POV en la experiencia de usuario.
 4. **User Persona** — **Complementa** con contexto humano (motivaciones, miedos, contexto vital). No inventes etapas o dolores que contradigan el HMW.
 
 Construyes ${mapaDesc}
@@ -151,18 +151,18 @@ Construyes ${mapaDesc}
 ${
   esClienteActual
     ? `## ⚠️ Cliente actual (obligatorio)
-- La protagonista del mapa **ya entrena con Patri** (clienta activa de MOA).
+- La protagonista del mapa **ya entrena con ${CLIENT.ownerFirstName}** (clienta activa de ${CLIENT.name}).
 - Las etapas son el viaje en el **tiempo de cliente**, no un relato genérico de "aún no conoce el gimnasio" salvo que el HMW lo pida.
 - Los **puntos de dolor** pueden ser miedos al ejercicio, cansancio, compararse, organizar la semana, comunicación con la entrenadora, etc., **en contexto de ya estar apuntada**.
 `
     : `## Cliente potencial
-- Describe el camino de quien **aún no** es clienta y acerca el relato a **descubrir / valorar / dar el paso** con MOA según HMW y POV.
+- Describe el camino de quien **aún no** es clienta y acerca el relato a **descubrir / valorar / dar el paso** con ${CLIENT.name} según HMW y POV.
 `
 }
 
 Requisitos:
 ${requisitoRol}
-- **Una** etapa debe marcar con claridad el **momento clave** en que MOA más contribuye al POV, **alineado con el HMW** y coherente con la **encuesta CEO** cuando trate de promesas o límites del servicio.
+- **Una** etapa debe marcar con claridad el **momento clave** en que ${CLIENT.name} más contribuye al POV, **alineado con el HMW** y coherente con la **encuesta CEO** cuando trate de promesas o límites del servicio.
 - Español de España, tono profesional y empático.
 ${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
 }
@@ -320,10 +320,10 @@ export async function POST(req: Request) {
 
   const modoIntro = journeyBaseMode
     ? esClienteActual
-      ? `Modo: **todos los canales · cliente actual**. La persona **ya entrena con Patri**. El mapa es el viaje end-to-end **como clienta** según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona** (no un embudo de captación por defecto).`
-      : `Modo: **todos los canales** (sin un único medio de comunicación). El mapa describe el camino end-to-end hacia MOA según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona**; los mapas por canal concreto se generan aparte.`
+      ? `Modo: **todos los canales · cliente actual**. La persona **ya entrena con ${CLIENT.ownerFirstName}**. El mapa es el viaje end-to-end **como clienta** según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona** (no un embudo de captación por defecto).`
+      : `Modo: **todos los canales** (sin un único medio de comunicación). El mapa describe el camino end-to-end hacia ${CLIENT.name} según **HMW**, la **encuesta CEO** (arriba), **POV** y **persona**; los mapas por canal concreto se generan aparte.`
     : esClienteActual
-      ? `Canal: **${canal.label}** · **Cliente actual**. Mapa del uso de este medio **siendo ya clienta** de MOA; coherente con la **encuesta CEO** (arriba) y los hábitos de la persona si aparecen abajo.`
+      ? `Canal: **${canal.label}** · **Cliente actual**. Mapa del uso de este medio **siendo ya clienta** de ${CLIENT.name}; coherente con la **encuesta CEO** (arriba) y los hábitos de la persona si aparecen abajo.`
       : `Canal de trabajo: **${canal.label}**. Las etapas deben describir la experiencia en **este** medio; coherente con la **encuesta CEO** (arriba) y los hábitos de búsqueda de la persona si aparecen abajo.`
 
   const prompt = `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) — modelo de servicio y negocio ===
@@ -333,7 +333,7 @@ ${modoIntro}
 
 ${
   esClienteActual
-    ? `**Recordatorio:** segmento **CLIENTE ACTUAL** — asume **relación activa** con MOA/Patri; no reescribas el recorrido como si fuera solo captación salvo que el HMW lo exija.\n\n`
+    ? `**Recordatorio:** segmento **CLIENTE ACTUAL** — asume **relación activa** con ${CLIENT.name} / ${CLIENT.ownerFirstName}; no reescribas el recorrido como si fuera solo captación salvo que el HMW lo exija.\n\n`
     : ''
 }=== ${hmwTitulo} ===
 ${hmwBlock}
@@ -345,7 +345,7 @@ ${povBlock}
 ${personaBlock}${personaCanalesBlock}
 
 ===
-Ceñe etapas, dolores y rol de MOA a la **encuesta CEO** cuando defina límites, formato del servicio o prioridades; no inventes ofertas que contradigan ese bloque.
+Ceñe etapas, dolores y rol de ${CLIENT.name} a la **encuesta CEO** cuando defina límites, formato del servicio o prioridades; no inventes ofertas que contradigan ese bloque.
 Devuelve el mapa en "journey".`
 
   const { object } = await generateObject({

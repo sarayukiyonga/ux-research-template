@@ -736,7 +736,13 @@ function hasValidInsightsPayload(data: unknown): boolean {
   )
 }
 
-export function UserPersonaPage() {
+export function UserPersonaPage({
+  businessName,
+  ownerFirstName,
+}: {
+  businessName: string
+  ownerFirstName: string
+}) {
   const [personas, setPersonas] = useState<UserPersonas | null>(null)
   const [savedAt, setSavedAt] = useState('')
   const [saving, setSaving] = useState(false)
@@ -924,10 +930,11 @@ export function UserPersonaPage() {
         <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-8 py-16 text-center space-y-4">
           <div className="text-5xl">👤</div>
           <div className="space-y-1">
-            <p className="font-semibold text-gray-800">Genera los User Personas de MOA</p>
+            <p className="font-semibold text-gray-800">Genera los User Personas de {businessName}</p>
             <p className="text-sm text-gray-500 max-w-md mx-auto">
               La IA combina los <strong>insights guardados</strong> de cada segmento con la <strong>encuesta filtrada</strong>{' '}
-              (edad, género, ocupación, muestras de respuestas y recuentos en potenciales) más la entrevista a Patri.
+              (edad, género, ocupación, muestras de respuestas y recuentos en potenciales) más la entrevista a{' '}
+              {ownerFirstName}.
             </p>
           </div>
           <button

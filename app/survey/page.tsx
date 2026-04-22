@@ -1,6 +1,6 @@
 import { SurveyDashboard } from '@/components/SurveyDashboard'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
-import { CLIENT } from '@/lib/client-config'
+import { CLIENT, CLIENT_PDF_BASENAME, PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function SurveyPage() {
@@ -8,10 +8,10 @@ export default function SurveyPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-3xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
-          <PdfDownloadButton fileName="moa-encuesta-clientes.pdf" />
+          <PdfDownloadButton fileName={`${CLIENT_PDF_BASENAME}-encuesta-clientes.pdf`} />
         </div>
 
-        <div id="moa-pdf-root">
+        <div id={PDF_CAPTURE_ROOT_ID}>
           {/* Nav */}
           <Link
             href="/"

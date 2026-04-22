@@ -1,5 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { MoaPdfRoute } from '@/lib/moa-pdf-routes'
+import { PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 
 export type { MoaPdfRoute } from '@/lib/moa-pdf-routes'
 
@@ -225,7 +226,7 @@ export async function exportRoutesToCombinedPdf(
       const doc = iframe.contentDocument
       const win = iframe.contentWindow
       const root =
-        (doc?.getElementById('moa-pdf-root') as HTMLElement | null) ??
+        (doc?.getElementById(PDF_CAPTURE_ROOT_ID) as HTMLElement | null) ??
         (doc?.body as HTMLElement | null)
 
       if (!root || !doc) {

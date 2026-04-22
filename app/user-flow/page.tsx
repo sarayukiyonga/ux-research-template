@@ -1,5 +1,6 @@
 import { UserFlowPage } from '@/components/UserFlowPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT, CLIENT_PDF_BASENAME, PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function UserFlowRoute() {
@@ -7,10 +8,10 @@ export default function UserFlowRoute() {
     <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-5xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
-          <PdfDownloadButton fileName="moa-user-flow.pdf" />
+          <PdfDownloadButton fileName={`${CLIENT_PDF_BASENAME}-user-flow.pdf`} />
         </div>
 
-        <div id="moa-pdf-root">
+        <div id={PDF_CAPTURE_ROOT_ID}>
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-6"
@@ -27,7 +28,7 @@ export default function UserFlowRoute() {
               <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">User Flow (flujo de usuario)</h1>
               <p className="mt-1 text-gray-500 text-sm">
                 Diagrama de flujo basado en el <strong>User Journey Map</strong> guardado: etapas, dolores y web↔POV
-                traducidos a pantallas y clics · MOA · Cliente actual y potencial
+                traducidos a pantallas y clics · {CLIENT.name} · Cliente actual y potencial
               </p>
             </div>
           </div>

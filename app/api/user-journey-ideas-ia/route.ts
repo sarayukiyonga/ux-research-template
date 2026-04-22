@@ -34,7 +34,7 @@ function journeyToPromptBlock(j: z.infer<typeof journeyIn>, canalLabel: string):
         `#### Etapa orden=${e.orden}${clave}: ${e.titulo}\n` +
         `${e.descripcion}\n` +
         `Dolores: ${e.puntosDeDolor.join(' · ')}\n` +
-        `Rol MOA frente al POV en ${canalLabel}: ${e.rolWebFrenteAlPov}`
+        `Rol ${CLIENT.name} frente al POV en ${canalLabel}: ${e.rolWebFrenteAlPov}`
       )
     })
   return [`Persona: ${j.etiquetaPersona}`, `Canal: ${canalLabel}`, '', ...lines].join('\n\n')
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       .min(8)
       .max(360)
       .describe(
-        'Idea concreta y accionable en español, alineada con los dolores y el rol MOA↔POV de esa etapa en el canal indicado.'
+        `Idea concreta y accionable en español, alineada con los dolores y el rol ${CLIENT.name}↔POV de esa etapa en el canal indicado.`
       ),
   })
 
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
           ),
       }),
       system:
-        'Eres estratega de producto y contenidos para MOA (Patri, salud y fitness, Martorell). ' +
+        `Eres estratega de producto y contenidos para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.sector} en ${CLIENT.location}). ` +
         'Generas ideas realistas para el canal de comunicación indicado (no inventes funciones imposibles para ese medio). ' +
         'Al inicio del mensaje de usuario viene la **encuesta / entrevista a la ' +
         CLIENT.ownerRole +
@@ -113,10 +113,10 @@ A partir del User Journey Map siguiente, genera ideas de **funcionalidades** (qu
 
 Reglas:
 - Cada idea debe asociarse a **etapaOrden** existente en el mapa (usa solo estos órdenes: ${ordenes.join(', ')}).
-- En cada etapa, piensa qué necesita la persona según descripción, dolores y rol MOA↔POV; propón ideas que **reduzcan fricción** o **refuercen confianza** hacia el POV.
+- En cada etapa, piensa qué necesita la persona según descripción, dolores y rol ${CLIENT.name}↔POV; propón ideas que **reduzcan fricción** o **refuercen confianza** hacia el POV.
 - Las ideas deben ser **coherentes** con la encuesta CEO de arriba (promesas, formato presencial/digital, recursos).
 - Alterna razonablemente funcionalidad y contenido según encaje (no hace falta 50/50 estricto).
-- Sé específico a MOA/Patri; evita ideas genéricas de manual de marketing.
+- Sé específico a ${CLIENT.name} / ${CLIENT.ownerFirstName}; evita ideas genéricas de manual de marketing.
 
 --- MAPA ---
 

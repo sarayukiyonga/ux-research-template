@@ -17,6 +17,7 @@ import {
 type Props = {
   persist: UserJourneyV3Persist
   segmento: UserJourneySegmento
+  businessName: string
 }
 
 function TrashMini({ className }: { className?: string }) {
@@ -27,7 +28,7 @@ function TrashMini({ className }: { className?: string }) {
   )
 }
 
-export function UserJourneyIdeasSection({ persist, segmento }: Props) {
+export function UserJourneyIdeasSection({ persist, segmento, businessName }: Props) {
   const seg = persist[segmento]
   const accent = segmento === 'clienteActual' ? 'teal' : 'orange'
   const ring = accent === 'teal' ? 'focus:ring-teal-500' : 'focus:ring-orange-500'
@@ -305,7 +306,8 @@ export function UserJourneyIdeasSection({ persist, segmento }: Props) {
         <h2 className="text-sm font-bold text-gray-900">Funcionalidades y contenido por canal</h2>
         <p className="text-xs text-gray-500 mt-1 leading-relaxed">
           Genera propuestas alineadas con <strong>cada etapa del User Journey</strong> del canal que elijas, para
-          cubrir dolores y el rol MOA frente al POV. Puedes <strong>editar, borrar o añadir</strong> ideas a mano. Las
+          cubrir dolores y el rol de {businessName} frente al POV. Puedes <strong>editar, borrar o añadir</strong> ideas a
+          mano. Las
           ideas se guardan por <strong>segmento</strong> (actual / potencial) y <strong>canal</strong>.
         </p>
       </div>

@@ -72,7 +72,10 @@ export async function POST(req: Request) {
   }
 
   if (segmento === 'clienteActual') {
-    const texto = povLineHmw('POV — CLIENTES ACTUALES (ya con Patri / MOA)', pov.data.clienteActual)
+    const texto = povLineHmw(
+      `POV — CLIENTES ACTUALES (ya con ${CLIENT.ownerFirstName} / ${CLIENT.name})`,
+      pov.data.clienteActual
+    )
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
       schema: z.object({
@@ -82,7 +85,7 @@ export async function POST(req: Request) {
       }),
       system: `${HMW_SYSTEM_BASE}
 
-Genera **solo** el array JSON "clienteActual" (4–8 preguntas). Deben derivarse **solo** del POV de clientes actuales (continuidad, confianza ya existente con Patri/MOA).`,
+Genera **solo** el array JSON "clienteActual" (4–8 preguntas). Deben derivarse **solo** del POV de clientes actuales (continuidad, confianza ya existente con ${CLIENT.ownerFirstName} / ${CLIENT.name}).`,
       prompt: `=== POV — CLIENTES ACTUALES (única fuente para este bloque) ===\n\n${texto}\n\n===\nDevuelve solo "clienteActual" en el JSON.`,
     })
     return NextResponse.json({ clienteActual: toPayload(object.clienteActual) })
@@ -113,7 +116,7 @@ Genera **solo** el array JSON "clientePotencial" (4–8 preguntas). Deben deriva
     system: `${HMW_SYSTEM_BASE}
 
 En esta petición generas **las dos** listas: "clienteActual" y "clientePotencial".
-- Las de "clienteActual": continuidad, confianza ya existente con Patri/MOA.
+- Las de "clienteActual": continuidad, confianza ya existente con ${CLIENT.ownerFirstName} / ${CLIENT.name}.
 - Las de "clientePotencial": captación, dudas previas, primera impresión; claramente distintas de las del otro bloque.`,
     prompt: `=== POV GUARDADOS (única fuente) ===\n\n${textoPov}\n\n===\nGenera las dos listas de HMW en el JSON de salida.`,
   })

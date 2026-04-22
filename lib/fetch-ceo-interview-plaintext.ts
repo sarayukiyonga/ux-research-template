@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { CLIENT } from '@/lib/client-config'
 
 function getAuth() {
   return new google.auth.JWT({
@@ -18,6 +19,6 @@ export async function fetchCeoInterviewPlaintext(): Promise<string> {
   if (!dataRow) return '(Sin datos de entrevista CEO)'
   return CEO_QUESTIONS.map((q) => {
     const answer = dataRow[q.columnIndex]?.trim() ?? ''
-    return `[${q.themeLabel}] ${q.question}\nPatricia: "${answer}"`
+    return `[${q.themeLabel}] ${q.question}\n${CLIENT.ownerFirstName}: "${answer}"`
   }).join('\n\n---\n\n')
 }

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { HMW_MARCA_MOTIVO_MAX_LEN, HMW_RESPUESTAS_MAX, normalizeHmwPayload } from '@/lib/hmw-payload'
 import { hmwIaContextToMarkdown, loadHmwIaContextOrFail } from '@/lib/hmw-ia-context'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 45
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
 
   const segmento =
     block === 'clienteActual'
-      ? 'CLIENTES ACTUALES (prioriza impacto en esa persona y viabilidad para Patri en ese contexto).'
-      : 'CLIENTES POTENCIALES (prioriza impacto en el arquetipo de captación y viabilidad para Patri).'
+      ? `CLIENTES ACTUALES (prioriza impacto en esa persona y viabilidad para ${CLIENT.ownerFirstName} en ese contexto).`
+      : `CLIENTES POTENCIALES (prioriza impacto en el arquetipo de captación y viabilidad para ${CLIENT.ownerFirstName}).`
 
   const schema = z.object({
     mejorIndice: z
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
       .string()
       .max(HMW_MARCA_MOTIVO_MAX_LEN)
       .describe(
-        '2–5 frases en español: por qué esa opción equilibra mejor impacto para la usuaria del segmento y viabilidad para Patri/MOA.'
+        `2–5 frases en español: por qué esa opción equilibra mejor impacto para la usuaria del segmento y viabilidad para ${CLIENT.ownerFirstName} / ${CLIENT.name}.`
       ),
   })
 
@@ -97,14 +98,14 @@ ${item.pregunta}
 **Respuestas ya escritas por la usuaria (índices 0…${item.respuestas.length - 1}):**
 ${listRespuestasForPrompt(item.respuestas)}
 
-Elige **un solo** \`mejorIndice\`: la respuesta que mejor equilibre **impacto para la persona usuaria** del segmento y **factibilidad** (tiempo, coste, riesgo) para Patri / MOA. No elijas índices cuyo texto esté vacío salvo que todas estén vacías (en ese caso devuelve 0). Rellena \`motivo\` con la justificación para la usuaria de la herramienta: **no** digas que algo es viable por “adaptarse a una plataforma existente” ni cites stack técnico que **no** aparezca de forma explícita en el contexto de arriba.`
+Elige **un solo** \`mejorIndice\`: la respuesta que mejor equilibre **impacto para la persona usuaria** del segmento y **factibilidad** (tiempo, coste, riesgo) para ${CLIENT.ownerFirstName} / ${CLIENT.name}. No elijas índices cuyo texto esté vacío salvo que todas estén vacías (en ese caso devuelve 0). Rellena \`motivo\` con la justificación para la usuaria de la herramienta: **no** digas que algo es viable por “adaptarse a una plataforma existente” ni cites stack técnico que **no** aparezca de forma explícita en el contexto de arriba.`
 
   try {
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
       schema,
       system:
-        'Eres diseñador de producto en MOA (Patri, Martorell). Devuelves solo el JSON pedido. español neutro. No inventas activos digitales (web, app, plataforma) que no consten en el contexto del usuario.' +
+        `Eres diseñador de producto en ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.location}). Devuelves solo el JSON pedido. español neutro. No inventas activos digitales (web, app, plataforma) que no consten en el contexto del usuario.` +
         MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
       prompt,
     })

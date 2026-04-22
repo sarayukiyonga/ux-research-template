@@ -372,12 +372,12 @@ export async function POST(req: Request) {
   const { object } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema,
-    system: `Eres un UX researcher experto en user personas para MOA (salud y fitness, Martorell).
+    system: `Eres un UX researcher experto en user personas para ${CLIENT.name} (${CLIENT.sector}, ${CLIENT.location}).
 
 Fuentes por persona:
 1) INSIGHTS guardados del segmento → motivaciones, necesidades, dolor, tono, tags, frase.
 2) DATOS ENCUESTA FILTRADOS del mismo segmento → **edad** y **genero** del schema deben ceñirse a la moda y franjas recuentes indicadas ahí (GÉNERO_MODA, EDAD_FRANJA_MODA / sugerencia entera). Ocupación/educación/ubicación: prioriza hechos de la encuesta cuando existan (p. ej. ocupaciones citadas); si no hay dato, infiere con moderación coherente con insights + entrevista.
-3) Entrevista a Patricia → contexto de marca, **cómo se presta el servicio** (presencial vs online) y matices; **no la contradigas** con suposiciones de negocio digital.
+3) Entrevista a ${CLIENT.ownerFirstName} (${CLIENT.ownerRole}) → contexto de marca, **cómo se presta el servicio** (presencial vs online) y matices; **no la contradigas** con suposiciones de negocio digital.
 
 "clienteActual" solo mezcla INSIGHTS clientes + ENCUESTA clientes + entrevista. No uses el bloque de potenciales.
 "clientePotencial" solo mezcla INSIGHTS potenciales + ENCUESTA potenciales + entrevista.
@@ -385,7 +385,7 @@ Fuentes por persona:
 Los dos perfiles deben distinguirse claramente. Español natural. Nombres locales plausibles.
 
 Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
-    prompt: `=== ENTREVISTA — PATRICIA / MOA ===\n${interview}
+    prompt: `=== ENTREVISTA — ${CLIENT.ownerFirstName} / ${CLIENT.name} ===\n${interview}
 
 === DATOS ENCUESTA FILTRADOS — CLIENTES ACTUALES (demografía y muestras; mismo corte que en /survey) ===
 ${ctxClientes}

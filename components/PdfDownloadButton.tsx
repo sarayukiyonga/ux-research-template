@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { exportElementToPdf } from '@/lib/moa-pdf-export'
+import { PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 
 type Props = {
   fileName: string
@@ -12,7 +13,7 @@ type Props = {
 
 export function PdfDownloadButton({
   fileName,
-  selector = '#moa-pdf-root',
+  selector = `#${PDF_CAPTURE_ROOT_ID}`,
   label = 'Descargar PDF',
   className,
 }: Props) {

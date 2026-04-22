@@ -23,6 +23,7 @@ import {
 import { userFlowLineSchema, normalizeUserFlowLine } from '@/lib/user-flow-tree'
 import { DEFAULT_USER_JOURNEY_CANAL_ID, getCanalPromptFields } from '@/lib/user-journey-channels'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 import { fetchSitemapPromptBlockFromSheets } from '@/lib/fetch-saved-sitemap-prompt'
 import { fetchMVPBundleFromSheets } from '@/lib/fetch-mvp-bundle-sheets'
 import { getMVPScopePersist, mvpPersistToPlainTextForIa, type MVPBundlePersist } from '@/lib/mvp-types'
@@ -42,7 +43,7 @@ const ERR_IDEAS =
   'Faltan ideas de funcionalidades y contenido guardadas para este canal y segmento. En /user-journey, sección «Funcionalidades y contenido por canal», elige el mismo canal, genera o añade al menos una idea, y guarda en Sheets.'
 
 function buildSystemBase(canalLabel: string): string {
-  return `Eres un diseñador UX/UI para MOA (Patri, entrenamiento y salud en Martorell).
+  return `Eres un diseñador UX/UI para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.sector} en ${CLIENT.location}).
 
 ## Canal
 **${canalLabel}**.
@@ -51,7 +52,7 @@ function buildSystemBase(canalLabel: string): string {
 Las **ideas de funcionalidades y contenidos** del bloque dedicado en /user-journey son la **base del diagrama**: cada rectángulo (proceso), el óvalo de entrada/salida y los textos de transición deben **materializar o preparar** esas ideas en un orden de uso real. Si una idea es de **contenido**, el paso debe reflejar qué ve o lee la persona; si es **funcionalidad**, qué hace el sistema o la interfaz en **${canalLabel}**.
 
 ## Contexto de apoyo (coherencia; no sustituye las ideas)
-El **User Journey Map** (etapas, dolores, rol MOA↔POV), la **User Persona** y el **POV** alinean tono y bifurcaciones. No contradigas el journey; si una idea choca con un dolor del mapa, **adapta el paso** para reducir esa fricción manteniendo la intención de la idea.
+El **User Journey Map** (etapas, dolores, rol ${CLIENT.name}↔POV), la **User Persona** y el **POV** alinean tono y bifurcaciones. No contradigas el journey; si una idea choca con un dolor del mapa, **adapta el paso** para reducir esa fricción manteniendo la intención de la idea.
 
 ## Trazado en **árbol vertical**
 El JSON **raiz** representa un **árbol que se lee de arriba abajo** (diagrama de flujo clásico):
@@ -118,7 +119,7 @@ async function generateOneFlow(opts: {
 Segmento: **${opts.segmentLabel}**.
 
 ## Jerarquía de fuentes
-1. **User Journey Map** del canal (bloque dedicado): etapas, dolores y rol MOA↔POV — **no contradigas** su orden ni sus tensiones.
+1. **User Journey Map** del canal (bloque dedicado): etapas, dolores y rol ${CLIENT.name}↔POV — **no contradigas** su orden ni sus tensiones.
 2. **Ideas FUNC/CONT** del mismo canal: base del diagrama (rectángulos y transiciones).
 3. **Matriz MVP** del mismo canal: ${mvpInstrucción}
 4. **User Persona y POV**: tono y coherencia.

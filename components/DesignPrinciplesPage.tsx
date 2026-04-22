@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DualSegmentFiltersReadBanner } from '@/components/SegmentFiltersReadBanner'
@@ -24,10 +24,11 @@ interface Question {
   pairs?: { left: string; right: string }[]
 }
 
-const QUESTIONS: Question[] = [
+function buildDesignQuestions(brandName: string): Question[] {
+  return [
   {
     id: 'filter_word',
-    question: '¿Con qué valores se identifica más MOA?',
+    question: `¿Con qué valores se identifica más ${brandName}?`,
     hint: 'Elige una palabra principal (el filtro clave de diseño) y opcionalmente una secundaria (el matiz que la complementa).',
     type: 'priority',
     options: [
@@ -53,7 +54,7 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'never',
-    question: '¿Qué nunca debe transmitir el diseño de MOA, en ningún soporte?',
+    question: `¿Qué nunca debe transmitir el diseño de ${brandName}, en ningún soporte?`,
     hint: 'Elige hasta dos. Los "no" en diseño son tan importantes como los "sí".',
     type: 'multi',
     options: [
@@ -66,6 +67,7 @@ const QUESTIONS: Question[] = [
     ],
   },
 ]
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -313,8 +315,8 @@ interface ResultsData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildFormAnswers(answers: Answers): string {
-  return QUESTIONS.map((q) => {
+function buildFormAnswers(answers: Answers, questions: Question[]): string {
+  return questions.map((q) => {
     const raw = answers[q.id]
     let readable = ''
     if (q.type === 'single') {
@@ -511,7 +513,8 @@ function PrinciplesDisplay({ data, savedAt, onRedo, onRegenerate, saving }: {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function DesignPrinciplesPage() {
+export function DesignPrinciplesPage({ brandName }: { brandName: string }) {
+  const questions = useMemo(() => buildDesignQuestions(brandName), [brandName])
   const [answers, setAnswers] = useState<Answers>({})
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showForm, setShowForm] = useState(false)
@@ -563,7 +566,7 @@ export function DesignPrinciplesPage() {
   const generate = async (currentAnswers: Answers, overrideFormAnswers?: string) => {
     setGenerating(true)
     setGenError(false)
-    const formAnswers = overrideFormAnswers ?? buildFormAnswers(currentAnswers)
+    const formAnswers = overrideFormAnswers ?? buildFormAnswers(currentAnswers, questions)
     try {
       const res = await fetch('/api/design-principles', {
         method: 'POST',
@@ -667,8 +670,8 @@ export function DesignPrinciplesPage() {
 
   // ── Form ───────────────────────────────────────────────────────────────────
 
-  const q = QUESTIONS[currentIdx]
-  const total = QUESTIONS.length
+  const q = questions[currentIdx]
+  const total = questions.length
 
   const setAnswer = (id: string, value: Answers[string]) =>
     setAnswers((prev) => ({ ...prev, [id]: value }))
@@ -692,7 +695,7 @@ export function DesignPrinciplesPage() {
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-400">{currentIdx + 1} de {total}</span>
           <div className="flex gap-1.5">
-            {QUESTIONS.map((_, i) => (
+            {questions.map((_, i) => (
               <div
                 key={i}
                 className={`h-1.5 w-8 rounded-full transition-all ${

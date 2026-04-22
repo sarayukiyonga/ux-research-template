@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { empathyMapToPlainText, fetchSavedEmpathyMap } from '@/lib/fetch-saved-empathy-map'
 import { sanitizeInsightsPayload } from '@/lib/insights-sanitize'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -59,8 +60,8 @@ export async function POST(req: Request) {
   const mapaTexto = empathyMapToPlainText(empathy.data)
   const contexto =
     segment === 'clientes'
-      ? 'CLIENTES ACTUALES de MOA (ya entrenan con Patricia Dorado en Martorell). El mapa ya refleja el subconjunto filtrado que guardaste.'
-      : 'CLIENTES POTENCIALES de MOA (aún no son clientes). El mapa ya refleja el subconjunto filtrado que guardaste.'
+      ? `CLIENTES ACTUALES de ${CLIENT.name} (ya entrenan con ${CLIENT.ownerFullName} en ${CLIENT.location}). El mapa ya refleja el subconjunto filtrado que guardaste.`
+      : `CLIENTES POTENCIALES de ${CLIENT.name} (aún no son clientes). El mapa ya refleja el subconjunto filtrado que guardaste.`
 
   const { object } = await generateObject({
     model: openai('gpt-4o-mini'),
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
 Tu única fuente de verdad es el MAPA DE EMPATÍA GUARDADO de ${contexto}
 No inventes datos que no estén implícitos en esas notas.
 
-Tu tarea es extraer INSIGHTS accionables para Patricia (entrenadora) y su marca MOA:
+Tu tarea es extraer INSIGHTS accionables para ${CLIENT.ownerFirstName} (${CLIENT.ownerRole}) y su marca ${CLIENT.name}:
 - Patrones, tensiones, oportunidades y riesgos que emergen del mapa.
 - Lenguaje cercano al del mapa cuando aporte valor.
 - Cada ítem debe ser específico (no genéricos como "mejorar la comunicación" sin contexto).

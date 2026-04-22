@@ -7,6 +7,7 @@ import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
 import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { CLIENT } from '@/lib/client-config'
 
 interface SurveyFilters {
   gender?: string
@@ -108,7 +109,7 @@ const CLIENT_EMPATHY_COLS: { title: string; colIndex: number }[] = [
   { title: '¿Qué te aporta entrenar con otras personas con situaciones similares a la tuya?', colIndex: 10 },
   { title: '¿Sientes que lo que pagas es una inversión en tu salud o un gasto de ocio? ¿Por qué?', colIndex: 12 },
   { title: '¿Recuerdas algún momento en el que sentiste que el entrenamiento realmente estaba funcionando?', colIndex: 13 },
-  { title: 'En el sistema actual de Patri, ¿qué es lo que más te cuesta o te da más pereza?', colIndex: 15 },
+  { title: `En el sistema actual de ${CLIENT.ownerFirstName}, ¿qué es lo que más te cuesta o te da más pereza?`, colIndex: 15 },
 ]
 
 const POTENTIAL_EMPATHY_COLS: { title: string; colIndex: number }[] = [
@@ -117,7 +118,7 @@ const POTENTIAL_EMPATHY_COLS: { title: string; colIndex: number }[] = [
   { title: '¿Cuál es el motivo principal por el que no haces ejercicio dirigido actualmente?', colIndex: 11 },
   { title: 'Si buscaras ayuda para un dolor/lesión, ¿dónde mirarías primero?', colIndex: 13 },
   { title: '¿Qué valoras más en un profesional de la salud?', colIndex: 14 },
-  { title: '¿Qué echas de menos en la oferta de bienestar actual en Martorell?', colIndex: 16 },
+  { title: `¿Qué echas de menos en la oferta de bienestar actual en ${CLIENT.location}?`, colIndex: 16 },
 ]
 
 const MAX_PER_Q = 10
@@ -196,15 +197,15 @@ export async function POST(req: Request) {
 
   const audiencia =
     segment === 'clientes'
-      ? 'CLIENTES ACTUALES de MOA (ya entrenan con Patricia). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.'
-      : 'CLIENTES POTENCIALES de MOA (aún no son clientes). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.'
+      ? `CLIENTES ACTUALES de ${CLIENT.name} (ya entrenan con ${CLIENT.ownerFirstName}). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.`
+      : `CLIENTES POTENCIALES de ${CLIENT.name} (aún no son clientes). Las notas deben reflejar SOLO la voz de ese bloque de encuesta.`
 
   const { object } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema,
     system: `Eres un UX researcher experto en mapas de empatía aplicados a marcas de salud y bienestar.
-Construyes UN mapa de empatía para MOA (entrenadora personal de salud en Martorell) usando:
-1. Entrevista a Patricia Dorado (cómo opera MOA, tono de marca, **peso presencial vs online**; fuente de verdad operativa — **no la contradigas**; sin sustituir la voz literal del encuestado en las notas).
+Construyes UN mapa de empatía para ${CLIENT.name} (${CLIENT.serviceShort} en ${CLIENT.location}) usando:
+1. Entrevista a ${CLIENT.ownerFullName} (cómo opera ${CLIENT.name}, tono de marca, **peso presencial vs online**; fuente de verdad operativa — **no la contradigas**; sin sustituir la voz literal del encuestado en las notas).
 2. ${audiencia}
 
 INSTRUCCIONES PARA CADA SECCIÓN:

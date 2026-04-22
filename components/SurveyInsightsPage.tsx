@@ -289,7 +289,7 @@ export function SurveyInsightsPage({
           <p className="font-semibold text-gray-800">Generar insights</p>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
             La IA leerá tu mapa de empatía guardado para este segmento y sintetizará patrones y hallazgos accionables
-            para Patri.
+            para el equipo.
           </p>
           <button
             onClick={generate}

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { EmpathyMapPage, type EmpathySegment } from '@/components/EmpathyMapPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
 
-function EmpathyTabsInner() {
+function EmpathyTabsInner({ pdfFileName, pdfRootId }: { pdfFileName: string; pdfRootId: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -25,10 +25,10 @@ function EmpathyTabsInner() {
   return (
     <div className="relative">
       <div className="absolute right-0 top-0 z-20">
-        <PdfDownloadButton fileName="moa-mapa-empatia.pdf" />
+        <PdfDownloadButton fileName={pdfFileName} />
       </div>
 
-      <div id="moa-pdf-root">
+      <div id={pdfRootId}>
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-700 mb-3">
             <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -72,7 +72,13 @@ function EmpathyTabsInner() {
   )
 }
 
-export function EmpathyTabbedView() {
+export function EmpathyTabbedView({
+  pdfFileName,
+  pdfRootId,
+}: {
+  pdfFileName: string
+  pdfRootId: string
+}) {
   return (
     <Suspense
       fallback={
@@ -82,7 +88,7 @@ export function EmpathyTabbedView() {
         </div>
       }
     >
-      <EmpathyTabsInner />
+      <EmpathyTabsInner pdfFileName={pdfFileName} pdfRootId={pdfRootId} />
     </Suspense>
   )
 }

@@ -16,6 +16,25 @@ function env(key: string, placeholderIfUnset: string): string {
   return v !== '' ? v : placeholderIfUnset
 }
 
+/** Variable opcional: cadena vacía = no definida (se usa el derivado). */
+function envOptional(key: string): string | undefined {
+  const raw = process.env[key]
+  if (typeof raw !== 'string') return undefined
+  const v = raw.trim()
+  return v !== '' ? v : undefined
+}
+
+/** Prefijo seguro para nombres de archivo PDF (ASCII). */
+function slugForPdfBasename(name: string): string {
+  const base = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return base || 'proyecto'
+}
+
 /** Marcadores genéricos si aún no hay `CLIENT_*` en el entorno (no son datos reales). */
 const PLACEHOLDER = {
   name: 'Tu negocio',
@@ -47,10 +66,19 @@ export const CLIENT = {
   serviceModel: env('CLIENT_SERVICE_MODEL', PLACEHOLDER.serviceModel),
 } as const
 
-/** Forma corta para uso en prompts: "MOA (Patri, salud y fitness, Martorell)" */
+/**
+ * Prefijo para nombres de PDF descargables (`${CLIENT_PDF_BASENAME}-user-persona.pdf`, etc.).
+ * Opcional en `.env`: si no se define, se deriva de `CLIENT_NAME`.
+ */
+export const CLIENT_PDF_BASENAME = envOptional('CLIENT_PDF_BASENAME') ?? slugForPdfBasename(CLIENT.name)
+
+/** `id` del contenedor que captura html2canvas / exportación PDF (mismo valor en todas las páginas exportables). */
+export const PDF_CAPTURE_ROOT_ID = 'research-pdf-root' as const
+
+/** Forma corta para uso en prompts: "Nombre del negocio (dueño/a, sector, ciudad)" */
 export const CLIENT_SHORT_DESC =
   `${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.sector}, ${CLIENT.location})`
 
-/** Forma larga: "MOA — centro de osteopatía y movimiento de Patri en Martorell" */
+/** Forma larga: "Nombre — descripción del servicio de dueño/a en ciudad" */
 export const CLIENT_LONG_DESC =
   `${CLIENT.name} — ${CLIENT.serviceDescription} de ${CLIENT.ownerFirstName} en ${CLIENT.location}`
