@@ -1,5 +1,7 @@
 # UX Research Template — IA para proyectos web de servicios
 
+[English](README.en.md)
+
 Plantilla Next.js para realizar investigación UX en **7 fases** (Research → Understanding → Define → ideación y priorización → arquitectura → interacción → identidad), con generación de análisis mediante IA (OpenAI GPT-4o). El orden canónico vive en `lib/research-journey-steps.ts` y alimenta el dashboard y la barra de recorrido.
 
 Diseñada para proyectos web de **negocios de servicios presenciales**: centros de salud, entrenadores personales, clínicas, estudios, consultorios, etc.
@@ -165,3 +167,6 @@ Solo hay que editar las variables `CLIENT_*` en `.env.local` (o en Vercel). El c
 - [Google Sheets API](https://developers.google.com/sheets/api) como base de datos
 - [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
 - [Zod](https://zod.dev/) para validación de esquemas IA
+
+
+Este proyecto nació de la necesidad de mostrar al cliente los resultados de las encuestas y para definir junto al cliente los principios de diseño. Poco a poco fui añadiendo todas las fases UX para ayudarme con el analisis y mostrar al cliente los resultados así poder defender después mis decisiones de diseño.
