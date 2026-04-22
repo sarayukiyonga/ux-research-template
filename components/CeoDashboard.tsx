@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CeoInsights } from './CeoInsights'
+import { CeoSheetLinkHelp } from './CeoSheetLinkHelp'
 import { THEME_COLORS } from '@/lib/ceo-questions'
 
 interface QA {
@@ -77,27 +78,39 @@ function QACard({ qa, index }: { qa: QA; index: number }) {
   )
 }
 
-export function CeoDashboard() {
+export function CeoDashboard({
+  ownerFullName,
+  ownerRole,
+  businessName,
+}: {
+  ownerFullName: string
+  ownerRole: string
+  businessName: string
+}) {
   const [data, setData] = useState<CeoData | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     fetch('/api/ceo')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.error)
-        else setData(d)
+      .then(async (r) => {
+        const d = (await r.json()) as { error?: string; qas?: QA[]; timestamp?: string }
+        if (!r.ok || d.error) {
+          setError(d.error ?? `Error ${r.status}: no se pudo cargar la entrevista.`)
+          return
+        }
+        setData(d as CeoData)
       })
-      .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
+      .catch(() => setError('No se pudo conectar con el servidor. Comprueba la red y que la app esté en marcha.'))
   }, [])
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="text-center space-y-2">
-          <p className="text-red-500 font-medium">Error al cargar los datos</p>
-          <p className="text-sm text-gray-500 max-w-md">{error}</p>
+      <div className="flex min-h-[320px] flex-col items-center justify-start px-1 py-4">
+        <div className="w-full max-w-xl text-center space-y-2">
+          <p className="text-red-600 font-semibold">No se pudo cargar la entrevista CEO</p>
+          <p className="text-sm text-gray-600 leading-relaxed">{error}</p>
         </div>
+        <CeoSheetLinkHelp />
       </div>
     )
   }
@@ -134,8 +147,10 @@ export function CeoDashboard() {
         </div>
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Entrevistada</p>
-          <p className="mt-1 text-sm font-bold text-gray-800">Patricia Dorado</p>
-          <p className="text-xs text-gray-400">Fundadora · MOA</p>
+          <p className="mt-1 text-sm font-bold text-gray-800">{ownerFullName}</p>
+          <p className="text-xs text-gray-400">
+            {ownerRole} · {businessName}
+          </p>
         </div>
       </div>
 

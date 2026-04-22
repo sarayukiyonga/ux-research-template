@@ -1,5 +1,6 @@
 import { CeoDashboard } from '@/components/CeoDashboard'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function CeoPage() {
@@ -28,10 +29,10 @@ export default function CeoPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-                  Entrevista a Patricia Dorado
+                  Entrevista a {CLIENT.ownerFullName}
                 </h1>
                 <p className="mt-1 text-gray-500 text-sm">
-                  Fundadora de MOA · Análisis estratégico de marca y negocio
+                  Análisis estratégico de la empresa y del mercado
                 </p>
               </div>
               <Link
@@ -44,7 +45,11 @@ export default function CeoPage() {
             </div>
           </div>
 
-          <CeoDashboard />
+          <CeoDashboard
+            ownerFullName={CLIENT.ownerFullName}
+            ownerRole={CLIENT.ownerRole}
+            businessName={CLIENT.name}
+          />
         </div>
       </div>
     </div>
