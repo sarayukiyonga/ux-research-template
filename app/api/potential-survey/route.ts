@@ -6,6 +6,7 @@ import {
   POTENTIAL_QUESTIONS,
   POTENTIAL_DEMOGRAPHIC_COLUMNS,
 } from '@/lib/potential-questions'
+import { friendlySheetsReadError } from '@/lib/sheets-link-errors'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -41,6 +42,16 @@ const PAIN_COLUMN_INDEX = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnInd
 
 export async function GET(request: NextRequest) {
   try {
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            'Servidor sin credenciales de Google: configura GOOGLE_SERVICE_ACCOUNT_EMAIL y GOOGLE_PRIVATE_KEY en .env.local.',
+        },
+        { status: 500 }
+      )
+    }
+
     const { searchParams } = request.nextUrl
     const genderParam = searchParams.get('gender') ?? 'all'
     const ageRangesParam = searchParams.get('ageRanges') ?? ''
@@ -153,7 +164,8 @@ export async function GET(request: NextRequest) {
       filterOptions: { ageRanges, painValues },
     })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Error desconocido'
+    const raw = e instanceof Error ? e.message : 'Error desconocido'
+    const msg = friendlySheetsReadError(raw, 'POTENTIAL_SURVEY_SHEET_ID')
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

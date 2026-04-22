@@ -9,6 +9,7 @@ import { OccupationsCard, type OccupationResult } from './OccupationsCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
 import { FilterBar, type ActiveFilters, type FilterOptions } from './FilterBar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SurveySheetLinkHelp } from '@/components/SurveySheetLinkHelp'
 import { readSegmentSurveyFilters, writeSegmentSurveyFilters } from '@/lib/segment-survey-filters'
 import { stableFiltersKey, toSurveyAiFiltersPayload } from '@/lib/survey-ai-filters'
 
@@ -196,15 +197,16 @@ export function SurveyDashboard() {
     setError('')
     setAiSheetHydrating(false)
     fetch(filtersToQuery(filters))
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.error)
-        else {
-          setAiSheetHydrating(true)
-          setData(d)
+      .then(async (r) => {
+        const d = (await r.json()) as { error?: string } & Partial<SurveyData>
+        if (!r.ok || d.error) {
+          setError(d.error ?? `Error ${r.status}: no se pudo cargar la encuesta.`)
+          return
         }
+        setAiSheetHydrating(true)
+        setData(d as SurveyData)
       })
-      .catch(() => setError('No se pudo conectar con la hoja de cálculo.'))
+      .catch(() => setError('No se pudo conectar con el servidor. Comprueba la red y que la app esté en marcha.'))
   }, [filters])
 
   async function handleRefreshAll() {
@@ -312,11 +314,12 @@ export function SurveyDashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="text-center space-y-2">
-          <p className="text-red-500 font-medium">Error al cargar los datos</p>
-          <p className="text-sm text-gray-500 max-w-md">{error}</p>
+      <div className="flex min-h-[320px] flex-col items-center justify-start px-1 py-4">
+        <div className="w-full max-w-xl text-center space-y-2">
+          <p className="text-red-600 font-semibold">No se pudo cargar la encuesta (clientes actuales)</p>
+          <p className="text-sm text-gray-600 leading-relaxed">{error}</p>
         </div>
+        <SurveySheetLinkHelp variant="clientes" />
       </div>
     )
   }

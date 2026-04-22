@@ -1,5 +1,6 @@
 import { PotentialSurveyDashboard } from '@/components/PotentialSurveyDashboard'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function PotentialPage() {
@@ -26,10 +27,10 @@ export default function PotentialPage() {
               Resultados en tiempo real
             </div>
             <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Encuesta a clientes potenciales
+              Encuesta · Clientes potenciales
             </h1>
             <p className="mt-1 text-gray-500 text-sm">
-              Perfil del público objetivo · Oportunidades de captación para MOA
+              Perfil del público objetivo · Captación para {CLIENT.name} ({CLIENT.sector})
             </p>
           </div>
 

@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { CEO_SHEET_ID, CEO_QUESTIONS } from '@/lib/ceo-questions'
+import { friendlySheetsReadError } from '@/lib/sheets-link-errors'
 
 export const dynamic = 'force-dynamic'
-
-function friendlySheetsError(message: string): string {
-  const m = message.toLowerCase()
-  if (m.includes('permission_denied') || m.includes('insufficient permission') || m.includes('403')) {
-    return 'Sin permiso para leer la hoja. Comparte el documento de Sheets con el correo de tu Service Account (Editor o Lector).'
-  }
-  if (m.includes('not found') || m.includes('requested entity was not found') || m.includes('404')) {
-    return 'No se encontró el documento. Revisa que GOOGLE_SHEETS_ID en .env.local sea el ID correcto de la URL del libro.'
-  }
-  return message
-}
 
 export async function GET() {
   try {
@@ -60,7 +50,7 @@ export async function GET() {
     return NextResponse.json({ timestamp: dataRow[0] ?? '', qas })
   } catch (error) {
     const raw = error instanceof Error ? error.message : 'Error desconocido'
-    const msg = friendlySheetsError(raw)
+    const msg = friendlySheetsReadError(raw, 'GOOGLE_SHEETS_ID')
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

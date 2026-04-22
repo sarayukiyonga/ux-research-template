@@ -1,5 +1,6 @@
 import { SurveyDashboard } from '@/components/SurveyDashboard'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
+import { CLIENT } from '@/lib/client-config'
 import Link from 'next/link'
 
 export default function SurveyPage() {
@@ -26,10 +27,10 @@ export default function SurveyPage() {
               Resultados en tiempo real
             </div>
             <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Encuesta de satisfacción
+              Encuesta · Clientes actuales
             </h1>
             <p className="mt-1 text-gray-500 text-sm">
-              Análisis de respuestas · Entrenamiento con Patri
+              Análisis de respuestas · {CLIENT.name} ({CLIENT.serviceShort})
             </p>
           </div>
 
