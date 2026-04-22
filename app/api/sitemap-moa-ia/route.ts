@@ -10,6 +10,9 @@ import { getMVPScopePersist, mvpPersistToPlainTextForIa, normalizeMVPStoredJson,
 import { DEFAULT_USER_JOURNEY_CANAL_ID } from '@/lib/user-journey-channels'
 import { newSitemapId } from '@/lib/sitemap-moa-types'
 import { CLIENT, CLIENT_LONG_DESC } from '@/lib/client-config'
+import { loadCardSortingConfigFromSheets } from '@/lib/card-sorting-sheets'
+import { loadCardSortingSubmissionsFromSheets } from '@/lib/card-sorting-submissions-sheets'
+import { buildCardSortingBlockForSitemapIa } from '@/lib/card-sorting-for-sitemap-ia'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,10 +89,12 @@ const responseSchema = z.object({
 
 export async function POST() {
   try {
-    const [mvp, moscow, ctxHmw] = await Promise.all([
+    const [mvp, moscow, ctxHmw, cardSortingSaved, cardSortingSubmissions] = await Promise.all([
       loadMVPPersistFromSheet(),
       loadMoSCoWData(),
       loadHmwIaContextOrFail(),
+      loadCardSortingConfigFromSheets(),
+      loadCardSortingSubmissionsFromSheets(),
     ])
 
     if (!mvp || mvp.notas.length === 0) {
@@ -125,6 +130,12 @@ ${joined}`
       }
     }
 
+    const cardSortingBlock = buildCardSortingBlockForSitemapIa(cardSortingSaved.config, cardSortingSubmissions)
+    const cardSortingSection = `=== CARD SORTING (resultados guardados en Sheets; arquitectura percibida por participantes) ===
+${cardSortingBlock}
+
+`
+
     const prompt = `Eres un arquitecto de información y experto en UX para proyectos web de servicios.
 
 ${mvpBlock}
@@ -133,10 +144,13 @@ ${contextoOpcional}
 
 ${moscowBlock}
 
+${cardSortingSection}
 === TU TAREA ===
 Genera el MAPA DEL SITIO completo de la nueva web de ${CLIENT_LONG_DESC}.
 
 **Prioridad:** la estructura (portada + menú + subpáginas) debe reflejar **antes que nada** la matriz MVP de arriba. Las notas con mayor valor de negocio y de usuario (x alto, y bajo, tamaño lg o color naranja en la descripción) deben tener presencia clara: sección propia, página hija o widget en portada. Lo que quede débil en la matriz puede ir a páginas secundarias o prioridad could.
+
+**Card sorting:** si hay participaciones en la sección CARD SORTING, úsalas para **alinear menú y agrupación** con el consenso de los usuarios (sin contradecir el MVP). Si no hay participaciones, ignora esa sección salvo el vocabulario de tarjetas.
 
 El nodo raiz (tituloInicio) representa la pagina de BIENVENIDA de la web — usa un nombre evocador tipo "Bienvenida a ${CLIENT.name}" o "Inicio — Bienvenida", no un titulo tecnico como "Mapa del sitio".
 

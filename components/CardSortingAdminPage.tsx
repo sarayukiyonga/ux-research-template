@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Check, Copy } from 'lucide-react'
 import {
   defaultCardSortingConfig,
   newCardSortingId,
@@ -32,6 +33,7 @@ export function CardSortingAdminPage() {
   const [refreshingSubmissions, setRefreshingSubmissions] = useState(false)
   const [mvpReplaceStatus, setMvpReplaceStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [mvpMergeStatus, setMvpMergeStatus] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [copyUrlHint, setCopyUrlHint] = useState<'idle' | 'ok' | 'err'>('idle')
 
   const btnBase =
     'cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-all duration-150 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100'
@@ -253,6 +255,19 @@ export function CardSortingAdminPage() {
   const publicUrl =
     typeof window !== 'undefined' ? `${window.location.origin}/participa/card-sorting` : '/participa/card-sorting'
 
+  const copyPublicUrl = async () => {
+    const url =
+      typeof window !== 'undefined' ? `${window.location.origin}/participa/card-sorting` : publicUrl
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopyUrlHint('ok')
+      window.setTimeout(() => setCopyUrlHint('idle'), 2000)
+    } catch {
+      setCopyUrlHint('err')
+      window.setTimeout(() => setCopyUrlHint('idle'), 2500)
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
@@ -335,9 +350,32 @@ export function CardSortingAdminPage() {
         </Link>
       </div>
       {savedAt && <p className="text-xs text-gray-500">Último guardado: {savedAt}</p>}
-      <p className="text-xs text-gray-500">
-        Enlace para compartir: <span className="font-mono text-gray-700">{publicUrl}</span>
-      </p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-gray-500">
+        <span className="shrink-0">Enlace para compartir:</span>
+        <a
+          href={publicUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="min-w-0 max-w-full break-all font-mono text-violet-700 underline-offset-2 transition-colors hover:text-violet-900 hover:underline"
+        >
+          {publicUrl}
+        </a>
+        <button
+          type="button"
+          onClick={() => void copyPublicUrl()}
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 active:scale-95"
+          aria-label="Copiar URL de la sesión pública"
+          title="Copiar URL"
+        >
+          {copyUrlHint === 'ok' ? (
+            <Check className="h-4 w-4 text-emerald-600" aria-hidden />
+          ) : (
+            <Copy className="h-4 w-4" aria-hidden />
+          )}
+        </button>
+        {copyUrlHint === 'ok' && <span className="text-emerald-600 font-medium">Copiado</span>}
+        {copyUrlHint === 'err' && <span className="text-red-600 font-medium">No se pudo copiar</span>}
+      </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">Tarjetas (páginas / secciones)</h2>

@@ -31,6 +31,8 @@ export default function CardSortingRoute() {
             Guarda los cambios para que la{' '}
             <Link
               href="/participa/card-sorting"
+              target="_blank"
+              rel="noopener noreferrer"
               className="cursor-pointer font-semibold underline underline-offset-2 text-violet-800 transition-colors hover:text-violet-950"
             >
               sesión pública

@@ -158,8 +158,9 @@ export function SitemapMoaPage() {
       {loadStatus === 'loading' && <p className="text-sm text-gray-400 animate-pulse">Cargando datos guardados…</p>}
 
       <p className="text-xs text-gray-400">
-        «Generar con IA» usa solo la matriz MVP del canal <strong>Página web</strong> en Sheets (y MoSCoW/POV si existen)
-        · Doble clic para editar · + para añadir hijos · × para eliminar
+        «Generar con IA» usa la matriz MVP del canal <strong>Página web</strong> en Sheets, MoSCoW/POV si existen y las
+        participaciones del <strong>card sorting</strong> guardadas (si hay) · Doble clic para editar · + para añadir
+        hijos · × para eliminar
       </p>
 
       {/* Árbol vertical */}

@@ -30,13 +30,16 @@ export default function MapaSitioRoute() {
         {/* Info */}
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 px-5 py-4 mb-8 space-y-2 text-sm text-violet-950 leading-relaxed">
           <p>
-            La IA construye el mapa solo con la{' '}
+            La IA construye el mapa con la{' '}
             <Link href="/mvp" className="font-semibold underline underline-offset-2 text-violet-700">
               matriz MVP
             </Link>{' '}
-            del canal <strong>Página web</strong> (valor negocio / valor usuario). Si tienes MoSCoW guardado, sirve de
-            referencia cruzada para prioridades;
-            el mapa resultante alimenta el{' '}
+            del canal <strong>Página web</strong> (valor negocio / valor usuario), MoSCoW como referencia cruzada y,
+            si existen, las{' '}
+            <Link href="/card-sorting" className="font-semibold underline underline-offset-2 text-violet-700">
+              participaciones del card sorting
+            </Link>{' '}
+            guardadas en Sheets (cómo agruparon usuarios las tarjetas por categoría). El mapa resultante alimenta el{' '}
             <Link href="/user-flow" className="font-semibold underline underline-offset-2 text-violet-700">User Flow</Link>.
           </p>
           <ul className="text-xs text-violet-800/80 space-y-0.5 pl-4 list-disc">
