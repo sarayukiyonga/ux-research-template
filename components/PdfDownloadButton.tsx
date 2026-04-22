@@ -14,7 +14,7 @@ type Props = {
 export function PdfDownloadButton({
   fileName,
   selector = `#${PDF_CAPTURE_ROOT_ID}`,
-  label = 'Descargar PDF',
+  label = 'Descargar PDF (para imprimir)',
   className,
 }: Props) {
   const [busy, setBusy] = useState(false)

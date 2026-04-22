@@ -27,7 +27,7 @@ export function PdfDashboardFullExport({ fileName }: { fileName: string }) {
       }}
       className="mx-auto mt-6 flex items-center justify-center rounded-xl border-2 border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-900 shadow-sm hover:bg-violet-100 disabled:opacity-60"
     >
-      {busy ? 'Generando informe (puede tardar varios minutos)…' : 'Descargar informe completo (PDF)'}
+      {busy ? 'Generando informe (puede tardar varios minutos)…' : 'Descargar informe completo (PDF, para imprimir)'}
     </button>
   )
 }
