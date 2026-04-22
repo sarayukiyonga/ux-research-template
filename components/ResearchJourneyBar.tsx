@@ -69,7 +69,7 @@ export function ResearchJourneyBar() {
                     <span
                       aria-hidden
                       className={cn(
-                        'max-w-[2rem] truncate text-center text-[7px] font-medium leading-tight text-gray-400 sm:max-w-none sm:text-[8px]',
+                        'max-w-8 truncate text-center text-[7px] font-medium leading-tight text-gray-400 sm:max-w-none sm:text-[8px]',
                         isCurrent && 'text-violet-700',
                         isPast && 'text-emerald-700'
                       )}

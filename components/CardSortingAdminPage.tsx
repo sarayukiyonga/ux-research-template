@@ -349,7 +349,7 @@ export function CardSortingAdminPage() {
           {config.cards.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-2">
               <input
-                className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="min-w-48 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 value={c.label}
                 onChange={(e) => updateCard(c.id, e.target.value)}
               />
@@ -365,7 +365,7 @@ export function CardSortingAdminPage() {
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
           <input
-            className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="min-w-48 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
             placeholder="Nueva tarjeta…"
             value={newCardLabel}
             onChange={(e) => setNewCardLabel(e.target.value)}
@@ -387,7 +387,7 @@ export function CardSortingAdminPage() {
           {config.categories.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center gap-2">
               <input
-                className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="min-w-48 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 value={c.label}
                 onChange={(e) => updateCat(c.id, e.target.value)}
               />
@@ -399,7 +399,7 @@ export function CardSortingAdminPage() {
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
           <input
-            className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="min-w-48 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
             placeholder="Nueva categoría…"
             value={newCatLabel}
             onChange={(e) => setNewCatLabel(e.target.value)}
