@@ -44,7 +44,7 @@ interface EditForm {
 export function SitemapMoaPage() {
   const [root, setRoot] = useState<SitemapNodo | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('loading')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [iaStatus, setIaStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [iaError, setIaError] = useState<string | null>(null)
@@ -53,7 +53,6 @@ export function SitemapMoaPage() {
   // ── Carga ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    setLoadStatus('loading')
     fetch('/api/sitemap-moa-saved')
       .then((r) => r.json())
       .then((d) => {
@@ -169,7 +168,6 @@ export function SitemapMoaPage() {
           <TreeNode
             nodo={root}
             depth={0}
-            isLast={true}
             onEdit={openEdit}
             onAddChild={addChild}
             onDelete={deleteNode}
@@ -220,11 +218,10 @@ export function SitemapMoaPage() {
 // ── Nodo del árbol (layout vertical indentado) ────────────────────────────────
 
 function TreeNode({
-  nodo, depth, isLast, isLeft = false, onEdit, onAddChild, onDelete,
+  nodo, depth, isLeft = false, onEdit, onAddChild, onDelete,
 }: {
   nodo: SitemapNodo
   depth: number
-  isLast: boolean
   isLeft?: boolean
   onEdit: (n: SitemapNodo) => void
   onAddChild: (id: string) => void
@@ -304,12 +301,11 @@ function TreeNode({
           {/* Columna izquierda: widgets de portada (conector a la derecha) */}
           {widgetHijos.length > 0 && (
             <div className="border-r border-gray-200 flex flex-col items-end pt-3">
-              {widgetHijos.map((hijo, i) => (
+              {widgetHijos.map((hijo) => (
                 <TreeNode
                   key={hijo.id}
                   nodo={hijo}
                   depth={1}
-                  isLast={i === widgetHijos.length - 1}
                   isLeft={true}
                   onEdit={onEdit}
                   onAddChild={onAddChild}
@@ -321,12 +317,11 @@ function TreeNode({
           {/* Columna derecha: secciones de menú (conector a la izquierda) */}
           {seccionHijos.length > 0 && (
             <div className="border-l border-gray-200 pt-3" style={{ marginLeft: '1.25rem' }}>
-              {seccionHijos.map((hijo, i) => (
+              {seccionHijos.map((hijo) => (
                 <TreeNode
                   key={hijo.id}
                   nodo={hijo}
                   depth={1}
-                  isLast={i === seccionHijos.length - 1}
                   onEdit={onEdit}
                   onAddChild={onAddChild}
                   onDelete={onDelete}
@@ -341,12 +336,11 @@ function TreeNode({
       {/* Hijos normales (depth > 0) */}
       {depth > 0 && hasChildren && (
         <div className="border-l border-gray-200 pl-0" style={{ marginLeft: '2.5rem' }}>
-          {nodo.hijos.map((hijo, i) => (
+          {nodo.hijos.map((hijo) => (
             <TreeNode
               key={hijo.id}
               nodo={hijo}
               depth={depth + 1}
-              isLast={i === nodo.hijos.length - 1}
               onEdit={onEdit}
               onAddChild={onAddChild}
               onDelete={onDelete}

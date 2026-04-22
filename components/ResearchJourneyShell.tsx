@@ -10,7 +10,13 @@ export function ResearchJourneyShell({ children }: { children: React.ReactNode }
   return (
     <>
       {!hideBar && <ResearchJourneyBar />}
-      {children}
+      <main
+        id="contenido-principal"
+        tabIndex={-1}
+        className="outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 focus-visible:ring-offset-2"
+      >
+        {children}
+      </main>
     </>
   )
 }

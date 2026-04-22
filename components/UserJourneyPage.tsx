@@ -286,7 +286,6 @@ function JourneyMapSection({
   onEditEtapa,
   onDeleteEtapa,
   clavePovLabel,
-  rolBloqueTitulo,
 }: {
   journey: JourneyForPersona
   segmentLabel: string
@@ -296,7 +295,6 @@ function JourneyMapSection({
   onEditEtapa: (orden: number) => void
   onDeleteEtapa: (orden: number) => void
   clavePovLabel: string
-  rolBloqueTitulo: string
 }) {
   const ring = accent === 'teal' ? 'ring-teal-400 shadow-teal-100' : 'ring-orange-400 shadow-orange-100'
   const badge = accent === 'teal' ? 'bg-teal-600' : 'bg-orange-600'
@@ -1222,7 +1220,6 @@ export function UserJourneyPage() {
         onEditEtapa={(orden) => openEditEtapa(orden)}
         onDeleteEtapa={(orden) => void deleteEtapa(orden)}
         clavePovLabel={clavePovLabel}
-        rolBloqueTitulo={rolBloqueTitulo}
       />
 
       <UserJourneyIdeasSection persist={panelPersist} segmento={segmento} />

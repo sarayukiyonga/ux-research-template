@@ -260,7 +260,7 @@ export function researchPhaseForPathname(pathname: string | null): ResearchPhase
   if (i < 0) return null
   let n = 0
   for (const ph of RESEARCH_PHASES) {
-    for (const st of ph.steps) {
+    for (let s = 0; s < ph.steps.length; s++) {
       if (n === i) return ph
       n++
     }

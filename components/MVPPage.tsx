@@ -51,7 +51,7 @@ export function MVPPage() {
     { id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' },
   ])
   const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('loading')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [iaStatus, setIaStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [iaError, setIaError] = useState<string | null>(null)
@@ -79,7 +79,6 @@ export function MVPPage() {
   // ── Carga inicial (matrices + mismos ámbitos que MoSCoW) ───────────────────────
 
   useEffect(() => {
-    setLoadStatus('loading')
     Promise.all([fetch('/api/mvp-saved'), fetch('/api/moscow-scopes')])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([data, scopesData]) => {
@@ -96,20 +95,18 @@ export function MVPPage() {
         setBundle(initial)
         if (data.saved?.savedAt) setSavedAt(data.saved.savedAt)
         const opts = Array.isArray(scopesData.options) ? scopesData.options : []
-        setScopeOptions(
-          opts.length ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        const nextOptions =
+          opts.length > 0 ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        setScopeOptions(nextOptions)
+        setScope((current) =>
+          nextOptions.some((o: MvpScopeOptionRow) => o.id === current)
+            ? current
+            : MOSCOW_SCOPE_ALL
         )
         setLoadStatus('loaded')
       })
       .catch(() => setLoadStatus('error'))
   }, [])
-
-  useEffect(() => {
-    if (loadStatus !== 'loaded') return
-    if (!scopeOptions.some((o) => o.id === scope)) {
-      setScope(MOSCOW_SCOPE_ALL)
-    }
-  }, [loadStatus, scopeOptions, scope])
 
   // ── Guardar ──────────────────────────────────────────────────────────────────
 
@@ -484,7 +481,7 @@ function StickyNota({
   onPointerDown: (e: React.PointerEvent, id: string) => void
   onEdit: (nota: MVPNota) => void
 }) {
-  const rotation = useRef(((nota.id.charCodeAt(nota.id.length - 1) % 7) - 3) * 0.8)
+  const rotationDeg = ((nota.id.charCodeAt(nota.id.length - 1) % 7) - 3) * 0.8
 
   return (
     <div
@@ -493,7 +490,7 @@ function StickyNota({
         position: 'absolute',
         left: `${nota.x}%`,
         top: `${nota.y}%`,
-        transform: `translate(-50%, -50%) rotate(${rotation.current}deg)`,
+        transform: `translate(-50%, -50%) rotate(${rotationDeg}deg)`,
         zIndex: 10,
         touchAction: 'none',
       }}

@@ -180,7 +180,7 @@ export function GroupedResponseCard({
                       key={i}
                       className="rounded-lg bg-white px-3 py-2 text-xs text-gray-700 italic border border-gray-100"
                     >
-                      "{ex}"
+                      {`\u201C${ex}\u201D`}
                     </div>
                   ))}
                 </div>

@@ -73,7 +73,7 @@ function hasValidPersonasPayload(data: unknown): boolean {
 // ── POV editable card + preview ───────────────────────────────────────────────
 
 function formatInsightForPov(insight: string): { text: string; showClosingDot: boolean } {
-  let t = insight.trim().replace(/\.{2,}\s*$/, '.')
+  const t = insight.trim().replace(/\.{2,}\s*$/, '.')
   if (!t) return { text: t, showClosingDot: true }
   const showClosingDot = !/[.!?…]\s*$/.test(t)
   return { text: t, showClosingDot }

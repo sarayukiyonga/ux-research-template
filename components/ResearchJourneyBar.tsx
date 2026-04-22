@@ -19,28 +19,39 @@ export function ResearchJourneyBar() {
   const bottomText =
     current >= 0 ? RESEARCH_JOURNEY_STEPS[current].long : homeBlurb
 
+  const total = RESEARCH_JOURNEY_STEPS.length
+
   return (
     <div className="sticky top-0 z-40 border-b border-gray-200/80 bg-white/95 shadow-sm backdrop-blur-md">
       <div className="mx-auto max-w-6xl px-3 sm:px-4 py-2.5 sm:py-3">
-        <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+        <p
+          id="research-journey-bar-label"
+          className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400"
+        >
           Recorrido de investigación UX
         </p>
 
-        <div className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav
+          className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-labelledby="research-journey-bar-label"
+        >
           <div className="flex min-w-max items-start justify-center gap-0 px-1">
             {RESEARCH_JOURNEY_STEPS.map((step, i) => {
               const isCurrent = i === current
               const isPast = current >= 0 && i < current
               const num = i + 1
+              const stepLabel = `Paso ${num} de ${total}: ${step.title}`
 
               return (
                 <div key={step.href} className="flex items-start">
                   <Link
                     href={step.href}
-                    title={`${num}. ${step.short}`}
+                    aria-label={stepLabel}
+                    aria-current={isCurrent ? 'page' : undefined}
                     className="group flex w-11 flex-col items-center gap-1 sm:w-14"
                   >
                     <span
+                      aria-hidden
                       className={cn(
                         'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors sm:h-8 sm:w-8 sm:text-[11px]',
                         isCurrent &&
@@ -56,6 +67,7 @@ export function ResearchJourneyBar() {
                       {num}
                     </span>
                     <span
+                      aria-hidden
                       className={cn(
                         'text-center text-[8px] font-medium leading-tight text-gray-400 sm:text-[9px]',
                         isCurrent && 'text-violet-700',
@@ -78,7 +90,7 @@ export function ResearchJourneyBar() {
               )
             })}
           </div>
-        </div>
+        </nav>
 
         <p
           className={cn(

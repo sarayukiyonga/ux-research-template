@@ -162,7 +162,6 @@ async function buildClientSurveyContext(filters: SurveyFilters): Promise<string>
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_RANGE })
   let rows = (res.data.values ?? []).slice(1).filter((r) => r.some(Boolean))
-  const header = res.data.values?.[0] ?? []
 
   if (filters.gender && filters.gender !== 'all') {
     rows = rows.filter((row) => clientGender(row) === filters.gender)

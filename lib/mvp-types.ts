@@ -104,7 +104,9 @@ export function unifyJourneyBaseMVPBundle(bundle: MVPBundlePersist): MVPBundlePe
     version: MVP_VERSION,
     notas: [...normalizeMVPPersist(bundle.generic).notas, ...normalizeMVPPersist(jb).notas],
   }
-  const { [JOURNEY_BASE_CANAL_ID]: _removed, ...rest } = bundle.canales
+  const rest = Object.fromEntries(
+    Object.entries(bundle.canales).filter(([k]) => k !== JOURNEY_BASE_CANAL_ID)
+  ) as Record<string, MVPPersist>
   return { ...bundle, generic: merged, canales: rest }
 }
 

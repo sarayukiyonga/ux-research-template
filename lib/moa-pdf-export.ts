@@ -209,7 +209,7 @@ export async function exportRoutesToCombinedPdf(
       host.appendChild(iframe)
 
       await new Promise<void>((resolve, reject) => {
-        let maxWait = window.setTimeout(() => {
+        const maxWait = window.setTimeout(() => {
           window.setTimeout(resolve, settleMs)
         }, 20000)
         iframe.onload = () => {

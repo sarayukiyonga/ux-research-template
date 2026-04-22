@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense, useCallback } from 'react'
+import { Suspense, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { EmpathyMapPage, type EmpathySegment } from '@/components/EmpathyMapPage'
 import { PdfDownloadButton } from '@/components/PdfDownloadButton'
@@ -9,18 +9,13 @@ function EmpathyTabsInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const [tab, setTab] = useState<EmpathySegment>('clientes')
-
-  useEffect(() => {
+  const tab = useMemo<EmpathySegment>(() => {
     const t = searchParams.get('tab')
-    if (t === 'potenciales' || t === 'clientes') {
-      setTab(t)
-    }
+    return t === 'potenciales' ? 'potenciales' : 'clientes'
   }, [searchParams])
 
   const selectTab = useCallback(
     (next: EmpathySegment) => {
-      setTab(next)
       const q = next === 'clientes' ? '' : '?tab=potenciales'
       router.replace(`${pathname}${q}`, { scroll: false })
     },

@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 import { CEO_SHEET_ID } from '@/lib/ceo-questions'
-import type { JourneyForPersona, UserJourneyBundle } from '@/lib/user-journey-bundle'
+import type { JourneyForPersona } from '@/lib/user-journey-bundle'
 import {
   getJourneyPairForUserFlow,
   parsePersistedJourneyCell,

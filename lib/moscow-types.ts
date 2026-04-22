@@ -141,7 +141,9 @@ export function unifyJourneyBaseMoSCoWBundle(bundle: MoSCoWBundlePersist): MoSCo
   const jb = bundle.canales[JOURNEY_BASE_CANAL_ID]
   if (!jb) return bundle
   const merged = mergeMoSCoWPersist(bundle.generic, jb)
-  const { [JOURNEY_BASE_CANAL_ID]: _removed, ...restCanales } = bundle.canales
+  const restCanales = Object.fromEntries(
+    Object.entries(bundle.canales).filter(([k]) => k !== JOURNEY_BASE_CANAL_ID)
+  ) as Record<string, MoSCoWPersist>
   return { ...bundle, generic: merged, canales: restCanales }
 }
 

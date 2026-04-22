@@ -361,7 +361,7 @@ function PasoEditForm({
           {retornoTipo && retornoA && (
             <label className="block space-y-1">
               <span className="text-[11px] font-medium text-gray-500">
-                Etiqueta de la flecha (ej. "Si falla", "Reintentar")
+                Etiqueta de la flecha (ej. «Si falla», «Reintentar»)
               </span>
               <input
                 value={retornoLabel}
@@ -579,19 +579,18 @@ function InlineLabelEditor({
   const [draft, setDraft] = useState(value)
   const ref = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (editing) {
-      setDraft(value)
-      setTimeout(() => { ref.current?.select() }, 0)
-    }
-  }, [editing, value])
-
   if (!editing) {
     return (
       <span
         className={`cursor-pointer rounded px-1 hover:bg-gray-100 transition-colors ${className}`}
         title="Clic para editar etiqueta"
-        onClick={() => setEditing(true)}
+        onClick={() => {
+          setDraft(value)
+          setEditing(true)
+          setTimeout(() => {
+            ref.current?.select()
+          }, 0)
+        }}
       >
         {value || <span className="italic text-gray-400">—</span>}
       </span>
@@ -717,13 +716,6 @@ function FlowDownArrow({
   const [draftLabel, setDraftLabel] = useState(label)
   const labelRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (editingLabel) {
-      setDraftLabel(label)
-      setTimeout(() => { labelRef.current?.select() }, 0)
-    }
-  }, [editingLabel, label])
-
   const tip = label ? label.slice(0, 2000) : undefined
 
   const commitLabel = () => {
@@ -749,7 +741,17 @@ function FlowDownArrow({
     <p
       className={`w-full max-w-2xl px-1 text-center text-[12px] font-medium leading-snug text-gray-500 line-clamp-3 ${onEditLabel ? 'cursor-pointer hover:text-teal-600' : ''}`}
       title={onEditLabel ? 'Clic para editar etiqueta' : tip}
-      onClick={onEditLabel ? () => setEditingLabel(true) : undefined}
+      onClick={
+        onEditLabel
+          ? () => {
+              setDraftLabel(label)
+              setEditingLabel(true)
+              setTimeout(() => {
+                labelRef.current?.select()
+              }, 0)
+            }
+          : undefined
+      }
     >
       {label}
     </p>
@@ -1187,11 +1189,7 @@ function TreeLinealSteps({
 
 // ─── Nodo recursivo editable ──────────────────────────────────────────────────
 
-function branchPathVariant(
-  _ramas: { etiqueta: string }[],
-  idx: number,
-  _parentVariant: 'default' | 'alternate'
-): 'default' | 'alternate' {
+function branchPathVariant(_ramas: { etiqueta: string }[], idx: number): 'default' | 'alternate' {
   // La primera rama (índice 0 = Sí / afirmativa) es siempre teal.
   // Las ramas siguientes (No, otras) son siempre rose/alternate.
   return idx === 0 ? 'default' : 'alternate'
@@ -1340,7 +1338,7 @@ function RenderFlowNodo({
 
       <div className="flex w-full flex-col items-stretch justify-center gap-8 pt-1 lg:flex-row lg:items-start">
         {nodo.ramas.map((rama, idx) => {
-          const childVariant = branchPathVariant(nodo.ramas, idx, pathVariant)
+          const childVariant = branchPathVariant(nodo.ramas, idx)
           return (
             <div
               key={`${rama.etiqueta}-${idx}`}
@@ -1465,13 +1463,11 @@ function UserFlowchartSection({
   flow,
   segmentLabel,
   canalSubtitle,
-  accent: _accent,
   onUpdateFlow,
 }: {
   flow: UserFlowLine
   segmentLabel: string
   canalSubtitle?: string
-  accent: 'cyan' | 'orange'
   onUpdateFlow?: (newFlow: UserFlowLine) => void
 }) {
   const { raiz } = flow
@@ -2146,7 +2142,6 @@ export function UserFlowPage() {
     )
   }
 
-  const accent = segmento === 'clienteActual' ? 'cyan' : 'orange'
   const segmentLabel = segmento === 'clienteActual' ? 'Cliente actual' : 'Cliente potencial'
   const activeCanalId = flow[segmento].canalActivoId
   const activeLine = getFlowLineForSegmentChannel(flow, segmento, activeCanalId)
@@ -2364,7 +2359,6 @@ export function UserFlowPage() {
           flow={activeLine}
           segmentLabel={segmentLabel}
           canalSubtitle={canalLabel}
-          accent={accent}
           onUpdateFlow={(newLine) => void handleUpdateActiveLine(newLine)}
         />
       ) : null}

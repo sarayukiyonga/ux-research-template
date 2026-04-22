@@ -11,7 +11,6 @@ import {
   MoSCoWNotas,
   MoSCoWTamano,
   createEmptyMoSCoWBundle,
-  createEmptyNotas,
   getScopePersist,
   newMoSCoWId,
   normalizeMoSCoWPersist,
@@ -64,7 +63,7 @@ export function MoSCoWPage() {
     { id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' },
   ])
   const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('loading')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [iaStatus, setIaStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [iaError, setIaError] = useState<string | null>(null)
@@ -89,7 +88,6 @@ export function MoSCoWPage() {
   // ── Carga inicial (tablero + ámbitos desde journey) ───────────────────────────
 
   useEffect(() => {
-    setLoadStatus('loading')
     Promise.all([fetch('/api/moscow-saved'), fetch('/api/moscow-scopes')])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([data, scopesData]) => {
@@ -106,20 +104,18 @@ export function MoSCoWPage() {
         setBundle(initial)
         if (data.saved?.savedAt) setSavedAt(data.saved.savedAt)
         const opts = Array.isArray(scopesData.options) ? scopesData.options : []
-        setScopeOptions(
-          opts.length ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        const nextOptions =
+          opts.length > 0 ? opts : [{ id: MOSCOW_SCOPE_ALL, label: 'Todos los canales' }]
+        setScopeOptions(nextOptions)
+        setScope((current) =>
+          nextOptions.some((o: MoscowScopeOptionRow) => o.id === current)
+            ? current
+            : MOSCOW_SCOPE_ALL
         )
         setLoadStatus('loaded')
       })
       .catch(() => setLoadStatus('error'))
   }, [])
-
-  useEffect(() => {
-    if (loadStatus !== 'loaded') return
-    if (!scopeOptions.some((o) => o.id === scope)) {
-      setScope(MOSCOW_SCOPE_ALL)
-    }
-  }, [loadStatus, scopeOptions, scope])
 
   // ── Guardar ──────────────────────────────────────────────────────────────────
 
@@ -455,11 +451,11 @@ function StickyNota({
   onPointerDown: (e: React.PointerEvent, id: string, cat: MoSCoWCategoria) => void
   onDoubleClick: () => void
 }) {
-  const rotation = useRef(((nota.id.charCodeAt(nota.id.length - 1) % 7) - 3) * 0.8)
+  const rotationDeg = ((nota.id.charCodeAt(nota.id.length - 1) % 7) - 3) * 0.8
 
   return (
     <div
-      style={{ transform: `rotate(${rotation.current}deg)`, touchAction: 'none' }}
+      style={{ transform: `rotate(${rotationDeg}deg)`, touchAction: 'none' }}
       className={`
         ${COLOR_CLASSES[nota.color]}
         ${SIZE_CLASSES[nota.tamano]}
