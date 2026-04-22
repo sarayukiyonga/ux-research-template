@@ -180,6 +180,17 @@ export const RESEARCH_PHASES: ResearchPhase[] = [
         long: 'Matriz MVP: qué entra en el producto mínimo y con qué peso relativo.',
         color: 'violet',
       },
+      {
+        href: '/card-sorting',
+        emoji: '📇',
+        tag: 'Priorizar',
+        title: 'Card sorting',
+        description:
+          'Tras el MVP: configuras tarjetas y categorías; los participantes clasifican en una página pública sin sesión.',
+        short: 'Cards',
+        long: 'Card sorting: tarjetas desde el MVP por canal y categorías; sesión pública con arrastre para usuarios.',
+        color: 'violet',
+      },
     ],
   },
   {

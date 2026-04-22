@@ -1,8 +1,8 @@
 import { streamText, generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { NextResponse } from 'next/server'
-import { QUESTIONS } from '@/lib/questions'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import type { SurveyQuestionFromSheet } from '@/lib/survey-sheet-headers'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -10,11 +10,12 @@ export const maxDuration = 120
 
 const SYSTEM = `Eres un investigador UX y estratega de marca especializado en salud, bienestar y entrenamiento personal. 
 Tu tarea es crear User Personas a partir de respuestas reales de encuestas.
-Responde siempre en español. Sé empático, humano y orientado a insights accionables para ${CLIENT.ownerFirstName} (${CLIENT.ownerRole}).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+Responde siempre en español. Sé empático, humano y orientado a insights accionables para ${CLIENT.ownerFirstName} (${CLIENT.ownerRole}).${CLIENT_AI_SERVICE_CONTEXT}`
 
 function buildPersonaPrompt(
   byQuestion: { questionId: number; answers: string[] }[],
-  demographic: { men: string[]; women: string[]; nonBinary: string[] }
+  demographic: { men: string[]; women: string[]; nonBinary: string[] },
+  questions: SurveyQuestionFromSheet[]
 ) {
   const totalRespondents =
     (demographic.men?.length ?? 0) +
@@ -31,12 +32,13 @@ function buildPersonaPrompt(
     .filter(Boolean)
     .join('\n')
 
-  const questionsBlock = QUESTIONS.map((q) => {
-    const entry = byQuestion.find((b: { questionId: number; answers: string[] }) => b.questionId === q.id)
-    const answers = entry?.answers ?? []
-    if (answers.length === 0) return ''
-    return `**${q.title}**\n${answers.map((a: string) => `- "${a}"`).join('\n')}`
-  })
+  const questionsBlock = questions
+    .map((q) => {
+      const entry = byQuestion.find((b: { questionId: number; answers: string[] }) => b.questionId === q.questionId)
+      const answers = entry?.answers ?? []
+      if (answers.length === 0) return ''
+      return `**${q.title}**\n${answers.map((a: string) => `- "${a}"`).join('\n')}`
+    })
     .filter(Boolean)
     .join('\n\n')
 
@@ -86,9 +88,16 @@ Qué le cuesta o le da pereza del modelo actual. 1-2 frases.
 }
 
 export async function POST(req: Request) {
-  const { byQuestion, demographic, stream = true } = await req.json()
+  const { byQuestion, demographic, questions, stream = true } = await req.json()
 
-  const { prompt } = buildPersonaPrompt(byQuestion, demographic)
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return NextResponse.json(
+      { error: 'Falta "questions" (metadatos de la fila de encabezados del Sheet). Recarga la encuesta en /survey.' },
+      { status: 400 }
+    )
+  }
+
+  const { prompt } = buildPersonaPrompt(byQuestion, demographic, questions as SurveyQuestionFromSheet[])
 
   if (!stream) {
     const { text } = await generateText({

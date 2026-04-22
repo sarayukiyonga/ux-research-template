@@ -4,15 +4,18 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
-import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS, QUESTIONS } from '@/lib/questions'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
+import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
 import { CLIENT } from '@/lib/client-config'
 import {
   POTENTIAL_SHEET_ID,
   POTENTIAL_SHEET_RANGE,
   POTENTIAL_DEMOGRAPHIC_COLUMNS,
-  POTENTIAL_QUESTIONS,
 } from '@/lib/potential-questions'
+import {
+  getSegmentFilterColumnIndex,
+  parseSurveyQuestionsFromHeaderRow,
+} from '@/lib/survey-sheet-headers'
 import type { SurveyFilters } from '@/lib/sheets'
 import { fetchSavedInsights, insightsToPlainText } from '@/lib/fetch-saved-insights'
 
@@ -117,8 +120,6 @@ function potentialAge(row: string[]): string {
   )
 }
 
-const PAIN_COL = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
-
 function countMap(arr: (string | null)[]): Record<string, number> {
   const m: Record<string, number> = {}
   for (const a of arr) {
@@ -161,7 +162,16 @@ function genderModalToPersona(g: 'men' | 'women' | 'nonBinary' | null): 'mujer' 
 async function buildClientSurveyContext(filters: SurveyFilters): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_RANGE })
-  let rows = (res.data.values ?? []).slice(1).filter((r) => r.some(Boolean))
+  const allRows = res.data.values ?? []
+  const headerRow = allRows[0] ?? []
+  const dataMaxLen = allRows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allClientRows = allRows.slice(1).filter((r) => r.some(Boolean))
+  const questions = parseSurveyQuestionsFromHeaderRow(headerRow, 'client', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allClientRows,
+  })
+
+  let rows = allClientRows
 
   if (filters.gender && filters.gender !== 'all') {
     rows = rows.filter((row) => clientGender(row) === filters.gender)
@@ -195,7 +205,7 @@ async function buildClientSurveyContext(filters: SurveyFilters): Promise<string>
   }
   if (best === 0) modalGenderKey = null
 
-  const occQ = QUESTIONS.find((q) => q.id === 2)
+  const occQ = questions.find((q) => q.isOccupationColumn) ?? questions[0]
   const occCounts: Record<string, number> = {}
   if (occQ) {
     rows.forEach((r) => {
@@ -220,10 +230,10 @@ async function buildClientSurveyContext(filters: SurveyFilters): Promise<string>
     return lines.length ? `${title}:\n${lines.join('\n')}` : ''
   }
 
-  const extra = [
-    sampleOpen(5, 'Muestras · salud/médicos antes (Q3)'),
-    sampleOpen(7, 'Muestras · barreras gimnasio convencional (Q5)'),
-  ]
+  const openNonOcc = questions.filter((q) => q.type === 'open' && !q.isOccupationColumn)
+  const pickCols = [openNonOcc[1], openNonOcc[3]].filter(Boolean) as typeof openNonOcc
+  const extra = pickCols
+    .map((q) => sampleOpen(q.columnIndex, `Muestras · ${q.shortTitle}`))
     .filter(Boolean)
     .join('\n\n')
 
@@ -247,7 +257,17 @@ async function buildClientSurveyContext(filters: SurveyFilters): Promise<string>
 async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: POTENTIAL_SHEET_ID, range: POTENTIAL_SHEET_RANGE })
-  let rows = (res.data.values ?? []).slice(1).filter((r) => r.some(Boolean))
+  const allRows = res.data.values ?? []
+  const headerRow = allRows[0] ?? []
+  const dataMaxLen = allRows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allPotentialRows = allRows.slice(1).filter((r) => r.some(Boolean))
+  const pq = parseSurveyQuestionsFromHeaderRow(headerRow, 'potential', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allPotentialRows,
+  })
+  const painCol = getSegmentFilterColumnIndex(pq)
+
+  let rows = allPotentialRows
 
   if (filters.gender && filters.gender !== 'all') {
     rows = rows.filter((row) => potentialGender(row) === filters.gender)
@@ -255,8 +275,8 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
   if (filters.ageRanges?.length) {
     rows = rows.filter((row) => filters.ageRanges!.includes(potentialAge(row)))
   }
-  if (filters.painValues?.length) {
-    rows = rows.filter((row) => filters.painValues!.includes((row[PAIN_COL] ?? '').trim()))
+  if (filters.painValues?.length && painCol != null) {
+    rows = rows.filter((row) => filters.painValues!.includes((row[painCol] ?? '').trim()))
   }
 
   const genders = rows.map(potentialGender).filter(Boolean) as ('men' | 'women' | 'nonBinary')[]
@@ -284,11 +304,13 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
   }
   if (best === 0) modalGenderKey = null
 
-  const painCounts = countMap(rows.map((r) => (r[PAIN_COL] ?? '').trim() || null))
+  const painCounts =
+    painCol != null ? countMap(rows.map((r) => (r[painCol] ?? '').trim() || null)) : {}
   const painTop = topCounts(painCounts, 6)
+  const filterQ = painCol != null ? pq.find((q) => q.columnIndex === painCol) : null
 
   const closedSummaries: string[] = []
-  for (const q of POTENTIAL_QUESTIONS.filter((x) => x.type === 'closed')) {
+  for (const q of pq.filter((x) => x.type === 'closed')) {
     const c = countMap(rows.map((r) => (r[q.columnIndex] ?? '').trim() || null))
     const t = topCounts(c, 5)
     if (t.length && t.some(([k]) => k)) {
@@ -298,9 +320,8 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
     }
   }
 
-  const sampleOpen = (id: number, max = 4) => {
-    const q = POTENTIAL_QUESTIONS.find((x) => x.id === id && x.type === 'open')
-    if (!q) return ''
+  const sampleOpenByCol = (q: (typeof pq)[number] | undefined, max = 4) => {
+    if (!q || q.type !== 'open') return ''
     const seen = new Set<string>()
     const lines: string[] = []
     for (const r of rows) {
@@ -313,7 +334,10 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
     return lines.length ? `${q.shortTitle}:\n${lines.join('\n')}` : ''
   }
 
-  const extra = [sampleOpen(8), sampleOpen(11), sampleOpen(13)].filter(Boolean).join('\n\n')
+  const opens = pq.filter((x) => x.type === 'open')
+  const extraPick = [opens[Math.floor(opens.length / 3)], opens[Math.floor((opens.length * 2) / 3)], opens[opens.length - 1]]
+    .filter((q, i, a) => q && a.findIndex((x) => x?.columnIndex === q.columnIndex) === i)
+  const extra = extraPick.map((q) => sampleOpenByCol(q)).filter(Boolean).join('\n\n')
 
   const lines = [
     `Respuestas en este corte: ${rows.length}`,
@@ -325,7 +349,9 @@ async function buildPotentialSurveyContext(filters: SurveyFilters): Promise<stri
     modalAgeLabel
       ? `EDAD_FRANJA_MODA: "${modalAgeLabel}"${ageHint != null ? ` → sugerencia entera edad: ${ageHint}` : ''}`
       : '',
-    painTop.length ? `Dolor / patología (Q1, más frecuente):\n${painTop.map(([k, v]) => `  - ${k}: ${v}`).join('\n')}` : '',
+    painTop.length && filterQ
+      ? `${filterQ.shortTitle} (columna filtro, más frecuente):\n${painTop.map(([k, v]) => `  - ${k}: ${v}`).join('\n')}`
+      : '',
     closedSummaries.length ? `Respuestas cerradas (recuentos):\n${closedSummaries.map((s) => `  - ${s}`).join('\n')}` : '',
     extra,
   ].filter(Boolean)
@@ -384,7 +410,7 @@ Fuentes por persona:
 
 Los dos perfiles deben distinguirse claramente. Español natural. Nombres locales plausibles.
 
-Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+Campo **canalesBusquedaSolucion** (obligatorio en cada persona): deduce **dónde y cómo** busca ayuda o información para cubrir sus necesidades, apoyándote sobre todo en **patrones de la encuesta** (p. ej. confianza en profesionales de la salud, uso de redes, búsqueda online, recomendaciones cercanas) y en insights. Entre 2 y 10 ítems, cada uno muy corto (máx. ~6 palabras).${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `=== ENTREVISTA — ${CLIENT.ownerFirstName} / ${CLIENT.name} ===\n${interview}
 
 === DATOS ENCUESTA FILTRADOS — CLIENTES ACTUALES (demografía y muestras; mismo corte que en /survey) ===

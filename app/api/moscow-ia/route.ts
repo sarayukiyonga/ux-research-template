@@ -15,7 +15,7 @@ import {
 import { getCanalPromptFields } from '@/lib/user-journey-channels'
 import type { UserJourneyV3Persist } from '@/lib/user-journey-persist'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import {
   hasIdeasForAllScope,
   journeyCanalReadyForMoscowIa,
@@ -180,7 +180,7 @@ Para cada nota:
 4. "origenMVP": texto corto (máx. 100) que cite la **idea FUNC/CONT** o el **título de etapa** del journey de la que procede; si fusionas varias, sepáralas con "; ". **null** solo si la nota se apoya **exclusivamente** en un fragmento claro de la **encuesta a la ${CLIENT.ownerRole}** (y entonces el "texto" debe reflejar ese fragmento).
 
 Distribución realista típica: 4–7 Must, 3–6 Should, 3–5 Could, 2–4 Won't.
-Contexto: ${CLIENT.name} (${CLIENT.serviceShort}, ${CLIENT.ownerFirstName}).${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+Contexto: ${CLIENT.name} (${CLIENT.serviceShort}, ${CLIENT.ownerFirstName}).${CLIENT_AI_SERVICE_CONTEXT}`
 
     const result = await generateObject({
       model: openai('gpt-4o'),

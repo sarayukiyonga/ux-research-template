@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { exportRoutesToCombinedPdf } from '@/lib/moa-pdf-export'
-import { MOA_FULL_PDF_ROUTES } from '@/lib/moa-pdf-routes'
+import { exportRoutesToCombinedPdf } from '@/lib/research-pdf-export'
+import { FULL_RESEARCH_PDF_ROUTES } from '@/lib/research-pdf-routes'
 
 export function PdfDashboardFullExport({ fileName }: { fileName: string }) {
   const [busy, setBusy] = useState(false)
@@ -15,7 +15,7 @@ export function PdfDashboardFullExport({ fileName }: { fileName: string }) {
       onClick={async () => {
         setBusy(true)
         try {
-          await exportRoutesToCombinedPdf(MOA_FULL_PDF_ROUTES, fileName)
+          await exportRoutesToCombinedPdf(FULL_RESEARCH_PDF_ROUTES, fileName)
         } catch (e) {
           console.error(e)
           window.alert(

@@ -3,7 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { hmwIaContextToMarkdown, loadHmwIaContextOrFail } from '@/lib/hmw-ia-context'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 import {
   HMW_MARCA_MOTIVO_MAX_LEN,
@@ -220,7 +220,7 @@ Las cadenas vacías "" solo al final del array, nunca intercaladas entre ideas c
       schema,
       system:
         `Eres un diseñador de producto digital senior en ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.location}). Respondes solo con el JSON pedido; español neutro o de España. En cada pregunta: "respuestas" ordenadas por prioridad (impacto usuaria, luego viabilidad ${CLIENT.ownerFirstName}); "respuestasMarcas" con exactamente una "mejor" y "no_viable" en ideas inviables; "respuestasMarcaMotivos" con explicaciones breves solo donde corresponda. No inventes canales digitales ni "plataforma existente" que no figuren en el contexto del prompt.` +
-        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
+        CLIENT_AI_SERVICE_CONTEXT,
       prompt: userPrompt,
     })
 

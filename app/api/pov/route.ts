@@ -3,7 +3,7 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { fetchSavedUserPersonas, personaRecordToPlainText } from '@/lib/fetch-saved-user-personas'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -115,14 +115,14 @@ export async function POST() {
   const { object: clienteActual } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema: z.object({ statement: statementSchemaActual }),
-    system: `${SYSTEM_CLIENTE_ACTUAL}${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+    system: `${SYSTEM_CLIENTE_ACTUAL}${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `=== ÚNICA FUENTE (cliente actual) ===\n\n${textoActual}\n\n===\nGenera el POV en el campo "statement".`,
   })
 
   const { object: clientePotencial } = await generateObject({
     model: openai('gpt-4o-mini'),
     schema: z.object({ statement: statementSchemaPotencial }),
-    system: `${SYSTEM_CLIENTE_POTENCIAL}${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+    system: `${SYSTEM_CLIENTE_POTENCIAL}${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `=== ÚNICA FUENTE (cliente potencial) ===\n\n${textoPotencial}\n\n===\nGenera el POV en el campo "statement".`,
   })
 

@@ -17,6 +17,8 @@ interface FilterBarProps {
   totalFiltered: number
   totalAll: number
   onChange: (filters: ActiveFilters) => void
+  /** Etiqueta del filtro multi-valor (p. ej. texto del encabezado de la columna [filtro] en Sheets). */
+  secondaryFilterLabel?: string
 }
 
 function toggleValue(current: string[], value: string): string[] {
@@ -39,6 +41,7 @@ export function FilterBar({
   totalFiltered,
   totalAll,
   onChange,
+  secondaryFilterLabel = 'Dolor crónico',
 }: FilterBarProps) {
   const isFiltered =
     activeFilters.gender !== 'all' ||
@@ -125,11 +128,11 @@ export function FilterBar({
           </div>
         )}
 
-        {/* Dolor crónico */}
+        {/* Filtro por columna marcada [filtro] o primera [closed] (potenciales) */}
         {(filterOptions.painValues?.length ?? 0) > 0 && (
           <div className="space-y-1.5">
             <p className="text-xs text-gray-400 font-medium">
-              Dolor crónico
+              {secondaryFilterLabel}
               {(activeFilters.painValues?.length ?? 0) > 0 && (
                 <span className="ml-1.5 text-violet-600">({activeFilters.painValues!.length} seleccionados)</span>
               )}

@@ -22,7 +22,7 @@ import {
 } from '@/lib/user-journey-ideas-persist'
 import { userFlowLineSchema, normalizeUserFlowLine } from '@/lib/user-flow-tree'
 import { DEFAULT_USER_JOURNEY_CANAL_ID, getCanalPromptFields } from '@/lib/user-journey-channels'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 import { fetchSitemapPromptBlockFromSheets } from '@/lib/fetch-saved-sitemap-prompt'
 import { fetchMVPBundleFromSheets } from '@/lib/fetch-mvp-bundle-sheets'
@@ -76,7 +76,7 @@ Reglas:
 - Responde en español.
 - Incluye **al menos una decisión** en el árbol.
 - Como máximo **2 decisiones** en cadena por rama.
-${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+${CLIENT_AI_SERVICE_CONTEXT}`
 }
 
 function buildMvpPromptBlock(bundle: MVPBundlePersist, canalId: string, canalLabel: string): string {

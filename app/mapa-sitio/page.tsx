@@ -48,9 +48,9 @@ export default function MapaSitioRoute() {
 
         <SitemapMoaPage />
 
-        <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
-          <Link href="/mvp" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            ← Matriz MVP
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-400">
+          <Link href="/card-sorting" className="text-violet-600 font-medium hover:underline underline-offset-2">
+            ← Card sorting
           </Link>
           <Link href="/user-flow" className="text-violet-600 font-medium hover:underline underline-offset-2">
             User Flow →

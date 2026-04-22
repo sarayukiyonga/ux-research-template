@@ -1,5 +1,10 @@
 import { google } from 'googleapis'
-import { SHEET_ID, SHEET_RANGE, QUESTIONS, DEMOGRAPHIC_COLUMNS } from './questions'
+import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from './questions'
+import { getConfidentialEmailExcludedColumnIndices } from './confidential-email'
+import {
+  parseSurveyQuestionsFromHeaderRow,
+  type SurveyQuestionFromSheet,
+} from './survey-sheet-headers'
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -49,6 +54,8 @@ export interface SurveyData {
   lastUpdated: string
   responses: SurveyRow[]
   byQuestion: { questionId: number; answers: string[] }[]
+  /** Metadatos de preguntas (textos desde la fila 1 del Sheet), orden por columna. */
+  questions: SurveyQuestionFromSheet[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
   filterOptions: SurveyFilterOptions
 }
@@ -80,9 +87,16 @@ export async function getSurveyData(filters: SurveyFilters = {}): Promise<Survey
   })
 
   const rows = res.data.values ?? []
+  const headerRow = rows[0] ?? []
   const allDataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const dataMaxLen = allDataRows.reduce((m, r) => Math.max(m, r.length), 0)
+  const maxCol = Math.max(dataMaxLen, headerRow.length)
+  const emailExcludedCols = getConfidentialEmailExcludedColumnIndices(headerRow, allDataRows, maxCol)
+  const questions = parseSurveyQuestionsFromHeaderRow(headerRow, 'client', {
+    maxColumnExclusive: maxCol,
+    confidentialEmailResponseRows: allDataRows,
+  })
 
-  // Compute filter options from the full dataset
   const ageRangesSet = new Set<string>()
   for (const row of allDataRows) {
     const age = getRowAge(row)
@@ -90,7 +104,6 @@ export async function getSurveyData(filters: SurveyFilters = {}): Promise<Survey
   }
   const ageRanges = Array.from(ageRangesSet).sort()
 
-  // Apply filters
   const dataRows = allDataRows.filter((row) => {
     if (filters.gender && filters.gender !== 'all') {
       if (getRowGender(row) !== filters.gender) return false
@@ -103,11 +116,11 @@ export async function getSurveyData(filters: SurveyFilters = {}): Promise<Survey
 
   const responses: SurveyRow[] = dataRows.map((row) => ({
     timestamp: row[0] ?? '',
-    answers: row.slice(1),
+    answers: row.slice(1).map((cell, i) => (emailExcludedCols.has(i + 1) ? '' : cell)),
   }))
 
-  const byQuestion = QUESTIONS.map((q) => ({
-    questionId: q.id,
+  const byQuestion = questions.map((q) => ({
+    questionId: q.questionId,
     answers: shuffle(
       dataRows
         .map((row) => row[q.columnIndex] ?? '')
@@ -130,6 +143,7 @@ export async function getSurveyData(filters: SurveyFilters = {}): Promise<Survey
     lastUpdated,
     responses,
     byQuestion,
+    questions,
     demographic,
     filterOptions: { ageRanges },
   }

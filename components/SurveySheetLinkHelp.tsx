@@ -4,7 +4,7 @@
 export function SurveySheetLinkHelp({ variant }: { variant: 'clientes' | 'potenciales' }) {
   const isClientes = variant === 'clientes'
   const envVar = isClientes ? 'SURVEY_SHEET_ID' : 'POTENTIAL_SURVEY_SHEET_ID'
-  const range = isClientes ? 'A:P' : 'A:Q'
+  const range = 'A:ZZ'
   const title = isClientes
     ? 'Cómo vincular la hoja de la encuesta (clientes actuales)'
     : 'Cómo vincular la hoja de la encuesta (clientes potenciales)'
@@ -29,7 +29,13 @@ export function SurveySheetLinkHelp({ variant }: { variant: 'clientes' | 'potenc
           </>
         )}{' '}
         La app consulta el rango <code className="rounded bg-white/80 px-1 text-[11px]">{range}</code> de la{' '}
-        <strong>primera pestaña</strong> de ese documento (fila 1 cabeceras, siguientes filas = respuestas).
+        <strong>primera pestaña</strong> de ese documento: la <strong>fila 1</strong> son los textos de las preguntas
+        (encabezados); no están definidos en código. Columna A = marca temporal; B–D = edad por género; desde la
+        columna E las respuestas abiertas/cerradas. Opcional en encabezados:{' '}
+        <code className="text-[10px]">[closed]</code> (potenciales), <code className="text-[10px]">[filtro]</code>,{' '}
+        <code className="text-[10px]">[ocupaciones]</code>, <code className="text-[10px]">[no grupos ia]</code>,{' '}
+        <code className="text-[10px]">[empatía]</code>, <code className="text-[10px]">[diseño]</code>,{' '}
+        <code className="text-[10px]">[ignore]</code> — ver comentario en <code className="text-[10px]">survey-sheet-headers.ts</code>.
       </p>
       <ol className="mt-3 list-decimal space-y-2 pl-4 text-xs text-amber-950/90 leading-relaxed marker:font-semibold">
         <li>
@@ -82,6 +88,10 @@ export function SurveySheetLinkHelp({ variant }: { variant: 'clientes' | 'potenc
         <li>
           Si la carga funciona pero ves pocos datos: revisa que haya filas con contenido bajo las cabeceras y que los
           filtros de género/edad (arriba) no dejen el conjunto vacío.
+        </li>
+        <li>
+          Por privacidad, las columnas cuyo encabezado indique correo electrónico o donde alguna respuesta parezca un
+          e-mail <strong>no se cargan ni se muestran</strong> en la app.
         </li>
       </ol>
       <p className="mt-3 text-[11px] text-amber-900/70">

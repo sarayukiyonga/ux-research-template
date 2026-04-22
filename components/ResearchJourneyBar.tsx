@@ -23,19 +23,19 @@ export function ResearchJourneyBar() {
 
   return (
     <div className="sticky top-0 z-40 border-b border-gray-200/80 bg-white/95 shadow-sm backdrop-blur-md">
-      <div className="mx-auto max-w-6xl px-3 sm:px-4 py-2.5 sm:py-3">
+      <div className="mx-auto max-w-7xl px-2 sm:px-3 py-2">
         <p
           id="research-journey-bar-label"
-          className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400"
+          className="mb-1 text-center text-[9px] font-semibold uppercase tracking-wide text-gray-400"
         >
           Recorrido de investigación UX
         </p>
 
         <nav
-          className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-labelledby="research-journey-bar-label"
         >
-          <div className="flex min-w-max items-start justify-center gap-0 px-1">
+          <div className="flex min-w-max items-start justify-center gap-0 px-0">
             {RESEARCH_JOURNEY_STEPS.map((step, i) => {
               const isCurrent = i === current
               const isPast = current >= 0 && i < current
@@ -43,19 +43,19 @@ export function ResearchJourneyBar() {
               const stepLabel = `Paso ${num} de ${total}: ${step.title}`
 
               return (
-                <div key={step.href} className="flex items-start">
+                <div key={step.href} className="flex shrink-0 items-start">
                   <Link
                     href={step.href}
                     aria-label={stepLabel}
                     aria-current={isCurrent ? 'page' : undefined}
-                    className="group flex w-11 flex-col items-center gap-1 sm:w-14"
+                    className="group flex w-8 flex-col items-center gap-0.5 sm:w-9"
                   >
                     <span
                       aria-hidden
                       className={cn(
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors sm:h-8 sm:w-8 sm:text-[11px]',
+                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold transition-colors sm:h-7 sm:w-7 sm:border-2 sm:text-[10px]',
                         isCurrent &&
-                          'border-violet-600 bg-violet-600 text-white shadow-md ring-2 ring-violet-200',
+                          'border-violet-600 bg-violet-600 text-white shadow-sm ring-1 ring-violet-200 sm:shadow-md sm:ring-2',
                         !isCurrent &&
                           isPast &&
                           'border-emerald-400 bg-emerald-50 text-emerald-800 group-hover:border-emerald-500',
@@ -69,10 +69,11 @@ export function ResearchJourneyBar() {
                     <span
                       aria-hidden
                       className={cn(
-                        'text-center text-[8px] font-medium leading-tight text-gray-400 sm:text-[9px]',
+                        'max-w-[2rem] truncate text-center text-[7px] font-medium leading-tight text-gray-400 sm:max-w-none sm:text-[8px]',
                         isCurrent && 'text-violet-700',
                         isPast && 'text-emerald-700'
                       )}
+                      title={step.short}
                     >
                       {step.short}
                     </span>
@@ -80,7 +81,7 @@ export function ResearchJourneyBar() {
                   {i < RESEARCH_JOURNEY_STEPS.length - 1 && (
                     <div
                       className={cn(
-                        'mx-0.5 mt-[13px] h-px w-2 shrink-0 sm:mx-1 sm:mt-[15px] sm:w-4 md:w-6',
+                        'mt-[11px] h-px w-1 shrink-0 self-start sm:mt-[13px] sm:w-1.5',
                         current >= 0 && i < current ? 'bg-emerald-300' : 'bg-gray-200'
                       )}
                       aria-hidden
@@ -94,7 +95,7 @@ export function ResearchJourneyBar() {
 
         <p
           className={cn(
-            'mt-2.5 border-t border-gray-100 pt-2 text-center text-[11px] leading-snug text-gray-600 sm:text-xs',
+            'mt-1.5 border-t border-gray-100 pt-1.5 text-center text-[10px] leading-snug text-gray-600 sm:text-[11px]',
             current >= 0 && 'text-gray-800'
           )}
         >

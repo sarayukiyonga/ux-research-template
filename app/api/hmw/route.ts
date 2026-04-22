@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { fetchSavedPovFromSheets, povPairToPlainTextForHmw, type POVStatement } from '@/lib/fetch-saved-pov'
 import type { HMWQuestionsPayload } from '@/lib/hmw-payload'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT, CLIENT_SHORT_DESC } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -46,7 +46,7 @@ Reglas:
 - Cada pregunta debe empezar exactamente por **"¿Cómo podríamos"** (tilde en "cómo"), seguida de un reto concreto de diseño (interfaz, contenidos, flujos, confianza, accesibilidad, prueba social, onboarding, etc.).
 - **No asumas** que existe web, app o «plataforma» salvo que el POV lo mencione de forma explícita.
 - Evita genéricos vacíos ("¿Cómo podríamos mejorar la web?"). Sé específico al dolor/necesidad/insight del POV.
-- No copies el POV entero dentro de la pregunta; tradúcelo a retos de diseño.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+- No copies el POV entero dentro de la pregunta; tradúcelo a retos de diseño.${CLIENT_AI_SERVICE_CONTEXT}`
 
 const toPayload = (list: string[]): HMWQuestionsPayload['clienteActual'] =>
   list.map((pregunta) => ({ pregunta, respuestas: [''] }))

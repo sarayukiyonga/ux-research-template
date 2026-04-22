@@ -1,7 +1,7 @@
-export type MoaPdfRoute = { path: string; title: string }
+export type ResearchPdfRoute = { path: string; title: string }
 
 /** Rutas del panel (mismo orden que el dashboard) para el PDF combinado. */
-export const MOA_FULL_PDF_ROUTES: MoaPdfRoute[] = [
+export const FULL_RESEARCH_PDF_ROUTES: ResearchPdfRoute[] = [
   { path: '/survey', title: 'Encuesta de clientes' },
   { path: '/potential', title: 'Encuesta a clientes potenciales' },
   { path: '/ceo', title: 'Entrevista a la CEO' },

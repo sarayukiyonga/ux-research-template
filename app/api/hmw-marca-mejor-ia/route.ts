@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { HMW_MARCA_MOTIVO_MAX_LEN, HMW_RESPUESTAS_MAX, normalizeHmwPayload } from '@/lib/hmw-payload'
 import { hmwIaContextToMarkdown, loadHmwIaContextOrFail } from '@/lib/hmw-ia-context'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -106,7 +106,7 @@ Elige **un solo** \`mejorIndice\`: la respuesta que mejor equilibre **impacto pa
       schema,
       system:
         `Eres diseñador de producto en ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.location}). Devuelves solo el JSON pedido. español neutro. No inventas activos digitales (web, app, plataforma) que no consten en el contexto del usuario.` +
-        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
+        CLIENT_AI_SERVICE_CONTEXT,
       prompt,
     })
 

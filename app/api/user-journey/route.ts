@@ -18,7 +18,7 @@ import {
 } from '@/lib/user-journey-channels'
 import type { UserJourneySegmento } from '@/lib/user-journey-persist'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -164,7 +164,7 @@ Requisitos:
 ${requisitoRol}
 - **Una** etapa debe marcar con claridad el **momento clave** en que ${CLIENT.name} más contribuye al POV, **alineado con el HMW** y coherente con la **encuesta CEO** cuando trate de promesas o límites del servicio.
 - Español de España, tono profesional y empático.
-${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`
+${CLIENT_AI_SERVICE_CONTEXT}`
 }
 
 function povToLine(label: string, s: POVStatement): string {

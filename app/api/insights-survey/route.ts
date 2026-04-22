@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { empathyMapToPlainText, fetchSavedEmpathyMap } from '@/lib/fetch-saved-empathy-map'
 import { sanitizeInsightsPayload } from '@/lib/insights-sanitize'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -80,7 +80,7 @@ Estructura de salida:
 - "resumen": síntesis ejecutiva.
 - "bloques": temas con título + lista de insights (cada uno una idea completa en una frase).
 
-PROHIBIDO en cualquier texto visible: llaves {}, corchetes [], comillas JSON sueltas, fragmentos como "}, {" o "'], [", bloques markdown con backticks, o pegamento de arrays. Solo español natural. No truncar frases: si un ítem es largo, que siga siendo una idea completa.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+PROHIBIDO en cualquier texto visible: llaves {}, corchetes [], comillas JSON sueltas, fragmentos como "}, {" o "'], [", bloques markdown con backticks, o pegamento de arrays. Solo español natural. No truncar frases: si un ítem es largo, que siga siendo una idea completa.${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `=== MAPA DE EMPATÍA (${segment === 'clientes' ? 'clientes actuales' : 'clientes potenciales'}) ===\n\n${mapaTexto}`,
   })
 

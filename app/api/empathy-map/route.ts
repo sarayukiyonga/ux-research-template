@@ -4,9 +4,14 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
-import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS } from '@/lib/potential-questions'
+import {
+  empathyVoiceColumns,
+  getSegmentFilterColumnIndex,
+  parseSurveyQuestionsFromHeaderRow,
+} from '@/lib/survey-sheet-headers'
 import { CLIENT } from '@/lib/client-config'
 
 interface SurveyFilters {
@@ -61,8 +66,6 @@ function potentialAge(row: string[]): string {
   )
 }
 
-const PAIN_COL = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
-
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
@@ -100,34 +103,21 @@ const schema = z.object({
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-const CLIENT_EMPATHY_COLS: { title: string; colIndex: number }[] = [
-  { title: '¿Qué te decían los médicos o tu entorno sobre tu salud antes de conocer a la entrenadora?', colIndex: 5 },
-  { title: '¿Qué actividad te costaba más realizar antes de empezar a entrenar?', colIndex: 6 },
-  { title: '¿Qué te frenaba a la hora de apuntarte a un gimnasio convencional?', colIndex: 7 },
-  { title: '¿Qué viste en ella que te dio la confianza para poner tu salud en sus manos?', colIndex: 8 },
-  { title: '¿Cómo describirías la sensación física y mental justo después de una sesión grupal?', colIndex: 9 },
-  { title: '¿Qué te aporta entrenar con otras personas con situaciones similares a la tuya?', colIndex: 10 },
-  { title: '¿Sientes que lo que pagas es una inversión en tu salud o un gasto de ocio? ¿Por qué?', colIndex: 12 },
-  { title: '¿Recuerdas algún momento en el que sentiste que el entrenamiento realmente estaba funcionando?', colIndex: 13 },
-  { title: `En el sistema actual de ${CLIENT.ownerFirstName}, ¿qué es lo que más te cuesta o te da más pereza?`, colIndex: 15 },
-]
-
-const POTENTIAL_EMPATHY_COLS: { title: string; colIndex: number }[] = [
-  { title: '¿Qué es lo primero que piensas cuando oyes "Entrenamiento Personal de Salud"?', colIndex: 5 },
-  { title: '¿Qué te gusta y qué no de tu centro actual?', colIndex: 8 },
-  { title: '¿Cuál es el motivo principal por el que no haces ejercicio dirigido actualmente?', colIndex: 11 },
-  { title: 'Si buscaras ayuda para un dolor/lesión, ¿dónde mirarías primero?', colIndex: 13 },
-  { title: '¿Qué valoras más en un profesional de la salud?', colIndex: 14 },
-  { title: `¿Qué echas de menos en la oferta de bienestar actual en ${CLIENT.location}?`, colIndex: 16 },
-]
-
 const MAX_PER_Q = 10
 
 async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_RANGE })
   const rows = res.data.values ?? []
-  let dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const headerRow = rows[0] ?? []
+  const dataMaxLen = rows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allData = rows.slice(1).filter((row) => row.some(Boolean))
+  const cq = parseSurveyQuestionsFromHeaderRow(headerRow, 'client', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allData,
+  })
+  const empathyCols = empathyVoiceColumns(cq)
+  let dataRows = allData
 
   if (filters.gender && filters.gender !== 'all') {
     dataRows = dataRows.filter((row) => clientGender(row) === filters.gender)
@@ -136,7 +126,7 @@ async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
     dataRows = dataRows.filter((row) => filters.ageRanges!.includes(clientAge(row)))
   }
 
-  const blocks = CLIENT_EMPATHY_COLS.map(({ title, colIndex }) => {
+  const blocks = empathyCols.map(({ title, colIndex }) => {
     const answers = dataRows
       .map((row) => row[colIndex]?.trim() ?? '')
       .filter((a) => a.length > 2)
@@ -154,7 +144,16 @@ async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: POTENTIAL_SHEET_ID, range: POTENTIAL_SHEET_RANGE })
   const rows = res.data.values ?? []
-  let dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const headerRow = rows[0] ?? []
+  const dataMaxLen = rows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allPotential = rows.slice(1).filter((row) => row.some(Boolean))
+  const pq = parseSurveyQuestionsFromHeaderRow(headerRow, 'potential', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allPotential,
+  })
+  const painCol = getSegmentFilterColumnIndex(pq)
+  const empathyCols = empathyVoiceColumns(pq)
+  let dataRows = allPotential
 
   if (filters.gender && filters.gender !== 'all') {
     dataRows = dataRows.filter((row) => potentialGender(row) === filters.gender)
@@ -162,11 +161,11 @@ async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
   if (filters.ageRanges?.length) {
     dataRows = dataRows.filter((row) => filters.ageRanges!.includes(potentialAge(row)))
   }
-  if (filters.painValues?.length) {
-    dataRows = dataRows.filter((row) => filters.painValues!.includes((row[PAIN_COL] ?? '').trim()))
+  if (filters.painValues?.length && painCol != null) {
+    dataRows = dataRows.filter((row) => filters.painValues!.includes((row[painCol] ?? '').trim()))
   }
 
-  const blocks = POTENTIAL_EMPATHY_COLS.map(({ title, colIndex }) => {
+  const blocks = empathyCols.map(({ title, colIndex }) => {
     const answers = dataRows
       .map((row) => row[colIndex]?.trim() ?? '')
       .filter((a) => a.length > 2)
@@ -221,7 +220,7 @@ FORMATO DE CADA NOTA:
 - Máximo 80 caracteres por nota
 - Directas y concretas, no abstractas
 - En primera persona o como cita cuando sea posible
-- Sin repetición entre secciones${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+- Sin repetición entre secciones${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `=== ENTREVISTA A LA FUNDADORA (contexto) ===\n${interview}\n\n=== VOZ DE ENCUESTA (${segment === 'clientes' ? 'CLIENTES ACTUALES' : 'CLIENTES POTENCIALES'}) ===\n${surveyVoice}`,
   })
 

@@ -25,6 +25,9 @@ export const dynamic = 'force-dynamic'
 const MOSCOW_SHEET = 'moscow'
 const MAX_MOSCOW_NOTAS = 50
 
+/** Must / Should / Could entran en la matriz MVP por IA; Won't queda fuera. */
+const MOSCOW_CATEGORIAS_PARA_MVP = MOSCOW_CATEGORIAS.filter((c) => c !== 'wont')
+
 function getAuth() {
   return new google.auth.JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -50,7 +53,7 @@ interface MoscowFlatItem {
 function flattenMoSCoW(persist: MoSCoWPersist): MoscowFlatItem[] {
   const out: MoscowFlatItem[] = []
   let orden = 1
-  for (const cat of MOSCOW_CATEGORIAS) {
+  for (const cat of MOSCOW_CATEGORIAS_PARA_MVP) {
     for (const n of persist.notas[cat]) {
       const t = n.texto?.trim()
       if (!t) continue
@@ -145,13 +148,15 @@ export async function POST(req: Request) {
 
     const flat = flattenMoSCoW(persist)
     if (flat.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'El MoSCoW guardado no tiene notas con texto. Añade al menos una nota en la página MoSCoW y vuelve a guardar.',
-        },
-        { status: 400 }
+      const totalConTexto = MOSCOW_CATEGORIAS.reduce(
+        (s, c) => s + persist.notas[c].filter((n) => n.texto?.trim()).length,
+        0
       )
+      const msg =
+        totalConTexto > 0
+          ? 'Solo hay notas en Won\'t o el resto de columnas está vacío: la fila Won\'t no se usa para crear el MVP con IA. Añade al menos una nota con texto en Must, Should o Could en MoSCoW y vuelve a guardar.'
+          : 'El MoSCoW guardado no tiene notas con texto. Añade al menos una nota en la página MoSCoW y vuelve a guardar.'
+      return NextResponse.json({ error: msg }, { status: 400 })
     }
 
     if (flat.length > MAX_MOSCOW_NOTAS) {
@@ -191,7 +196,7 @@ export async function POST(req: Request) {
 
 ${ambitoLine}
 
-=== FUNCIONALIDADES Ya definidas en MoSCoW (orden fijo; cada línea es UNA nota en la matriz) ===
+=== FUNCIONALIDADES Ya definidas en MoSCoW — solo Must, Should y Could (Won't no entra en el MVP) ===
 ${listaMoscow}
 
 ${bloqueClientes}
@@ -215,7 +220,7 @@ Para cada entrada i:
 5. "tamano": "lg" si es crítica en ese cuadrante, "md" si es importante, "sm" si es secundaria (relativo al resto del listado).
 6. "origenHmw": cadena corta con la categoría MoSCoW de origen, por ejemplo "MoSCoW · Must". Si en la línea había trazo HMW/MVP, añade " — " y un fragmento breve (máx. ~80 caracteres en total).
 
-Cómo posicionar: usa sobre todo los insights de las dos encuestas y la entrevista CEO para situar x e y. La etiqueta MoSCoW (Must/Should/Could/Won't) orienta prioridad global pero NO sustituye la evidencia de encuestas y CEO (por ejemplo, algo en "Could" puede tener alto valor de usuario si las encuestas lo muestran).
+Cómo posicionar: usa sobre todo los insights de las dos encuestas y la entrevista CEO para situar x e y. La etiqueta MoSCoW (Must/Should/Could) orienta prioridad global pero NO sustituye la evidencia de encuestas y CEO (por ejemplo, algo en "Could" puede tener alto valor de usuario si las encuestas lo muestran).
 
 No inventes datos demográficos ni funciones que no estén en el listado MoSCoW. Reparte las posiciones de forma realista; no apiles todas en el mismo punto.`
 

@@ -1,6 +1,6 @@
 import { streamText } from 'ai'
 import { openai } from '@ai-sdk/openai'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { CLIENT } from '@/lib/client-config'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     system: `Eres un consultor estratégico de marca y negocio especializado en centros de salud y bienestar.
 Analiza entrevistas a CEOs y fundadoras para extraer insights accionables.
 Ceñe el modelo operativo a lo que **${CLIENT.ownerFirstName} describe en la entrevista** (no proyectes un negocio "solo digital" si habla de presencial, grupo o espacio físico).
-Responde siempre en español. Sé directo, concreto y orientado a la acción.${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}`,
+Responde siempre en español. Sé directo, concreto y orientado a la acción.${CLIENT_AI_SERVICE_CONTEXT}`,
     prompt: `Analiza esta entrevista a ${CLIENT.ownerFullName}, ${CLIENT.ownerRole} de ${CLIENT.name} (${CLIENT.serviceDescription} en ${CLIENT.location}):
 
 ${content}

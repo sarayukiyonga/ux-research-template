@@ -5,7 +5,7 @@ import { ResearchJourneyBar } from '@/components/ResearchJourneyBar'
 
 export function ResearchJourneyShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const hideBar = pathname === '/login'
+  const hideBar = pathname === '/login' || pathname?.startsWith('/participa/')
 
   return (
     <>

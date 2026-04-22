@@ -2,7 +2,7 @@ import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
 import { CLIENT } from '@/lib/client-config'
 
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         '**: úsala como **fuente de verdad** para modelo de servicio, límites, tono y viabilidad; **no contradigas** lo explícito ni propongas ofertas o canales que la encuesta descarte. ' +
         'Las etapas del mapa definen **dónde** aplicar cada idea. ' +
         'Responde solo con el JSON del esquema. Español.' +
-        MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO,
+        CLIENT_AI_SERVICE_CONTEXT,
       prompt: `=== ENCUESTA / ENTREVISTA A LA ${CLIENT.ownerRole.toUpperCase()} (${CLIENT.ownerFirstName}) — modelo de servicio ===
 ${ceoInterview}
 

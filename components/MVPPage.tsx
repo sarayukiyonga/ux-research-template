@@ -307,8 +307,9 @@ export function MVPPage() {
 
       {/* Instrucción */}
       <p className="text-xs text-gray-400">
-        «Generar con IA» usa el MoSCoW del <strong>canal seleccionado</strong> (mismas opciones que en /moscow) · Doble
-        clic en la matriz para añadir · Clic para editar · Arrastra para reposicionar
+        «Generar con IA» usa el MoSCoW del <strong>canal seleccionado</strong> (Must, Should y Could; la columna
+        Won&apos;t no entra en el MVP) · Doble clic en la matriz para añadir · Clic para editar · Arrastra para
+        reposicionar
       </p>
 
       {/* Matriz */}

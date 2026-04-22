@@ -45,13 +45,18 @@ export default function MVPRoute() {
 
         <MVPPage />
 
-        <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-400">
           <Link href="/moscow" className="text-violet-600 font-medium hover:underline underline-offset-2">
             ← Must · Should · Could · Won&apos;t
           </Link>
-          <Link href="/mapa-sitio" className="text-violet-600 font-medium hover:underline underline-offset-2">
-            Mapa del sitio →
-          </Link>
+          <div className="flex flex-wrap gap-4">
+            <Link href="/card-sorting" className="text-violet-600 font-medium hover:underline underline-offset-2">
+              Card sorting →
+            </Link>
+            <Link href="/mapa-sitio" className="text-violet-600 font-medium hover:underline underline-offset-2">
+              Mapa del sitio →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

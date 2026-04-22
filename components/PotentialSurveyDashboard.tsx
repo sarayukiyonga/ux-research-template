@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import type { SurveyQuestionFromSheet } from '@/lib/survey-sheet-headers'
 import { DemographicCard } from './DemographicCard'
 import { QuestionCard } from './QuestionCard'
 import { GroupedResponseCard, type Group } from './GroupedResponseCard'
@@ -11,8 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SurveySheetLinkHelp } from '@/components/SurveySheetLinkHelp'
 import { readSegmentSurveyFilters, writeSegmentSurveyFilters } from '@/lib/segment-survey-filters'
 import { stableFiltersKey, toSurveyAiFiltersPayload } from '@/lib/survey-ai-filters'
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DistributionOption {
   label: string
@@ -34,6 +32,8 @@ interface SurveyData {
   distributions: Distribution[]
   demographic: { men: string[]; women: string[]; nonBinary: string[] }
   filterOptions: FilterOptions
+  questions: SurveyQuestionFromSheet[]
+  filterColumnLabel?: string
 }
 
 interface GroupState {
@@ -42,9 +42,6 @@ interface GroupState {
   error: string
   savedAt?: string
 }
-
-const OPEN_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'open')
-const CLOSED_QUESTIONS = POTENTIAL_QUESTIONS.filter((q) => q.type === 'closed')
 
 const DEFAULT_FILTERS: ActiveFilters = { gender: 'all', ageRanges: [], painValues: [] }
 
@@ -57,19 +54,17 @@ function filtersToQuery(filters: ActiveFilters): string {
   return qs ? `/api/potential-survey?${qs}` : '/api/potential-survey'
 }
 
-// ── Closed question card ───────────────────────────────────────────────────────
-
 function ClosedQuestionCard({
   question,
   distribution,
 }: {
-  question: (typeof POTENTIAL_QUESTIONS)[number]
+  question: SurveyQuestionFromSheet
   distribution: Distribution | undefined
 }) {
   if (!distribution || distribution.total === 0) {
     return (
       <div className="rounded-xl border bg-white p-5">
-        <p className="text-xs text-gray-400 mb-1">Pregunta {question.id} — {question.shortTitle}</p>
+        <p className="text-xs text-gray-400 mb-1">Col. {question.columnIndex} — {question.shortTitle}</p>
         <p className="text-sm font-semibold text-gray-800 mb-3">{question.title}</p>
         <p className="text-xs text-gray-300 text-center py-3">Sin respuestas aún</p>
       </div>
@@ -80,7 +75,7 @@ function ClosedQuestionCard({
     <div className="rounded-xl border bg-white p-5 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Pregunta {question.id} — {question.shortTitle}</p>
+          <p className="text-xs text-gray-400 mb-0.5">Col. {question.columnIndex} — {question.shortTitle}</p>
           <p className="text-sm font-semibold text-gray-800 leading-snug">{question.title}</p>
         </div>
         <span className="shrink-0 text-xs rounded-full bg-gray-100 text-gray-500 px-2 py-0.5">
@@ -89,7 +84,7 @@ function ClosedQuestionCard({
       </div>
       <div className="space-y-2">
         {distribution.options.map((opt) => (
-          <div key={opt.label}>
+          <div key={`${question.questionId}-${opt.label}-${opt.count}`}>
             <div className="flex justify-between text-xs text-gray-600 mb-1">
               <span className="font-medium">{opt.label}</span>
               <span className="text-gray-400">{opt.count} ({opt.pct}%)</span>
@@ -106,8 +101,6 @@ function ClosedQuestionCard({
     </div>
   )
 }
-
-// ── Main dashboard ─────────────────────────────────────────────────────────────
 
 async function fetchGroups(questionTitle: string, answers: string[]): Promise<Group[]> {
   const r = await fetch('/api/group-responses', {
@@ -143,17 +136,29 @@ export function PotentialSurveyDashboard() {
   const filtersPayload = useMemo(() => toSurveyAiFiltersPayload(filters), [filters])
   const filtersKey = useMemo(() => stableFiltersKey(filtersPayload), [filtersPayload])
 
+  const openQuestions = useMemo(() => {
+    if (!data?.questions?.length) return []
+    return data.questions.filter((q) => q.type === 'open')
+  }, [data])
+
+  const closedQuestions = useMemo(() => {
+    if (!data?.questions?.length) return []
+    return data.questions.filter((q) => q.type === 'closed')
+  }, [data])
+
   const latestBundleRef = useRef({
     personaText: '',
     groupStates: {} as Record<number, GroupState>,
+    openIds: [] as number[],
   })
 
   useEffect(() => {
     latestBundleRef.current = {
       personaText: personaSheet.text,
       groupStates,
+      openIds: openQuestions.map((q) => q.questionId),
     }
-  }, [personaSheet.text, groupStates])
+  }, [personaSheet.text, groupStates, openQuestions])
 
   const setGroupState = useCallback((questionId: number, patch: Partial<GroupState>) => {
     setGroupStates((prev) => ({
@@ -196,9 +201,9 @@ export function PotentialSurveyDashboard() {
         if (d.saved) {
           const rawGroups = d.saved.groups ?? {}
           const nextStates: Record<number, GroupState> = {}
-          for (const q of OPEN_QUESTIONS) {
-            const arr = (rawGroups[String(q.id)] ?? rawGroups[q.id] ?? []) as Group[]
-            nextStates[q.id] = {
+          for (const q of openQuestions) {
+            const arr = (rawGroups[String(q.questionId)] ?? rawGroups[q.questionId] ?? []) as Group[]
+            nextStates[q.questionId] = {
               groups: Array.isArray(arr) ? arr : [],
               loading: false,
               error: '',
@@ -215,8 +220,8 @@ export function PotentialSurveyDashboard() {
           setAiBundleSavedAt(d.saved.savedAt)
         } else {
           const empty: Record<number, GroupState> = {}
-          for (const q of OPEN_QUESTIONS) {
-            empty[q.id] = { groups: [], loading: false, error: '' }
+          for (const q of openQuestions) {
+            empty[q.questionId] = { groups: [], loading: false, error: '' }
           }
           setGroupStates(empty)
           setPersonaSheet({ text: '', savedAt: '', loading: false, error: false })
@@ -227,8 +232,8 @@ export function PotentialSurveyDashboard() {
         if (!cancelled) {
           setPersonaSheet({ text: '', savedAt: '', loading: false, error: true })
           const empty: Record<number, GroupState> = {}
-          for (const q of OPEN_QUESTIONS) {
-            empty[q.id] = { groups: [], loading: false, error: '' }
+          for (const q of openQuestions) {
+            empty[q.questionId] = { groups: [], loading: false, error: '' }
           }
           setGroupStates(empty)
         }
@@ -240,7 +245,7 @@ export function PotentialSurveyDashboard() {
     return () => {
       cancelled = true
     }
-  }, [data, filtersKey, filtersPayload])
+  }, [data, filtersKey, filtersPayload, openQuestions])
 
   useEffect(() => {
     setData(null)
@@ -263,8 +268,8 @@ export function PotentialSurveyDashboard() {
     if (!data) return
     setRefreshing(true)
     setPersonaSheet((p) => ({ ...p, loading: true, error: false }))
-    for (const q of OPEN_QUESTIONS) {
-      setGroupState(q.id, { loading: true, error: '', groups: [] })
+    for (const q of openQuestions) {
+      setGroupState(q.questionId, { loading: true, error: '', groups: [] })
     }
 
     const getAnswers = (id: number) => data.byQuestion.find((x) => x.questionId === id)?.answers ?? []
@@ -273,18 +278,23 @@ export function PotentialSurveyDashboard() {
       const personaRes = await fetch('/api/potential-persona', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ byQuestion: data.byQuestion, demographic: data.demographic, stream: false }),
+        body: JSON.stringify({
+          byQuestion: data.byQuestion,
+          demographic: data.demographic,
+          questions: data.questions,
+          stream: false,
+        }),
       })
       if (!personaRes.ok) throw new Error(await personaRes.text())
       const personaJson = await personaRes.json()
       const personaText = typeof personaJson.text === 'string' ? personaJson.text : ''
 
       const groupResults = await Promise.all(
-        OPEN_QUESTIONS.map(async (q) => {
-          const answers = getAnswers(q.id)
-          if (answers.length < 4) return { id: q.id, groups: [] as Group[] }
+        openQuestions.map(async (q) => {
+          const answers = getAnswers(q.questionId)
+          if (answers.length < 4) return { id: q.questionId, groups: [] as Group[] }
           const groups = await fetchGroups(q.title, answers)
-          return { id: q.id, groups }
+          return { id: q.questionId, groups }
         })
       )
 
@@ -295,10 +305,10 @@ export function PotentialSurveyDashboard() {
 
       const savedAt = await postSurveyAiSave(groupsRecord, personaText)
 
-      for (const q of OPEN_QUESTIONS) {
-        setGroupState(q.id, {
+      for (const q of openQuestions) {
+        setGroupState(q.questionId, {
           loading: false,
-          groups: groupsRecord[q.id] ?? [],
+          groups: groupsRecord[q.questionId] ?? [],
           error: '',
           savedAt,
         })
@@ -308,8 +318,8 @@ export function PotentialSurveyDashboard() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error'
       setPersonaSheet((p) => ({ ...p, loading: false, error: true }))
-      for (const q of OPEN_QUESTIONS) {
-        setGroupState(q.id, { loading: false, groups: [], error: msg })
+      for (const q of openQuestions) {
+        setGroupState(q.questionId, { loading: false, groups: [], error: msg })
       }
     } finally {
       setRefreshing(false)
@@ -322,10 +332,10 @@ export function PotentialSurveyDashboard() {
       setGroupState(questionId, { loading: true, error: '', groups: [] })
       try {
         const groups = await fetchGroups(questionTitle, answers)
-        const { personaText, groupStates: gs } = latestBundleRef.current
+        const { personaText, groupStates: gs, openIds } = latestBundleRef.current
         const groupsRecord: Record<number, Group[]> = {}
-        for (const q of OPEN_QUESTIONS) {
-          groupsRecord[q.id] = q.id === questionId ? groups : (gs[q.id]?.groups ?? [])
+        for (const id of openIds) {
+          groupsRecord[id] = id === questionId ? groups : (gs[id]?.groups ?? [])
         }
         const savedAt = await postSurveyAiSave(groupsRecord, personaText)
         setGroupState(questionId, { loading: false, groups, error: '', savedAt })
@@ -373,7 +383,8 @@ export function PotentialSurveyDashboard() {
     )
   }
 
-  // Empty state — no responses at all or no results after filtering
+  const filterSubtitle = data.filterColumnLabel ?? 'Filtro'
+
   if (data.totalResponses === 0) {
     const isFiltered =
       filters.gender !== 'all' || filters.ageRanges.length > 0 || filters.painValues.length > 0
@@ -385,6 +396,7 @@ export function PotentialSurveyDashboard() {
           totalFiltered={0}
           totalAll={data.totalAll}
           onChange={handleFiltersChange}
+          secondaryFilterLabel={filterSubtitle}
         />
         <p className="text-xs text-gray-400 -mt-2">
           Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño.
@@ -412,20 +424,19 @@ export function PotentialSurveyDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
       <FilterBar
         filterOptions={data.filterOptions}
         activeFilters={filters}
         totalFiltered={data.totalResponses}
         totalAll={data.totalAll}
         onChange={handleFiltersChange}
+        secondaryFilterLabel={filterSubtitle}
       />
       <p className="text-xs text-gray-400 -mt-2">
         Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño (misma
         selección al regenerar en esas páginas).
       </p>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Total respuestas</p>
@@ -433,7 +444,7 @@ export function PotentialSurveyDashboard() {
         </div>
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Preguntas</p>
-          <p className="mt-1 text-3xl font-bold text-violet-700">{POTENTIAL_QUESTIONS.length + 1}</p>
+          <p className="mt-1 text-3xl font-bold text-violet-700">{data.questions.length + 1}</p>
         </div>
         <div className="rounded-xl border bg-white p-4 shadow-sm col-span-2 sm:col-span-1">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Última respuesta</p>
@@ -458,25 +469,23 @@ export function PotentialSurveyDashboard() {
         hideRefreshButton
       />
 
-      {/* Demografía */}
       <DemographicCard
         men={data.demographic.men}
         women={data.demographic.women}
         nonBinary={data.demographic.nonBinary}
       />
 
-      {/* Preguntas cerradas */}
-      {CLOSED_QUESTIONS.length > 0 && (
+      {closedQuestions.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">
             Preguntas de respuesta cerrada
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {CLOSED_QUESTIONS.map((q) => (
+            {closedQuestions.map((q) => (
               <ClosedQuestionCard
-                key={q.id}
+                key={q.questionId}
                 question={q}
-                distribution={getDistribution(q.id)}
+                distribution={getDistribution(q.questionId)}
               />
             ))}
           </div>
@@ -502,29 +511,28 @@ export function PotentialSurveyDashboard() {
         </button>
       </div>
 
-      {/* Preguntas abiertas */}
-      {OPEN_QUESTIONS.map((q) => {
-        const gs = groupStates[q.id] ?? { groups: [], loading: aiSheetHydrating, error: '' }
-        const answers = getAnswers(q.id)
+      {openQuestions.map((q) => {
+        const gs = groupStates[q.questionId] ?? { groups: [], loading: aiSheetHydrating, error: '' }
+        const answers = getAnswers(q.questionId)
         return (
-          <div key={q.id} className="space-y-3">
+          <div key={q.questionId} className="space-y-3">
             {answers.length > 0 && (
               <div className="rounded-2xl border-2 border-violet-200 bg-linear-to-br from-violet-50 to-white p-1">
                 <GroupedResponseCard
                   questionTitle={q.title}
-                  shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+                  shortTitle={`Col. ${q.columnIndex} · ${q.shortTitle}`}
                   answers={answers}
                   groups={gs.groups}
                   loading={gs.loading || aiSheetHydrating}
                   error={gs.error}
-                  onRetry={() => void retryOneGroup(q.id, q.title, answers)}
+                  onRetry={() => void retryOneGroup(q.questionId, q.title, answers)}
                 />
               </div>
             )}
             <QuestionCard
-              questionId={q.id}
+              questionId={q.questionId}
               title={q.title}
-              shortTitle={`Pregunta ${q.id} — ${q.shortTitle}`}
+              shortTitle={`Col. ${q.columnIndex} · ${q.shortTitle}`}
               answers={answers}
             />
           </div>

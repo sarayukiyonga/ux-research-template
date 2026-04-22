@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { exportElementToPdf } from '@/lib/moa-pdf-export'
+import { exportElementToPdf } from '@/lib/research-pdf-export'
 import { PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 
 type Props = {

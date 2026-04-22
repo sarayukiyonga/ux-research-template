@@ -1,8 +1,8 @@
 import type { jsPDF } from 'jspdf'
-import type { MoaPdfRoute } from '@/lib/moa-pdf-routes'
+import type { ResearchPdfRoute } from '@/lib/research-pdf-routes'
 import { PDF_CAPTURE_ROOT_ID } from '@/lib/client-config'
 
-export type { MoaPdfRoute } from '@/lib/moa-pdf-routes'
+export type { ResearchPdfRoute } from '@/lib/research-pdf-routes'
 
 const SIDE_MM = 10
 const BOTTOM_MM = 10
@@ -179,7 +179,7 @@ export async function exportSelectorToPdf(selector: string, fileName: string) {
 }
 
 export async function exportRoutesToCombinedPdf(
-  routes: MoaPdfRoute[],
+  routes: ResearchPdfRoute[],
   fileName: string,
   options?: { settleMs?: number; scale?: number }
 ) {

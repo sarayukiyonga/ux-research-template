@@ -3,9 +3,12 @@ import { google } from 'googleapis'
 import {
   POTENTIAL_SHEET_ID,
   POTENTIAL_SHEET_RANGE,
-  POTENTIAL_QUESTIONS,
   POTENTIAL_DEMOGRAPHIC_COLUMNS,
 } from '@/lib/potential-questions'
+import {
+  getSegmentFilterColumnIndex,
+  parseSurveyQuestionsFromHeaderRow,
+} from '@/lib/survey-sheet-headers'
 import { friendlySheetsReadError } from '@/lib/sheets-link-errors'
 
 export const dynamic = 'force-dynamic'
@@ -36,9 +39,6 @@ function getRowAge(row: string[]): string {
     (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
   )
 }
-
-// Column index for pain question (Q1)
-const PAIN_COLUMN_INDEX = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,21 +72,32 @@ export async function GET(request: NextRequest) {
     })
 
     const rows = res.data.values ?? []
+    const headerRow = rows[0] ?? []
     const allDataRows = rows.slice(1).filter((row) => row.some(Boolean))
+    const dataMaxLen = allDataRows.reduce((m, r) => Math.max(m, r.length), 0)
+    const maxCol = Math.max(dataMaxLen, headerRow.length)
+    const questions = parseSurveyQuestionsFromHeaderRow(headerRow, 'potential', {
+      maxColumnExclusive: maxCol,
+      confidentialEmailResponseRows: allDataRows,
+    })
+    const filterCol = getSegmentFilterColumnIndex(questions)
+    const filterColumnLabel =
+      filterCol != null ? (questions.find((q) => q.columnIndex === filterCol)?.shortTitle ?? 'Filtro') : 'Filtro'
 
-    // Compute filter options from the full dataset
+
     const ageRangesSet = new Set<string>()
     const painValuesSet = new Set<string>()
     for (const row of allDataRows) {
       const age = getRowAge(row)
       if (age) ageRangesSet.add(age)
-      const pain = (row[PAIN_COLUMN_INDEX] ?? '').trim()
-      if (pain) painValuesSet.add(pain)
+      if (filterCol != null) {
+        const pain = (row[filterCol] ?? '').trim()
+        if (pain) painValuesSet.add(pain)
+      }
     }
     const ageRanges = Array.from(ageRangesSet).sort()
     const painValues = Array.from(painValuesSet).sort()
 
-    // Apply filters
     const dataRows = allDataRows.filter((row) => {
       if (genderParam !== 'all') {
         if (getRowGender(row) !== genderParam) return false
@@ -94,15 +105,15 @@ export async function GET(request: NextRequest) {
       if (selectedAgeRanges.length > 0) {
         if (!selectedAgeRanges.includes(getRowAge(row))) return false
       }
-      if (selectedPainValues.length > 0) {
-        const pain = (row[PAIN_COLUMN_INDEX] ?? '').trim()
+      if (selectedPainValues.length > 0 && filterCol != null) {
+        const pain = (row[filterCol] ?? '').trim()
         if (!selectedPainValues.includes(pain)) return false
       }
       return true
     })
 
-    const byQuestion = POTENTIAL_QUESTIONS.map((q) => ({
-      questionId: q.id,
+    const byQuestion = questions.map((q) => ({
+      questionId: q.questionId,
       answers: shuffle(
         dataRows
           .map((row) => row[q.columnIndex] ?? '')
@@ -110,29 +121,30 @@ export async function GET(request: NextRequest) {
       ),
     }))
 
-    // For closed questions, also compute distribution
-    const distributions = POTENTIAL_QUESTIONS.filter((q) => q.type === 'closed').map((q) => {
-      const answers = dataRows
-        .map((row) => row[q.columnIndex] ?? '')
-        .filter((a) => a.trim() !== '')
+    const distributions = questions
+      .filter((q) => q.type === 'closed')
+      .map((q) => {
+        const answers = dataRows
+          .map((row) => row[q.columnIndex] ?? '')
+          .filter((a) => a.trim() !== '')
 
-      const counts: Record<string, number> = {}
-      for (const a of answers) {
-        counts[a] = (counts[a] ?? 0) + 1
-      }
-      const total = answers.length
-      return {
-        questionId: q.id,
-        total,
-        options: Object.entries(counts)
-          .sort((a, b) => b[1] - a[1])
-          .map(([label, count]) => ({
-            label,
-            count,
-            pct: total > 0 ? Math.round((count / total) * 100) : 0,
-          })),
-      }
-    })
+        const counts: Record<string, number> = {}
+        for (const a of answers) {
+          counts[a] = (counts[a] ?? 0) + 1
+        }
+        const total = answers.length
+        return {
+          questionId: q.questionId,
+          total,
+          options: Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, count]) => ({
+              label,
+              count,
+              pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            })),
+        }
+      })
 
     const demographic = {
       men: shuffle(
@@ -162,6 +174,8 @@ export async function GET(request: NextRequest) {
       distributions,
       demographic,
       filterOptions: { ageRanges, painValues },
+      questions,
+      filterColumnLabel,
     })
   } catch (e) {
     const raw = e instanceof Error ? e.message : 'Error desconocido'

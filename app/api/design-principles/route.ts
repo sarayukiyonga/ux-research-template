@@ -4,9 +4,14 @@ import { z } from 'zod'
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { fetchCeoInterviewPlaintext } from '@/lib/fetch-ceo-interview-plaintext'
-import { MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO } from '@/lib/moa-ai-contexto-servicio'
+import { CLIENT_AI_SERVICE_CONTEXT } from '@/lib/client-ai-service-context'
 import { SHEET_ID, SHEET_RANGE, DEMOGRAPHIC_COLUMNS } from '@/lib/questions'
-import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS, POTENTIAL_QUESTIONS } from '@/lib/potential-questions'
+import { POTENTIAL_SHEET_ID, POTENTIAL_SHEET_RANGE, POTENTIAL_DEMOGRAPHIC_COLUMNS } from '@/lib/potential-questions'
+import {
+  designVoiceColumns,
+  getSegmentFilterColumnIndex,
+  parseSurveyQuestionsFromHeaderRow,
+} from '@/lib/survey-sheet-headers'
 import { CLIENT } from '@/lib/client-config'
 
 interface SurveyFilters {
@@ -48,8 +53,6 @@ function potentialAge(row: string[]): string {
     (row[POTENTIAL_DEMOGRAPHIC_COLUMNS.nonBinary] ?? '').trim()
   )
 }
-
-const PAIN_COL = POTENTIAL_QUESTIONS.find((q) => q.id === 1)!.columnIndex
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -105,24 +108,7 @@ async function requireCeoInterviewForDesign(): Promise<string> {
   return t
 }
 
-// Questions most relevant for design: how they arrived, trust, post-session feeling, group value
-const DESIGN_RELEVANT_QUESTION_COLS: { title: string; colIndex: number }[] = [
-  { title: '¿Qué te decían los médicos o tu entorno sobre tu salud antes de conocer a la entrenadora?', colIndex: 5 },
-  { title: '¿Qué te frenaba a la hora de apuntarte a un gimnasio convencional?', colIndex: 7 },
-  { title: '¿Qué viste en ella que te dio la confianza para poner tu salud en sus manos?', colIndex: 8 },
-  { title: '¿Cómo describirías la sensación física y mental justo después de una sesión grupal?', colIndex: 9 },
-  { title: '¿Qué te aporta entrenar con otras personas con situaciones similares a la tuya?', colIndex: 10 },
-]
 const MAX_ANSWERS_PER_QUESTION = 8
-
-// Most design-relevant questions from the potential clients survey
-const POTENTIAL_DESIGN_COLS: { title: string; colIndex: number }[] = [
-  { title: '¿Qué es lo primero que piensas cuando oyes "Entrenamiento Personal de Salud"?', colIndex: 5 },
-  { title: '¿Qué te gusta y qué no de tu centro actual?', colIndex: 8 },
-  { title: 'Si buscaras ayuda para un dolor/lesión, ¿dónde mirarías primero?', colIndex: 13 },
-  { title: '¿Qué valoras más en un profesional de la salud?', colIndex: 14 },
-  { title: `¿Qué echas de menos en la oferta de bienestar actual en ${CLIENT.location}?`, colIndex: 16 },
-]
 
 async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() })
@@ -131,7 +117,15 @@ async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
     range: POTENTIAL_SHEET_RANGE,
   })
   const rows = res.data.values ?? []
-  let dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const headerRow = rows[0] ?? []
+  const dataMaxLen = rows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allPotentialRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const pq = parseSurveyQuestionsFromHeaderRow(headerRow, 'potential', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allPotentialRows,
+  })
+  const painCol = getSegmentFilterColumnIndex(pq)
+  let dataRows = allPotentialRows
 
   if (filters.gender && filters.gender !== 'all') {
     dataRows = dataRows.filter((row) => potentialGender(row) === filters.gender)
@@ -139,13 +133,14 @@ async function getPotentialVoice(filters: SurveyFilters = {}): Promise<string> {
   if (filters.ageRanges && filters.ageRanges.length > 0) {
     dataRows = dataRows.filter((row) => filters.ageRanges!.includes(potentialAge(row)))
   }
-  if (filters.painValues && filters.painValues.length > 0) {
-    dataRows = dataRows.filter((row) => filters.painValues!.includes((row[PAIN_COL] ?? '').trim()))
+  if (filters.painValues && filters.painValues.length > 0 && painCol != null) {
+    dataRows = dataRows.filter((row) => filters.painValues!.includes((row[painCol] ?? '').trim()))
   }
 
   if (dataRows.length === 0) return '(Sin respuestas para los filtros seleccionados)'
 
-  const blocks = POTENTIAL_DESIGN_COLS.map(({ title, colIndex }) => {
+  const cols = designVoiceColumns(pq)
+  const blocks = cols.map(({ title, colIndex }) => {
     const answers = dataRows
       .map((row) => row[colIndex]?.trim() ?? '')
       .filter((a) => a.length > 0)
@@ -166,7 +161,14 @@ async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
     range: SHEET_RANGE,
   })
   const rows = res.data.values ?? []
-  let dataRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const headerRow = rows[0] ?? []
+  const dataMaxLen = rows.slice(1).reduce((m, r) => Math.max(m, r.length), 0)
+  const allClientRows = rows.slice(1).filter((row) => row.some(Boolean))
+  const cq = parseSurveyQuestionsFromHeaderRow(headerRow, 'client', {
+    maxColumnExclusive: Math.max(dataMaxLen, headerRow.length),
+    confidentialEmailResponseRows: allClientRows,
+  })
+  let dataRows = allClientRows
 
   if (filters.gender && filters.gender !== 'all') {
     dataRows = dataRows.filter((row) => clientGender(row) === filters.gender)
@@ -175,17 +177,21 @@ async function getClientVoice(filters: SurveyFilters = {}): Promise<string> {
     dataRows = dataRows.filter((row) => filters.ageRanges!.includes(clientAge(row)))
   }
 
-  return DESIGN_RELEVANT_QUESTION_COLS.map(({ title, colIndex }) => {
-    const answers = dataRows
-      .map((row) => row[colIndex]?.trim() ?? '')
-      .filter((a) => a.length > 0)
-      .slice(0, MAX_ANSWERS_PER_QUESTION)
+  const cols = designVoiceColumns(cq)
+  return cols
+    .map(({ title, colIndex }) => {
+      const answers = dataRows
+        .map((row) => row[colIndex]?.trim() ?? '')
+        .filter((a) => a.length > 0)
+        .slice(0, MAX_ANSWERS_PER_QUESTION)
 
-    if (answers.length === 0) return null
+      if (answers.length === 0) return null
 
-    const lines = answers.map((a, i) => `  ${i + 1}. "${a}"`).join('\n')
-    return `${title}\n${lines}`
-  }).filter(Boolean).join('\n\n---\n\n')
+      const lines = answers.map((a, i) => `  ${i + 1}. "${a}"`).join('\n')
+      return `${title}\n${lines}`
+    })
+    .filter(Boolean)
+    .join('\n\n---\n\n')
 }
 
 export async function POST(req: Request) {
@@ -228,7 +234,7 @@ Los principios deben ser válidos en cualquier soporte: web, app, espacio físic
 Cuando los clientes actuales y potenciales coincidan en algo, refuérzalo. Cuando haya diferencias entre lo que esperan los potenciales y lo que valoran los actuales, úsalas para afinar el principio.
 Usa las propias palabras de ${CLIENT.ownerFirstName} y de los clientes siempre que puedas.
 NO inventes nada que no se pueda trazar a las cuatro fuentes.
-${MOA_AI_CONTEXTO_SERVICIO_PRESENCIAL_Y_CEO}
+${CLIENT_AI_SERVICE_CONTEXT}
 Responde siempre en español.`,
     prompt: `FUENTE 1 — ENTREVISTA A ${CLIENT.ownerFullName.toUpperCase()}, ${CLIENT.ownerRole.toUpperCase()} DE ${CLIENT.name.toUpperCase()}:
 
