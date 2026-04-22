@@ -48,9 +48,9 @@ function LoginForm() {
             className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-600 text-white text-2xl font-bold mb-4 shadow-lg"
             aria-hidden
           >
-            M
+            UX
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">MOA Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-900">UX Research tools</h1>
           <p className="mt-1 text-sm text-gray-500">Panel interno · Acceso restringido</p>
         </div>
 
