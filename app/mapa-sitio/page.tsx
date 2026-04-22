@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export default function MapaSitioRoute() {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-10">
         <Link
           href="/"
@@ -57,6 +57,6 @@ export default function MapaSitioRoute() {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

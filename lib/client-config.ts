@@ -1,41 +1,50 @@
 /**
- * Configuración del cliente — único punto donde se definen todos los datos
- * específicos del proyecto. Para un nuevo proyecto, edita las variables de
- * entorno en .env.local (o en Vercel/Netlify) y este archivo no necesita tocarse.
+ * Configuración del cliente — **solo lectura de `process.env`** (`CLIENT_*`).
  *
- * Variables de entorno necesarias (ver .env.example):
- *   CLIENT_NAME                – nombre comercial corto           e.g. "MOA"
- *   CLIENT_OWNER_FIRST_NAME    – nombre informal del propietario   e.g. "Patri"
- *   CLIENT_OWNER_FULL_NAME     – nombre completo                  e.g. "Patricia Dorado"
- *   CLIENT_OWNER_ROLE          – rol en la empresa                e.g. "fundadora y CEO"
- *   CLIENT_LOCATION            – ciudad principal                 e.g. "Martorell"
- *   CLIENT_LOCATION_REGION     – región/comarca                   e.g. "Baix Llobregat"
- *   CLIENT_SECTOR              – sector/industria                 e.g. "salud y fitness"
- *   CLIENT_SERVICE_SHORT       – descripción corta del servicio   e.g. "osteopatía y movimiento"
- *   CLIENT_SERVICE_DESCRIPTION – descripción completa             e.g. "centro de osteopatía y movimiento"
- *   CLIENT_SERVICE_COMBO       – servicios combinados             e.g. "ejercicio + osteopatía + fisio"
- *   CLIENT_BRAND_CONCEPT       – concepto de marca                e.g. "Salud en Movimiento"
- *   CLIENT_SERVICE_MODEL       – modelo presencial/digital        e.g. "presencial"
- *   GOOGLE_SHEETS_ID           – ID de la hoja de Google Sheets
+ * No hace falta (ni conviene) editar este archivo por proyecto: copia
+ * `.env.example` → `.env.local` y rellena ahí los datos (o las variables en
+ * Vercel). Los valores por defecto del segundo argumento de `env()` son solo
+ * marcadores neutros por si falta una variable (p. ej. arranque sin `.env`);
+ * no sustituyen a un `.env` completo en producción.
+ *
+ * Lista de claves: ver `.env.example`.
  */
 
-function env(key: string, fallback: string): string {
-  return process.env[key] ?? fallback
+function env(key: string, placeholderIfUnset: string): string {
+  const raw = process.env[key]
+  const v = typeof raw === 'string' ? raw.trim() : ''
+  return v !== '' ? v : placeholderIfUnset
 }
 
+/** Marcadores genéricos si aún no hay `CLIENT_*` en el entorno (no son datos reales). */
+const PLACEHOLDER = {
+  name: 'Tu negocio',
+  ownerFirstName: 'Nombre',
+  ownerFullName: 'Nombre Apellido',
+  ownerRole: 'fundador/a y CEO',
+  location: 'Ciudad',
+  locationRegion: 'Región',
+  sector: 'sector o industria',
+  serviceShort: 'descripción corta del servicio',
+  serviceDescription: 'descripción del servicio',
+  serviceCombo: 'servicio A + servicio B',
+  brandConcept: 'Concepto de marca',
+  serviceModel: 'presencial',
+} as const
+
 export const CLIENT = {
-  name:               env('CLIENT_NAME',               'MOA'),
-  ownerFirstName:     env('CLIENT_OWNER_FIRST_NAME',   'Patri'),
-  ownerFullName:      env('CLIENT_OWNER_FULL_NAME',    'Patricia Dorado'),
-  ownerRole:         env('CLIENT_OWNER_ROLE',          'fundadora y CEO'),
-  location:           env('CLIENT_LOCATION',           'Martorell'),
-  locationRegion:     env('CLIENT_LOCATION_REGION',    'Baix Llobregat'),
-  sector:             env('CLIENT_SECTOR',             'salud y fitness'),
-  serviceShort:       env('CLIENT_SERVICE_SHORT',      'osteopatía y movimiento'),
-  serviceDescription: env('CLIENT_SERVICE_DESCRIPTION','centro de osteopatía y movimiento'),
-  serviceCombo:       env('CLIENT_SERVICE_COMBO',      'ejercicio + osteopatía + fisio'),
-  brandConcept:       env('CLIENT_BRAND_CONCEPT',      'Salud en Movimiento'),
-  serviceModel:       env('CLIENT_SERVICE_MODEL',      'presencial'),
+  name: env('CLIENT_NAME', PLACEHOLDER.name),
+  ownerFirstName: env('CLIENT_OWNER_FIRST_NAME', PLACEHOLDER.ownerFirstName),
+  ownerFullName: env('CLIENT_OWNER_FULL_NAME', PLACEHOLDER.ownerFullName),
+  ownerRole: env('CLIENT_OWNER_ROLE', PLACEHOLDER.ownerRole),
+  location: env('CLIENT_LOCATION', PLACEHOLDER.location),
+  locationRegion: env('CLIENT_LOCATION_REGION', PLACEHOLDER.locationRegion),
+  sector: env('CLIENT_SECTOR', PLACEHOLDER.sector),
+  serviceShort: env('CLIENT_SERVICE_SHORT', PLACEHOLDER.serviceShort),
+  serviceDescription: env('CLIENT_SERVICE_DESCRIPTION', PLACEHOLDER.serviceDescription),
+  serviceCombo: env('CLIENT_SERVICE_COMBO', PLACEHOLDER.serviceCombo),
+  brandConcept: env('CLIENT_BRAND_CONCEPT', PLACEHOLDER.brandConcept),
+  serviceModel: env('CLIENT_SERVICE_MODEL', PLACEHOLDER.serviceModel),
 } as const
 
 /** Forma corta para uso en prompts: "MOA (Patri, salud y fitness, Martorell)" */

@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 export default function HMWRoute() {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-4xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
           <PdfDownloadButton fileName="moa-hmw.pdf" />
@@ -58,6 +58,6 @@ export default function HMWRoute() {
           </p>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

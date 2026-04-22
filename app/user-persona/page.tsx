@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 export default function UserPersonaRoute() {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="relative mx-auto max-w-3xl px-4 py-10">
         <div className="absolute right-2 top-10 z-20 sm:right-4">
           <PdfDownloadButton fileName="moa-user-persona.pdf" />
@@ -38,6 +38,6 @@ export default function UserPersonaRoute() {
           <UserPersonaPage />
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -1,8 +1,7 @@
-'use client'
-
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { DashboardLogoutBar } from '@/components/DashboardLogoutBar'
 import { PdfDashboardFullExport } from '@/components/PdfDashboardFullExport'
+import { CLIENT } from '@/lib/client-config'
 import { RESEARCH_PHASES, type DashboardColor } from '@/lib/research-journey-steps'
 
 const colorMap: Record<
@@ -72,16 +71,11 @@ const colorMap: Record<
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
-
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
-    router.refresh()
-  }
+  const dashboardTitle = `${CLIENT.name} | ${CLIENT.ownerFullName}`
+  const footerBrand = `${CLIENT.name} · ${CLIENT.location}`
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:py-14">
         {/* Header */}
         <div className="mb-10 text-center">
@@ -89,7 +83,7 @@ export default function DashboardPage() {
             ✦
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            MOA | Patricia Dorado Trainer
+            {dashboardTitle}
           </h1>
           <p className="mt-2 text-sm text-gray-500">Panel de análisis · Marca y estrategia</p>
           <PdfDashboardFullExport />
@@ -150,16 +144,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 pb-8">
-        <p className="text-xs text-gray-300">MOA · Martorell</p>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="text-xs text-gray-300 underline underline-offset-2 transition-colors hover:text-gray-500"
-        >
-          Cerrar sesión
-        </button>
-      </div>
-    </main>
+      <DashboardLogoutBar footerBrand={footerBrand} />
+    </div>
   )
 }
