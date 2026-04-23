@@ -65,11 +65,11 @@ function makeJourneySchemas(canal: CanalPromptFields, journeyBaseMode: boolean, 
       .describe(
         journeyBaseMode
           ? esClienteActual
-            ? `Qué debe hacer ${CLIENT.name} / ${CLIENT.ownerFirstName} para **acompañar a la clienta ya activa** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no actúes como si fuera captación salvo que el HMW lo indique.`
-            : `Qué debe hacer ${CLIENT.name} para acompañar al usuario en esta etapa respecto al POV (contenido, tono, timing, confianza…). El campo JSON se llama "rolWebFrenteAlPov" por compatibilidad: aquí resume el **rol de ${CLIENT.name}** en el recorrido (puede abarcar varios medios). Coherente con el HMW.`
+            ? `Oportunidad/rol de ${CLIENT.name} (y ${CLIENT.ownerFirstName}) para **acompañar a la clienta ya activa** en esta etapa respecto al POV: qué debe aportar, decir o facilitar (contenido, tono, timing, confianza…). Campo JSON "rolWebFrenteAlPov" por compatibilidad (no implica "web"). Coherente con el HMW; no lo enfoques como captación salvo que el HMW lo indique.`
+            : `Oportunidad/rol de ${CLIENT.name} en esta etapa respecto al POV: qué debe aportar, decir o facilitar (contenido, tono, timing, confianza…). El campo JSON se llama "rolWebFrenteAlPov" por compatibilidad (no implica "web"): aquí resume el **rol de ${CLIENT.name}** en el recorrido global (puede abarcar varios medios). Coherente con el HMW.`
           : esClienteActual
-            ? `Qué debe hacer ${CLIENT.name} en ${canal.descripcionCorta} para la **persona que ya entrena** en esta etapa respecto al POV. Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no centres el relato en "convencer por primera vez" salvo que el HMW lo pida.`
-            : `Qué debe hacer ${CLIENT.name} en ${canal.descripcionCorta} en esta etapa respecto al POV (contenido, tono, timing…). El nombre del campo en JSON es "rolWebFrenteAlPov" por compatibilidad; describe el rol del **canal ${canal.label}**. Debe ser coherente con las ideas HMW que esta etapa atiende.`
+            ? `Oportunidad/rol del canal **${canal.label}** para la **persona que ya entrena** en esta etapa respecto al POV: qué debe aportar ese medio (contenido, tono, timing, confianza…). Campo JSON "rolWebFrenteAlPov" por compatibilidad. Coherente con el HMW; no centres el relato en "convencer por primera vez" salvo que el HMW lo pida.`
+            : `Oportunidad/rol del canal **${canal.label}** en esta etapa respecto al POV: qué debe aportar ese medio (contenido, tono, timing, confianza…). El nombre del campo en JSON es "rolWebFrenteAlPov" por compatibilidad; describe el rol del **canal ${canal.label}**. Debe ser coherente con las ideas HMW que esta etapa atiende.`
       ),
   })
 
@@ -135,8 +135,8 @@ function buildSystemBase(canal: CanalPromptFields, journeyBaseMode: boolean, esC
       : `un **User Journey Map** para **${canal.label}** (${canal.focoExperiencia}), desde el problema o la necesidad hasta **${canal.cierreExperiencia}**. Ancla límites y realismo del servicio a la **encuesta CEO** del prompt.`
 
   const requisitoRol = journeyBaseMode
-    ? `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de **${CLIENT.name}** frente al POV en esa fase del recorrido; el nombre del campo es heredado del formato).`
-    : `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (rol de ${CLIENT.name} en ${canal.descripcionCorta} frente al POV en esa etapa).`
+    ? `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (oportunidad/rol de **${CLIENT.name}** frente al POV en esa fase del recorrido global; el nombre del campo es heredado del formato y no implica "web").`
+    : `- Cada etapa: título, descripción, **puntos de dolor** y **rolWebFrenteAlPov** (oportunidad/rol del canal **${canal.label}** frente al POV en esa etapa; el nombre del campo es heredado del formato).`
 
   return `Eres un UX strategist para ${CLIENT.name} (${CLIENT.ownerFirstName}, ${CLIENT.sector} en ${CLIENT.location}).
 

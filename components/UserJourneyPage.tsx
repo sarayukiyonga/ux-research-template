@@ -286,6 +286,7 @@ function JourneyMapSection({
   onEditEtapa,
   onDeleteEtapa,
   clavePovLabel,
+  oportunidadLabel,
 }: {
   journey: JourneyForPersona
   segmentLabel: string
@@ -295,6 +296,7 @@ function JourneyMapSection({
   onEditEtapa: (orden: number) => void
   onDeleteEtapa: (orden: number) => void
   clavePovLabel: string
+  oportunidadLabel: string
 }) {
   const ring = accent === 'teal' ? 'ring-teal-400 shadow-teal-100' : 'ring-orange-400 shadow-orange-100'
   const badge = accent === 'teal' ? 'bg-teal-600' : 'bg-orange-600'
@@ -418,7 +420,7 @@ function JourneyMapSection({
                   </div>
                 )}
                 <div className={`rounded-xl border px-3 py-2.5 text-xs leading-relaxed ${webBox}`}>
-                  <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80 mb-1">Oportunidad web</p>
+                  <p className="font-semibold text-[10px] uppercase tracking-wide opacity-80 mb-1">{oportunidadLabel}</p>
                   <p>{e.rolWebFrenteAlPov}</p>
                 </div>
               </div>
@@ -595,6 +597,7 @@ export function UserJourneyPage({ businessName }: { businessName: string }) {
   const rolBloqueTitulo = isBaseChannel
     ? `${businessName} frente al POV (recorrido global)`
     : `${canalPrompt.label} y el POV`
+  const oportunidadLabel = isBaseChannel ? 'Oportunidad' : canalActivoId === 'web' ? 'Oportunidad web' : 'Oportunidad'
   const clavePovCheckboxLabel = isBaseChannel
     ? `Momento clave: ${businessName} aporta más al POV en el recorrido`
     : `Esta etapa es el momento clave POV ↔ ${canalPrompt.label}`
@@ -1220,6 +1223,7 @@ export function UserJourneyPage({ businessName }: { businessName: string }) {
         onEditEtapa={(orden) => openEditEtapa(orden)}
         onDeleteEtapa={(orden) => void deleteEtapa(orden)}
         clavePovLabel={clavePovLabel}
+        oportunidadLabel={oportunidadLabel}
       />
 
       <UserJourneyIdeasSection persist={panelPersist} segmento={segmento} businessName={businessName} />
