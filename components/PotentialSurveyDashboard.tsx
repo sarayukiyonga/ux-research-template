@@ -401,6 +401,21 @@ export function PotentialSurveyDashboard() {
         <p className="text-xs text-gray-400 -mt-2">
           Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño.
         </p>
+        <div className="flex justify-end px-1">
+          <button
+            type="button"
+            onClick={() => void handleRefreshAll()}
+            disabled={refreshing || aiSheetHydrating}
+            className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+          >
+            <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
+            {refreshing
+              ? 'Generando y guardando…'
+              : aiBundleSavedAt
+                ? 'Regenerar y guardar en Sheets'
+                : 'Generar y guardar en Sheets'}
+          </button>
+        </div>
         <div className="flex flex-col items-center justify-center min-h-[200px] text-center space-y-3">
           <span className="text-4xl">{isFiltered ? '🔍' : '📭'}</span>
           <p className="text-gray-500 font-medium">
@@ -436,6 +451,21 @@ export function PotentialSurveyDashboard() {
         Estos filtros son la referencia para mapa de empatía, insights, POV, user persona y principios de diseño (misma
         selección al regenerar en esas páginas).
       </p>
+      <div className="flex justify-end px-1">
+        <button
+          type="button"
+          onClick={() => void handleRefreshAll()}
+          disabled={refreshing || aiSheetHydrating}
+          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+        >
+          <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
+          {refreshing
+            ? 'Generando y guardando…'
+            : aiBundleSavedAt
+              ? 'Regenerar y guardar en Sheets'
+              : 'Generar y guardar en Sheets'}
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border bg-white p-4 shadow-sm">
@@ -492,24 +522,9 @@ export function PotentialSurveyDashboard() {
         </div>
       )}
 
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between px-1">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-          Análisis agrupados por IA · Google Sheets
-        </p>
-        <button
-          type="button"
-          onClick={() => void handleRefreshAll()}
-          disabled={refreshing || aiSheetHydrating}
-          className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-        >
-          <span className={refreshing ? 'animate-spin inline-block' : ''}>↺</span>
-          {refreshing
-            ? 'Generando y guardando…'
-            : aiBundleSavedAt
-              ? 'Regenerar y guardar en Sheets'
-              : 'Generar y guardar en Sheets'}
-        </button>
-      </div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">
+        Análisis agrupados por IA · Google Sheets
+      </p>
 
       {openQuestions.map((q) => {
         const gs = groupStates[q.questionId] ?? { groups: [], loading: aiSheetHydrating, error: '' }
