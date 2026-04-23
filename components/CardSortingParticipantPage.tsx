@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CLIENT } from '@/lib/client-config'
 import { newCardSortingId, type CardSortingCard, type CardSortingCategory } from '@/lib/card-sorting-types'
+import { CardSortingAssignSheet } from '@/components/CardSortingAssignSheet'
 
 type Assignment = Record<string, string>
 
@@ -20,6 +21,10 @@ export function CardSortingParticipantPage() {
   const [participantId, setParticipantId] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isTouchMode, setIsTouchMode] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignCardId, setAssignCardId] = useState<string | null>(null)
+  const [openCatId, setOpenCatId] = useState<string | null>(null)
 
   const allCategories = useMemo(
     () => [...baseCategories, ...extraCategories],
@@ -57,6 +62,14 @@ export function CardSortingParticipantPage() {
     } catch {
       setParticipantId(crypto.randomUUID())
     }
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const update = () => setIsTouchMode(Boolean(mq.matches))
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
   }, [])
 
   const load = useCallback(async () => {
@@ -159,6 +172,7 @@ export function CardSortingParticipantPage() {
   )
 
   const onDragStart = (e: React.DragEvent, cardId: string) => {
+    if (isTouchMode) return
     setDraggingId(cardId)
     e.dataTransfer.setData('text/plain', cardId)
     e.dataTransfer.effectAllowed = 'move'
@@ -167,11 +181,13 @@ export function CardSortingParticipantPage() {
   const onDragEnd = () => setDraggingId(null)
 
   const onDragOverZone = (e: React.DragEvent) => {
+    if (isTouchMode) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
 
   const onDropPool = (e: React.DragEvent) => {
+    if (isTouchMode) return
     e.preventDefault()
     const id = e.dataTransfer.getData('text/plain') || draggingId
     if (!id) return
@@ -184,11 +200,33 @@ export function CardSortingParticipantPage() {
   }
 
   const onDropCategory = (e: React.DragEvent, catId: string) => {
+    if (isTouchMode) return
     e.preventDefault()
     const id = e.dataTransfer.getData('text/plain') || draggingId
     if (!id) return
     setAssignment((prev) => ({ ...prev, [id]: catId }))
     setDraggingId(null)
+  }
+
+  const openAssignForCard = (cardId: string) => {
+    setAssignCardId(cardId)
+    setAssignOpen(true)
+  }
+
+  const assignTo = (categoryId: string | null) => {
+    const id = assignCardId
+    if (!id) return
+    if (categoryId == null) {
+      setAssignment((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    } else {
+      setAssignment((prev) => ({ ...prev, [id]: categoryId }))
+    }
+    setAssignOpen(false)
+    setAssignCardId(null)
   }
 
   const addParticipantCategory = () => {
@@ -272,6 +310,25 @@ export function CardSortingParticipantPage() {
         )}
       </div>
 
+      {isTouchMode && (
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-gray-50/90 backdrop-blur border-b border-gray-200">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-gray-600">
+              Sin clasificar: <span className="font-semibold text-gray-900">{unassigned.length}</span>
+            </span>
+            <span className="text-gray-500">
+              {saveStatus === 'saving'
+                ? 'Guardando…'
+                : saveStatus === 'saved'
+                  ? 'Guardado'
+                  : saveStatus === 'error'
+                    ? 'Error al guardar'
+                    : ' '}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -301,10 +358,13 @@ export function CardSortingParticipantPage() {
           {unassigned.map((c) => (
             <div
               key={c.id}
-              draggable
+              draggable={!isTouchMode}
               onDragStart={(e) => onDragStart(e, c.id)}
               onDragEnd={onDragEnd}
-              className="cursor-grab active:cursor-grabbing rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950 shadow-sm"
+              onClick={() => (isTouchMode ? openAssignForCard(c.id) : undefined)}
+              className={`rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-950 shadow-sm ${
+                isTouchMode ? 'cursor-pointer active:scale-[0.99]' : 'cursor-grab active:cursor-grabbing'
+              }`}
             >
               {c.label}
             </div>
@@ -313,53 +373,119 @@ export function CardSortingParticipantPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-3">
+      {isTouchMode ? (
+        <div className="space-y-3">
           {allCategories.map((cat) => {
             const isExtra = extraCategories.some((x) => x.id === cat.id)
             const inCol = cardsInCategory(cat.id)
+            const isOpen = openCatId ? openCatId === cat.id : inCol.length > 0
             return (
-              <div
-                key={cat.id}
-                onDragOver={onDragOverZone}
-                onDrop={(e) => onDropCategory(e, cat.id)}
-                className={`flex w-[220px] shrink-0 flex-col rounded-2xl border-2 border-dashed p-3 ${
-                  draggingId ? 'border-teal-400 bg-teal-50/30' : 'border-gray-200 bg-white'
-                }`}
-              >
-                {isExtra ? (
-                  <input
-                    className="mb-2 w-full rounded-md border border-gray-200 px-2 py-1 text-sm font-semibold text-gray-900"
-                    value={cat.label}
-                    onChange={(e) => updateExtraCategoryLabel(cat.id, e.target.value)}
-                    aria-label="Nombre de la categoría añadida"
-                  />
-                ) : (
-                  <h3 className="mb-2 border-b border-gray-100 pb-2 text-sm font-semibold text-gray-900">{cat.label}</h3>
-                )}
-                <div className="flex min-h-[120px] flex-1 flex-col gap-2">
-                  {inCol.map((c) => (
-                    <div
-                      key={c.id}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, c.id)}
-                      onDragEnd={onDragEnd}
-                      className="cursor-grab active:cursor-grabbing rounded-lg border border-teal-200 bg-teal-50/90 px-2 py-2 text-xs font-medium text-teal-950 shadow-sm"
-                    >
-                      {c.label}
-                    </div>
-                  ))}
+              <section key={cat.id} className="rounded-2xl border border-gray-200 bg-white">
+                <div className="flex items-center justify-between gap-2 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    {isExtra ? (
+                      <input
+                        className="w-full rounded-md border border-gray-200 px-2 py-1 text-sm font-semibold text-gray-900"
+                        value={cat.label}
+                        onChange={(e) => updateExtraCategoryLabel(cat.id, e.target.value)}
+                        aria-label="Nombre de la categoría añadida"
+                      />
+                    ) : (
+                      <h3 className="text-sm font-semibold text-gray-900 truncate">{cat.label}</h3>
+                    )}
+                    <p className="text-[11px] text-gray-500">{inCol.length} tarjetas</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenCatId((cur) => (cur === cat.id ? null : cat.id))}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    aria-expanded={isOpen}
+                  >
+                    {isOpen ? 'Ocultar' : 'Ver'}
+                  </button>
                 </div>
-              </div>
+                {isOpen && (
+                  <div className="px-4 pb-4">
+                    <div className="flex flex-col gap-2">
+                      {inCol.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => openAssignForCard(c.id)}
+                          className="w-full rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-3 text-left text-sm font-medium text-teal-950 shadow-sm active:scale-[0.99]"
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                      {inCol.length === 0 && <p className="text-sm text-gray-400">Vacío.</p>}
+                    </div>
+                  </div>
+                )}
+              </section>
             )
           })}
         </div>
-      </div>
+      ) : (
+        <div className="overflow-x-auto pb-2">
+          <div className="flex min-w-max gap-3">
+            {allCategories.map((cat) => {
+              const isExtra = extraCategories.some((x) => x.id === cat.id)
+              const inCol = cardsInCategory(cat.id)
+              return (
+                <div
+                  key={cat.id}
+                  onDragOver={onDragOverZone}
+                  onDrop={(e) => onDropCategory(e, cat.id)}
+                  className={`flex w-[220px] shrink-0 flex-col rounded-2xl border-2 border-dashed p-3 ${
+                    draggingId ? 'border-teal-400 bg-teal-50/30' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  {isExtra ? (
+                    <input
+                      className="mb-2 w-full rounded-md border border-gray-200 px-2 py-1 text-sm font-semibold text-gray-900"
+                      value={cat.label}
+                      onChange={(e) => updateExtraCategoryLabel(cat.id, e.target.value)}
+                      aria-label="Nombre de la categoría añadida"
+                    />
+                  ) : (
+                    <h3 className="mb-2 border-b border-gray-100 pb-2 text-sm font-semibold text-gray-900">{cat.label}</h3>
+                  )}
+                  <div className="flex min-h-[120px] flex-1 flex-col gap-2">
+                    {inCol.map((c) => (
+                      <div
+                        key={c.id}
+                        draggable={!isTouchMode}
+                        onDragStart={(e) => onDragStart(e, c.id)}
+                        onDragEnd={onDragEnd}
+                        className="cursor-grab active:cursor-grabbing rounded-lg border border-teal-200 bg-teal-50/90 px-2 py-2 text-xs font-medium text-teal-950 shadow-sm"
+                      >
+                        {c.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-gray-500">
-        Arrastra cada tarjeta a la columna que encaje. Puedes volver a dejarla en «sin clasificar» soltándola en la zona
-        superior.
+        {isTouchMode
+          ? 'Toca una tarjeta para moverla a una categoría. Puedes devolverla a «sin clasificar» desde el menú.'
+          : 'Arrastra cada tarjeta a la columna que encaje. Puedes volver a dejarla en «sin clasificar» soltándola en la zona superior.'}
       </p>
+
+      <CardSortingAssignSheet
+        open={assignOpen && Boolean(assignCardId)}
+        cardLabel={cards.find((c) => c.id === assignCardId)?.label ?? ''}
+        categories={allCategories}
+        onAssign={assignTo}
+        onClose={() => {
+          setAssignOpen(false)
+          setAssignCardId(null)
+        }}
+      />
     </div>
   )
 }
