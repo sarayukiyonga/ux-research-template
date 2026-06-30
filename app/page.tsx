@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { DashboardLogoutBar } from '@/components/DashboardLogoutBar'
 import { PdfDashboardFullExport } from '@/components/PdfDashboardFullExport'
+import { MdDashboardFullExport } from '@/components/MdDashboardFullExport'
 import { CLIENT, CLIENT_PDF_BASENAME } from '@/lib/client-config'
 import { RESEARCH_PHASES, type DashboardColor } from '@/lib/research-journey-steps'
 
@@ -87,6 +88,7 @@ export default function DashboardPage() {
           </h1>
           <p className="mt-2 text-sm text-gray-500">Panel de análisis · Marca y estrategia</p>
           <PdfDashboardFullExport fileName={`${CLIENT_PDF_BASENAME}-panel-completo.pdf`} />
+          <MdDashboardFullExport />
         </div>
 
         {/* Fases agrupadas en cards */}
